@@ -1,0 +1,1 @@
+import Dashboard from '../../components/Dashboard';export default function Page(){return <Dashboard role="GAINT Admin" path="/admin/dashboard"/>}

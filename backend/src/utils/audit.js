@@ -1,0 +1,1 @@
+import {q} from '../config/db.js'; export async function audit(req,action,entityType,entityId,before=null,after=null){await q('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id,before_data,after_data,ip) VALUES($1,$2,$3,$4,$5,$6,$7)',[req.user?.id||null,action,entityType,String(entityId||''),before,after,req.ip]);}

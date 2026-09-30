@@ -1,0 +1,1 @@
+import test from 'node:test';import assert from 'node:assert/strict';test('status workflow constants',()=>{assert.ok(['VERIFIED','REUPLOAD_REQUESTED','REJECTED'].includes('VERIFIED'))});test('role model',()=>{assert.equal(new Set(['SUPER_ADMIN','ADMIN','MENTOR','INTERN']).size,4)});

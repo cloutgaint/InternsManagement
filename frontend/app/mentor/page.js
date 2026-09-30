@@ -1,0 +1,1 @@
+import Dashboard from '../../components/Dashboard';export default function Page(){return <Dashboard role="Mentor" path="/mentor/dashboard"/>}
