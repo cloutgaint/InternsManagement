@@ -64,3 +64,8 @@ ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS liveness_score numeric;
 ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS challenge_type text;
 ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS challenge_pass boolean;
 ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS capture_path text;
+
+-- Leave policy configuration
+ALTER TABLE batches ADD COLUMN IF NOT EXISTS leave_limit_days int DEFAULT 3;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS requested_days int DEFAULT 0;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS decided_at timestamptz;
