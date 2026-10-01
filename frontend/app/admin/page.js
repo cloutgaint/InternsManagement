@@ -21,6 +21,7 @@ export default function Page(){
  async function certificate(x){try{await api('/admin/certificates/'+x.intern_id+'/issue',{method:'POST',body:JSON.stringify({mode:'IN_APP'})});ok('Certificate issued for '+x.full_name+'.')}catch(e){fail(e)}}
  return <><Dashboard role="GAINT Admin" path="/admin/dashboard"/><main className="wrap">{err&&<p className="error">{err}</p>}{success&&<p className="success">{success}</p>}
  <section className="card"><h2>Quick Actions</h2><p className="muted">Open the required workspace. Detailed student and workflow information is kept out of the dashboard.</p><div className="admin-module-grid">
+  <Link className="module-card" href="/admin/colleges"><b>College Master</b><span>Add, edit, activate or deactivate registration colleges</span></Link>
   <Link className="module-card" href="/admin/verification"><b>Registration & Verification</b><span>Proof review and account approval</span></Link>
   <Link className="module-card" href="/admin/batches"><b>Batches & Domains</b><span>Batch allocation and final domain</span></Link>
   <Link className="module-card" href="/admin/work"><b>Internship Management</b><span>Groups, mentors, projects and weekly tasks</span></Link>
