@@ -69,3 +69,12 @@ ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS capture_path text;
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS leave_limit_days int DEFAULT 3;
 ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS requested_days int DEFAULT 0;
 ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS decided_at timestamptz;
+
+-- Scheduled weekly task release and typed submission evidence
+ALTER TABLE weekly_tasks ADD COLUMN IF NOT EXISTS release_weekday int;
+ALTER TABLE weekly_tasks ADD COLUMN IF NOT EXISTS release_time time;
+ALTER TABLE weekly_tasks ADD COLUMN IF NOT EXISTS release_timezone text DEFAULT 'Asia/Kolkata';
+ALTER TABLE weekly_tasks ADD COLUMN IF NOT EXISTS released_at timestamptz;
+ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS file_path text;
+ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS file_name text;
+ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS mime_type text;
