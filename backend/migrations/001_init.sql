@@ -53,3 +53,8 @@ CREATE TABLE IF NOT EXISTS certificates(id uuid PRIMARY KEY DEFAULT gen_random_u
 CREATE TABLE IF NOT EXISTS college_completion_reports(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),intern_id uuid REFERENCES intern_profiles(id),allotment_reference text,attendance_percent numeric,marks_summary jsonb,mentor_remarks text,status text DEFAULT 'DRAFT',file_path text,created_at timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS audit_logs(id bigserial PRIMARY KEY,actor_id uuid REFERENCES users(id),action text NOT NULL,entity_type text,entity_id text,before_data jsonb,after_data jsonb,ip text,created_at timestamptz DEFAULT now());
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type,entity_id); CREATE INDEX IF NOT EXISTS idx_attendance_day ON attendance_daily(day); CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
+
+-- Assessment scoring rubric extension
+ALTER TABLE assessment_sections ADD COLUMN IF NOT EXISTS rubric_id uuid REFERENCES rubrics(id);
+ALTER TABLE assessment_answers ADD COLUMN IF NOT EXISTS rubric_scores jsonb DEFAULT '[]';
+ALTER TABLE assessment_answers ADD COLUMN IF NOT EXISTS evaluated_at timestamptz;
