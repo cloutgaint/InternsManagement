@@ -78,3 +78,12 @@ ALTER TABLE weekly_tasks ADD COLUMN IF NOT EXISTS released_at timestamptz;
 ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS file_path text;
 ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS file_name text;
 ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS mime_type text;
+
+-- Task evaluation/rework lifecycle and fortnight review controls
+ALTER TABLE task_evaluations ADD COLUMN IF NOT EXISTS rubric_scores jsonb DEFAULT '[]';
+ALTER TABLE task_evaluations ADD COLUMN IF NOT EXISTS decision text DEFAULT 'APPROVED';
+ALTER TABLE task_evaluations ADD COLUMN IF NOT EXISTS rework_instructions text;
+ALTER TABLE task_evaluations ADD COLUMN IF NOT EXISTS rework_due_at timestamptz;
+ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS rework_due_at timestamptz;
+ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS mentor_feedback text;
+ALTER TABLE fortnight_reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
