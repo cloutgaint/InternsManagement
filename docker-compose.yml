@@ -5,21 +5,46 @@ services:
       POSTGRES_DB: gaint_interns
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports: ["5434:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gaint_interns"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
   backend:
     build: ./backend
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/gaint_interns
       JWT_SECRET: change-me-in-production
       PORT: 8000
       FRONTEND_URL: http://localhost:3000
-    ports: ["8000:8000"]
-    depends_on: [db]
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api
-    ports: ["3000:3000"]
-    depends_on: [backend]
-volumes: {pgdata: {}}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:
