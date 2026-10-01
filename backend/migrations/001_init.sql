@@ -58,3 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type,entity_id)
 ALTER TABLE assessment_sections ADD COLUMN IF NOT EXISTS rubric_id uuid REFERENCES rubrics(id);
 ALTER TABLE assessment_answers ADD COLUMN IF NOT EXISTS rubric_scores jsonb DEFAULT '[]';
 ALTER TABLE assessment_answers ADD COLUMN IF NOT EXISTS evaluated_at timestamptz;
+
+-- Camera attendance verification evidence
+ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS liveness_score numeric;
+ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS challenge_type text;
+ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS challenge_pass boolean;
+ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS capture_path text;
