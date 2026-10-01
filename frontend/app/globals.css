@@ -18,3 +18,5 @@
 
 .workflow-section{margin:18px 0}.workflow-section>h2{margin-top:0}.workflow-row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:14px 0;border-bottom:1px solid #e4ebe7}.workflow-row:last-child{border-bottom:0}.action-row{display:flex;gap:8px;flex-wrap:wrap}.workflow-row .btn,.action-row .btn{padding:8px 12px}.workflow-section>.action-row{margin:12px 0 16px}
 @media(max-width:700px){.workflow-row{align-items:flex-start;flex-direction:column}.workflow-row .action-row{width:100%}.workflow-row .btn{flex:1}}
+
+.admin-module-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}.module-card{display:flex;flex-direction:column;gap:6px;padding:18px;border:1px solid #dce5df;border-radius:12px;text-decoration:none;color:inherit;background:#fff}.module-card:hover{border-color:#8fb5a0;box-shadow:0 6px 18px rgba(0,0,0,.05)}.module-card span{color:#617168;font-size:14px}@media(max-width:650px){.admin-module-grid{grid-template-columns:1fr}}
