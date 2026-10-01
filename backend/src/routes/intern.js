@@ -1,23 +1,814 @@
-import {Router} from 'express';import crypto from 'crypto';import fs from 'fs';import path from 'path';import multer from 'multer';import {q} from '../config/db.js';import {auth,permit} from '../middleware/auth.js';const r=Router();const submissionDir=path.resolve('uploads/task-submissions');fs.mkdirSync(submissionDir,{recursive:true});const taskUpload=multer({dest:submissionDir,limits:{fileSize:25*1024*1024},fileFilter:(req,file,cb)=>{const ok=['application/pdf','application/zip','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.presentationml.presentation','video/mp4','text/plain'].includes(file.mimetype);cb(ok?null:new Error('Unsupported task submission file type'),ok)}});
-r.use(auth,permit('INTERN'));
-async function me(uid){return (await q('SELECT * FROM intern_profiles WHERE user_id=$1',[uid])).rows[0]}
-r.get('/dashboard',async(req,res)=>{const p=await me(req.user.id);const [alloc,offer,face,att,tasks,notes]=await Promise.all([q(`SELECT ba.*,b.name batch_name,b.start_date,b.end_date,d.name domain_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=$2 WHERE ba.intern_id=$1 ORDER BY b.start_date DESC LIMIT 1`,[p.id,p.final_domain_id]),q(`SELECT ol.* FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id WHERE ba.intern_id=$1 ORDER BY ol.created_at DESC LIMIT 1`,[p.id]),q('SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1',[p.id]),q('SELECT * FROM attendance_daily WHERE intern_id=$1 ORDER BY day DESC LIMIT 31',[p.id]),q(`SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') ORDER BY wt.due_at`,[p.id]),q('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20',[req.user.id])]);res.json({profile:p,allocation:alloc.rows[0],offerLetter:offer.rows[0],face:face.rows[0],attendance:att.rows,tasks:tasks.rows,notifications:notes.rows})});
-r.post('/proofs',async(req,res)=>{const p=await me(req.user.id);const b=req.body;if(new Date(b.issueDate)>new Date())return res.status(400).json({error:'Issue date cannot be future'});const hash=crypto.createHash('sha256').update(String(b.filePath||'')+String(b.referenceNumber)).digest('hex');try{const x=(await q("INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,file_path,file_hash,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'UPLOADED') RETURNING *",[p.id,b.proofType,b.issuingAuthority,b.referenceNumber,b.issueDate,b.approvedFrom,b.approvedTo,b.filePath,hash])).rows[0];await q("UPDATE users SET status='PROOF_UNDER_REVIEW' WHERE id=$1",[req.user.id]);res.status(201).json(x)}catch(e){if(e.code==='23505')return res.status(409).json({error:'Duplicate proof/reference detected'});throw e}});
-r.post('/face-enrollment',async(req,res)=>{const p=await me(req.user.id);const {consent,imageData}=req.body;if(!consent)return res.status(400).json({error:'Biometric consent required'});if(!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData||'')))return res.status(400).json({error:'A camera-captured JPEG/PNG image is required'});const latest=(await q("SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",[p.id])).rows[0];if(latest&&['PENDING_ADMIN_APPROVAL','APPROVED'].includes(latest.status))return res.status(409).json({error:latest.status==='APPROVED'?'Face enrollment is already approved':'Face enrollment is already awaiting Admin approval'});const [,type,b64]=String(imageData).match(/^data:image\/(jpeg|jpg|png);base64,(.+)$/)||[];const buf=Buffer.from(b64||'','base64');if(buf.length<10000||buf.length>5*1024*1024)return res.status(400).json({error:'Captured image quality/size is invalid. Retake the photo in good lighting.'});const dir=path.resolve('uploads/face-enrollment');fs.mkdirSync(dir,{recursive:true});const ext=type==='png'?'png':'jpg',file=path.join(dir,p.id+'-'+Date.now()+'.'+ext);fs.writeFileSync(file,buf);const hash=crypto.createHash('sha256').update(buf).digest('hex');const x=(await q(`INSERT INTO face_enrollments(intern_id,template_ref,raw_image_path,status,consent_at,quality_score) VALUES($1,$2,$3,'PENDING_ADMIN_APPROVAL',now(),$4) RETURNING *`,[p.id,'capture:'+hash,file,Number(req.body.qualityScore||1)])).rows[0];res.status(201).json(x)});
-r.get('/attendance/status',async(req,res)=>{const p=await me(req.user.id);const face=(await q("SELECT id,status,decision_reason,approved_at FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",[p.id])).rows[0];const today=(await q('SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date',[p.id])).rows[0];res.json({face,today})});
-r.post('/attendance/verify',async(req,res)=>{const p=await me(req.user.id);const f=(await q("SELECT * FROM face_enrollments WHERE intern_id=$1 AND status='APPROVED' ORDER BY approved_at DESC LIMIT 1",[p.id])).rows[0];if(!f)return res.status(409).json({error:'Approved face enrollment required'});const {eventType,imageData,challengeType,challengePass,livenessScore,matchScore}=req.body;if(!['CHECK_IN','CHECK_OUT'].includes(eventType))return res.status(400).json({error:'Invalid attendance event'});if(!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData||'')))return res.status(400).json({error:'Live camera capture is required'});if(!['TURN_LEFT','TURN_RIGHT','BLINK','SMILE'].includes(challengeType)||challengePass!==true||Number(livenessScore)<0.75)return res.status(422).json({error:'Liveness challenge failed. Please retry with a live camera capture.'});if(!Number.isFinite(Number(matchScore))||Number(matchScore)<0||Number(matchScore)>1)return res.status(400).json({error:'A biometric matcher score between 0 and 1 is required'});const buf=Buffer.from(String(imageData).split(',')[1]||'','base64');if(buf.length<10000||buf.length>5*1024*1024)return res.status(400).json({error:'Invalid camera capture'});const dir=path.resolve('uploads/attendance-evidence');fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,p.id+'-'+Date.now()+'.jpg');fs.writeFileSync(file,buf);if(Number(matchScore)<0.75){const ex=(await q("INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold','DETECTED',$2) RETURNING *",[p.id,{matchScore:Number(matchScore),livenessScore:Number(livenessScore),challengeType}])).rows[0];return res.status(422).json({error:'Face match failed. Attendance was not recorded.',exception:ex})}const alloc=(await q('SELECT * FROM batch_allocations WHERE intern_id=$1 AND current_date BETWEEN intern_start AND intern_end ORDER BY intern_start DESC LIMIT 1',[p.id])).rows[0];if(!alloc)return res.status(409).json({error:'No active internship allocation for today'});const today=(await q('SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date',[p.id])).rows[0];if(eventType==='CHECK_IN'&&today?.check_in)return res.status(409).json({error:'Already checked in today'});if(eventType==='CHECK_OUT'&&!today?.check_in)return res.status(409).json({error:'Check in before checking out'});if(eventType==='CHECK_OUT'&&today?.check_out)return res.status(409).json({error:'Already checked out today'});const ev=(await q(`INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,true,$8) RETURNING *`,[p.id,alloc.batch_id,eventType,Number(matchScore),file,Number(livenessScore),challengeType,file])).rows[0];let daily;if(eventType==='CHECK_IN')daily=(await q(`INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status) VALUES($1,$2,current_date,now(),'PRESENT') ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status='PRESENT' RETURNING *`,[p.id,alloc.batch_id])).rows[0];else daily=(await q(`UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int,status='PRESENT' WHERE intern_id=$1 AND day=current_date RETURNING *`,[p.id])).rows[0];res.status(201).json({event:ev,daily})});
-r.get('/work-log',async(req,res)=>{const p=await me(req.user.id);const [reports,leaves,holidays,allocation]=await Promise.all([q('SELECT * FROM daily_reports WHERE intern_id=$1 ORDER BY day DESC LIMIT 90',[p.id]),q('SELECT * FROM leave_requests WHERE intern_id=$1 ORDER BY created_at DESC',[p.id]),q(`SELECT h.* FROM holidays h JOIN batch_allocations ba ON ba.batch_id=h.batch_id WHERE ba.intern_id=$1 AND h.day BETWEEN ba.intern_start AND ba.intern_end ORDER BY h.day`,[p.id]),q('SELECT ba.*,b.leave_limit_days,b.name batch_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 ORDER BY ba.intern_start DESC LIMIT 1',[p.id])]);const used=leaves.rows.filter(x=>x.status==='APPROVED').reduce((n,x)=>n+Number(x.requested_days||0),0);res.json({reports:reports.rows,leaves:leaves.rows,holidays:holidays.rows,allocation:allocation.rows[0]||null,approvedLeaveDays:used,remainingLeaveDays:Math.max(0,Number(allocation.rows[0]?.leave_limit_days||0)-used)})});
-r.post('/daily-report',async(req,res)=>{const p=await me(req.user.id);const {plannedTasks,completedTasks,pendingBlockers,proofLinks=[],phase}=req.body;if(!['MORNING','EVENING'].includes(phase))return res.status(400).json({error:'Invalid report phase'});if(phase==='MORNING'&&!String(plannedTasks||'').trim())return res.status(400).json({error:'Planned tasks are required'});if(phase==='EVENING'&&!String(completedTasks||'').trim())return res.status(400).json({error:'Completed work is required'});if(!Array.isArray(proofLinks)||proofLinks.length>10)return res.status(400).json({error:'Proof links must be a list of up to 10 links'});const bad=proofLinks.find(x=>{try{const u=new URL(x);return !['http:','https:'].includes(u.protocol)}catch{return true}});if(bad)return res.status(400).json({error:'Every proof link must be a valid http/https URL'});const existing=(await q('SELECT * FROM daily_reports WHERE intern_id=$1 AND day=current_date',[p.id])).rows[0];if(phase==='MORNING'&&existing?.morning_at)return res.status(409).json({error:'Morning plan already submitted today'});if(phase==='EVENING'&&!existing?.morning_at)return res.status(409).json({error:'Submit the morning plan before the evening report'});if(phase==='EVENING'&&existing?.evening_at)return res.status(409).json({error:'Evening report already submitted today'});const x=(await q(`INSERT INTO daily_reports(intern_id,day,planned_tasks,completed_tasks,pending_blockers,proof_links,morning_at,evening_at) VALUES($1,current_date,$2,$3,$4,$5,CASE WHEN $6='MORNING' THEN now() END,CASE WHEN $6='EVENING' THEN now() END) ON CONFLICT(intern_id,day) DO UPDATE SET planned_tasks=COALESCE(EXCLUDED.planned_tasks,daily_reports.planned_tasks),completed_tasks=COALESCE(EXCLUDED.completed_tasks,daily_reports.completed_tasks),pending_blockers=COALESCE(EXCLUDED.pending_blockers,daily_reports.pending_blockers),proof_links=CASE WHEN EXCLUDED.proof_links='[]'::jsonb THEN daily_reports.proof_links ELSE EXCLUDED.proof_links END,morning_at=COALESCE(EXCLUDED.morning_at,daily_reports.morning_at),evening_at=COALESCE(EXCLUDED.evening_at,daily_reports.evening_at) RETURNING *`,[p.id,plannedTasks||null,completedTasks||null,pendingBlockers||null,proofLinks,phase])).rows[0];res.json(x)});
-r.post('/leave',async(req,res)=>{const p=await me(req.user.id);const {fromDate,toDate,reason}=req.body;if(!fromDate||!toDate||!String(reason||'').trim())return res.status(400).json({error:'From date, to date and reason are required'});if(new Date(toDate)<new Date(fromDate))return res.status(400).json({error:'Leave end date cannot be before start date'});const alloc=(await q('SELECT ba.*,b.leave_limit_days FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 AND $2::date BETWEEN ba.intern_start AND ba.intern_end AND $3::date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1',[p.id,fromDate,toDate])).rows[0];if(!alloc)return res.status(409).json({error:'Leave dates must be inside your internship allocation'});const days=(await q(`SELECT count(*)::int n FROM generate_series($1::date,$2::date,'1 day') d WHERE extract(isodow from d)<6 AND NOT EXISTS(SELECT 1 FROM holidays h WHERE h.batch_id=$3 AND h.day=d::date)`,[fromDate,toDate,alloc.batch_id])).rows[0].n;if(!days)return res.status(400).json({error:'The selected range contains no working days'});const overlap=(await q("SELECT 1 FROM leave_requests WHERE intern_id=$1 AND status IN('REQUESTED','APPROVED') AND daterange(from_date,to_date,'[]') && daterange($2::date,$3::date,'[]') LIMIT 1",[p.id,fromDate,toDate])).rows[0];if(overlap)return res.status(409).json({error:'An active leave request already overlaps these dates'});const used=Number((await q("SELECT COALESCE(sum(requested_days),0) n FROM leave_requests WHERE intern_id=$1 AND status='APPROVED'",[p.id])).rows[0].n);if(used+Number(days)>Number(alloc.leave_limit_days||0))return res.status(409).json({error:'Leave limit exceeded. Remaining allowance: '+Math.max(0,Number(alloc.leave_limit_days||0)-used)+' working day(s)'});const x=(await q("INSERT INTO leave_requests(intern_id,from_date,to_date,reason,status,requested_days) VALUES($1,$2,$3,$4,'REQUESTED',$5) RETURNING *",[p.id,fromDate,toDate,reason.trim(),days])).rows[0];res.status(201).json(x)});
-r.get('/tasks/:id/submissions',async(req,res)=>{const p=await me(req.user.id);res.json((await q('SELECT id,content,file_name,mime_type,status,submitted_at,is_late,attempt FROM task_submissions WHERE task_id=$1 AND intern_id=$2 ORDER BY attempt DESC',[req.params.id,p.id])).rows)});
-r.post('/tasks/:id/submit',taskUpload.single('file'),async(req,res)=>{const p=await me(req.user.id);const t=(await q("SELECT * FROM weekly_tasks WHERE id=$1 AND status='RELEASED'",[req.params.id])).rows[0];if(!t){if(req.file)fs.unlinkSync(req.file.path);return res.status(404).json({error:'Released task not found'})}const alloc=(await q('SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) LIMIT 1',[p.id,t.batch_id,t.group_id])).rowCount;if(!alloc){if(req.file)fs.unlinkSync(req.file.path);return res.status(403).json({error:'Task is not assigned to you'})}let content={};try{content=JSON.parse(req.body.content||'{}')}catch{if(req.file)fs.unlinkSync(req.file.path);return res.status(400).json({error:'Invalid submission content'})}const allowed=t.submission_types||[];if(content.repositoryUrl&&!allowed.includes('REPOSITORY'))return res.status(400).json({error:'Repository submission is not enabled for this task'});if(content.videoUrl&&!allowed.includes('VIDEO'))return res.status(400).json({error:'Video link submission is not enabled for this task'});if(content.link&&!allowed.includes('LINK'))return res.status(400).json({error:'Link submission is not enabled for this task'});if(content.text&&!allowed.includes('TEXT'))return res.status(400).json({error:'Text submission is not enabled for this task'});if(req.file&&!['FILE','DOCUMENT','PRESENTATION','VIDEO'].some(x=>allowed.includes(x))){fs.unlinkSync(req.file.path);return res.status(400).json({error:'File submission is not enabled for this task'})}for(const u of [content.repositoryUrl,content.videoUrl,content.link].filter(Boolean)){try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0}catch{return res.status(400).json({error:'Submission URLs must be valid http/https links'})}}if(!req.file&&!Object.values(content).some(Boolean))return res.status(400).json({error:'Provide at least one required submission item'});const previous=(await q('SELECT * FROM task_submissions WHERE task_id=$1 AND intern_id=$2 ORDER BY attempt DESC LIMIT 1',[t.id,p.id])).rows[0],prev=Number(previous?.attempt||0);if(previous&&previous.status!=='REWORK_REQUIRED'){if(req.file)fs.unlinkSync(req.file.path);return res.status(409).json({error:'A new attempt is allowed only after Mentor requests rework'})}if(previous&&!t.resubmission_allowed){if(req.file)fs.unlinkSync(req.file.path);return res.status(409).json({error:'Resubmission is not allowed'})}const deadline=previous?.rework_due_at||t.due_at;const x=(await q("INSERT INTO task_submissions(task_id,intern_id,content,file_path,file_name,mime_type,is_late,attempt,status) VALUES($1,$2,$3,$4,$5,$6,now()>$7,$8,$9) RETURNING *",[t.id,p.id,content,req.file?.path||null,req.file?.originalname||null,req.file?.mimetype||null,deadline,prev+1,prev?'RESUBMITTED':'SUBMITTED'])).rows[0];res.status(201).json(x)});
-r.get('/assessments',async(req,res)=>{const p=await me(req.user.id);res.json((await q(`SELECT a.*,aa.id attempt_id,aa.status attempt_status,aa.total_score,aa.started_at,aa.submitted_at FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id AND ba.intern_id=$1 LEFT JOIN LATERAL (SELECT * FROM assessment_attempts x WHERE x.assessment_id=a.id AND x.intern_id=$1 ORDER BY x.started_at DESC LIMIT 1) aa ON true WHERE a.status IN ('PUBLISHED','ACTIVE') ORDER BY a.window_start NULLS FIRST`,[p.id])).rows)});
-r.post('/assessments/:id/start',async(req,res)=>{const p=await me(req.user.id);const a=(await q(`SELECT a.* FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id WHERE a.id=$1 AND ba.intern_id=$2 AND a.status IN ('PUBLISHED','ACTIVE')`,[req.params.id,p.id])).rows[0];if(!a)return res.status(404).json({error:'Assessment not available'});const now=new Date();if(a.window_start&&now<new Date(a.window_start))return res.status(409).json({error:'Assessment has not opened yet'});if(a.window_end&&now>new Date(a.window_end))return res.status(409).json({error:'Assessment window has closed'});const count=Number((await q('SELECT count(*) n FROM assessment_attempts WHERE assessment_id=$1 AND intern_id=$2',[a.id,p.id])).rows[0].n);if(count>=Number(a.attempt_count||1))return res.status(409).json({error:'Maximum assessment attempts reached'});const at=(await q("INSERT INTO assessment_attempts(assessment_id,intern_id,status,started_at) VALUES($1,$2,'IN_PROGRESS',now()) RETURNING *",[a.id,p.id])).rows[0];res.status(201).json(at)});
-r.get('/assessments/:id/questions',async(req,res)=>{const p=await me(req.user.id);const at=(await q(`SELECT aa.*,a.duration_minutes,a.randomize,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.assessment_id=$1 AND aa.intern_id=$2 AND aa.status='IN_PROGRESS' ORDER BY aa.started_at DESC LIMIT 1`,[req.params.id,p.id])).rows[0];if(!at)return res.status(409).json({error:'Start the assessment first'});const deadline=new Date(new Date(at.started_at).getTime()+Number(at.duration_minutes||60)*60000);if(at.window_end&&new Date(at.window_end)<deadline)deadline.setTime(new Date(at.window_end).getTime());const sec=(await q('SELECT * FROM assessment_sections WHERE assessment_id=$1 ORDER BY id',[req.params.id])).rows;const ids=sec.flatMap(x=>x.question_ids||[]);let qs=ids.length?(await q('SELECT id,topic,difficulty,type,question,options,marks FROM question_bank WHERE id=ANY($1::uuid[])',[ids])).rows:[];const order=new Map(ids.map((id,i)=>[id,i]));qs.sort((a,b)=>(order.get(a.id)??0)-(order.get(b.id)??0));if(at.randomize)qs=qs.sort(()=>Math.random()-.5);res.json({attemptId:at.id,startedAt:at.started_at,deadline:deadline.toISOString(),sections:sec,questions:qs})});
-r.post('/assessments/:id/submit',async(req,res)=>{const p=await me(req.user.id);const {attemptId,answers=[]}=req.body;let at=(await q(`SELECT aa.*,a.duration_minutes,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.id=$1 AND aa.assessment_id=$2 AND aa.intern_id=$3 AND aa.status='IN_PROGRESS'`,[attemptId,req.params.id,p.id])).rows[0];if(!at)return res.status(409).json({error:'No active assessment attempt'});const validIds=(await q('SELECT question_ids FROM assessment_sections WHERE assessment_id=$1',[req.params.id])).rows.flatMap(x=>x.question_ids||[]);let total=0,manualPending=false;for(const ans of answers){if(!validIds.includes(ans.questionId))continue;const qu=(await q('SELECT correct_answer,marks,type FROM question_bank WHERE id=$1',[ans.questionId])).rows[0];let score=null,status='SUBMITTED';if(['MCQ','MULTI_SELECT','TRUE_FALSE'].includes(qu?.type)){const norm=v=>Array.isArray(v)?[...v].map(String).sort():String(v??'').trim().toLowerCase();score=JSON.stringify(norm(qu.correct_answer))===JSON.stringify(norm(ans.answer))?Number(qu.marks||0):0;total+=score}else manualPending=true;await q('INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,$5)',[at.id,ans.questionId,ans.answer??null,score,status])}at=(await q("UPDATE assessment_attempts SET total_score=$1,status=$2,submitted_at=now() WHERE id=$3 RETURNING *",[total,manualPending?'PENDING_EVALUATION':'EVALUATED',at.id])).rows[0];res.status(201).json({...at,manualEvaluationPending:manualPending})});
-r.get('/group',async(req,res)=>{const p=await me(req.user.id);const g=(await q(`SELECT g.*,pa.project_id,pr.title project_title,pr.description project_description FROM group_members gm JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=$1 AND gm.active ORDER BY g.created_at DESC LIMIT 1`,[p.id])).rows[0];if(!g)return res.json(null);g.members=(await q('SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active',[g.id])).rows;g.mentors=(await q('SELECT m.full_name,ma.is_lead FROM mentor_assignments ma JOIN mentors m ON m.id=ma.mentor_id WHERE ma.group_id=$1 AND ma.active',[g.id])).rows;res.json(g)});
-r.get('/reviews',async(req,res)=>{const p=await me(req.user.id);res.json((await q(`SELECT fr.* FROM fortnight_reviews fr JOIN group_members gm ON gm.group_id=fr.group_id WHERE gm.intern_id=$1 AND fr.status IN ('CONDUCTED','PUBLISHED') ORDER BY fr.review_date DESC`,[p.id])).rows)});
-r.get('/offer-letters',async(req,res)=>{const p=await me(req.user.id);res.json((await q(`SELECT ol.id,ol.student_name_snapshot,ol.college_snapshot,ol.batch_snapshot,ol.from_date,ol.to_date,ol.duration_text,ol.issue_at,ol.reference_number,ol.status,ol.reason,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ba.intern_id=$1 AND ol.status IN ('ISSUED','REVOKED') ORDER BY ol.created_at DESC`,[p.id])).rows)});
-r.get('/offer-letters/:id/view',async(req,res)=>{const p=await me(req.user.id);const x=(await q(`SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status IN ('ISSUED','REVOKED')`,[req.params.id,p.id])).rows[0];if(!x)return res.status(404).json({error:'Offer letter not found'});const values={student_name:x.student_name_snapshot,college:x.college_snapshot,batch:x.batch_snapshot,from_date:String(x.from_date).slice(0,10),to_date:String(x.to_date).slice(0,10),duration:x.duration_text,reference_number:x.reference_number};let body=x.template_body||'';for(const [k,v] of Object.entries(values))body=body.replaceAll('{{'+k+'}}',v||'');res.json({...x,rendered_body:body})});
-r.get('/completion',async(req,res)=>{const p=await me(req.user.id);const evaluation=(await q('SELECT * FROM final_evaluations WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1',[p.id])).rows[0];const approval=(await q('SELECT * FROM completion_approvals WHERE intern_id=$1 ORDER BY approved_at DESC LIMIT 1',[p.id])).rows[0];const certificate=(await q('SELECT * FROM certificates WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1',[p.id])).rows[0];res.json({evaluation,approval,certificate})});
+import { Router } from "express";
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
+import { q } from "../config/db.js";
+import { auth, permit } from "../middleware/auth.js";
+const r = Router();
+const submissionDir = path.resolve("uploads/task-submissions");
+fs.mkdirSync(submissionDir, { recursive: true });
+const taskUpload = multer({
+  dest: submissionDir,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = [
+      "application/pdf",
+      "application/zip",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "video/mp4",
+      "text/plain",
+    ].includes(file.mimetype);
+    cb(ok ? null : new Error("Unsupported task submission file type"), ok);
+  },
+});
+r.use(auth, permit("INTERN"));
+async function me(uid) {
+  return (await q("SELECT * FROM intern_profiles WHERE user_id=$1", [uid]))
+    .rows[0];
+}
+r.get("/dashboard", async (req, res) => {
+  const p = await me(req.user.id);
+  const [alloc, offer, face, att, tasks, notes] = await Promise.all([
+    q(
+      `SELECT ba.*,b.name batch_name,b.start_date,b.end_date,d.name domain_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=$2 WHERE ba.intern_id=$1 ORDER BY b.start_date DESC LIMIT 1`,
+      [p.id, p.final_domain_id],
+    ),
+    q(
+      `SELECT ol.* FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id WHERE ba.intern_id=$1 ORDER BY ol.created_at DESC LIMIT 1`,
+      [p.id],
+    ),
+    q(
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [p.id],
+    ),
+    q(
+      "SELECT * FROM attendance_daily WHERE intern_id=$1 ORDER BY day DESC LIMIT 31",
+      [p.id],
+    ),
+    q(
+      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') ORDER BY wt.due_at`,
+      [p.id],
+    ),
+    q(
+      "SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20",
+      [req.user.id],
+    ),
+  ]);
+  res.json({
+    profile: p,
+    allocation: alloc.rows[0],
+    offerLetter: offer.rows[0],
+    face: face.rows[0],
+    attendance: att.rows,
+    tasks: tasks.rows,
+    notifications: notes.rows,
+  });
+});
+r.post("/proofs", async (req, res) => {
+  const p = await me(req.user.id);
+  const b = req.body;
+  if (new Date(b.issueDate) > new Date())
+    return res.status(400).json({ error: "Issue date cannot be future" });
+  const hash = crypto
+    .createHash("sha256")
+    .update(String(b.filePath || "") + String(b.referenceNumber))
+    .digest("hex");
+  try {
+    const x = (
+      await q(
+        "INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,file_path,file_hash,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'UPLOADED') RETURNING *",
+        [
+          p.id,
+          b.proofType,
+          b.issuingAuthority,
+          b.referenceNumber,
+          b.issueDate,
+          b.approvedFrom,
+          b.approvedTo,
+          b.filePath,
+          hash,
+        ],
+      )
+    ).rows[0];
+    await q("UPDATE users SET status='PROOF_UNDER_REVIEW' WHERE id=$1", [
+      req.user.id,
+    ]);
+    res.status(201).json(x);
+  } catch (e) {
+    if (e.code === "23505")
+      return res
+        .status(409)
+        .json({ error: "Duplicate proof/reference detected" });
+    throw e;
+  }
+});
+r.post("/face-enrollment", async (req, res) => {
+  const p = await me(req.user.id);
+  const { consent, imageData } = req.body;
+  if (!consent)
+    return res.status(400).json({ error: "Biometric consent required" });
+  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
+    return res
+      .status(400)
+      .json({ error: "A camera-captured JPEG/PNG image is required" });
+  const latest = (
+    await q(
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  if (latest && ["PENDING_ADMIN_APPROVAL", "APPROVED"].includes(latest.status))
+    return res
+      .status(409)
+      .json({
+        error:
+          latest.status === "APPROVED"
+            ? "Face enrollment is already approved"
+            : "Face enrollment is already awaiting Admin approval",
+      });
+  const [, type, b64] =
+    String(imageData).match(/^data:image\/(jpeg|jpg|png);base64,(.+)$/) || [];
+  const buf = Buffer.from(b64 || "", "base64");
+  if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
+    return res
+      .status(400)
+      .json({
+        error:
+          "Captured image quality/size is invalid. Retake the photo in good lighting.",
+      });
+  const dir = path.resolve("uploads/face-enrollment");
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = type === "png" ? "png" : "jpg",
+    file = path.join(dir, p.id + "-" + Date.now() + "." + ext);
+  fs.writeFileSync(file, buf);
+  const hash = crypto.createHash("sha256").update(buf).digest("hex");
+  const x = (
+    await q(
+      `INSERT INTO face_enrollments(intern_id,template_ref,raw_image_path,status,consent_at,quality_score) VALUES($1,$2,$3,'PENDING_ADMIN_APPROVAL',now(),$4) RETURNING *`,
+      [p.id, "capture:" + hash, file, Number(req.body.qualityScore || 1)],
+    )
+  ).rows[0];
+  res.status(201).json(x);
+});
+r.get("/attendance/status", async (req, res) => {
+  const p = await me(req.user.id);
+  const face = (
+    await q(
+      "SELECT id,status,decision_reason,approved_at FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  const today = (
+    await q(
+      "SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date",
+      [p.id],
+    )
+  ).rows[0];
+  res.json({ face, today });
+});
+r.post("/attendance/verify", async (req, res) => {
+  const p = await me(req.user.id);
+  const f = (
+    await q(
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 AND status='APPROVED' ORDER BY approved_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  if (!f)
+    return res.status(409).json({ error: "Approved face enrollment required" });
+  const {
+    eventType,
+    imageData,
+    challengeType,
+    challengePass,
+    livenessScore,
+    matchScore,
+  } = req.body;
+  if (!["CHECK_IN", "CHECK_OUT"].includes(eventType))
+    return res.status(400).json({ error: "Invalid attendance event" });
+  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
+    return res.status(400).json({ error: "Live camera capture is required" });
+  if (
+    !["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"].includes(challengeType) ||
+    challengePass !== true ||
+    Number(livenessScore) < 0.75
+  )
+    return res
+      .status(422)
+      .json({
+        error:
+          "Liveness challenge failed. Please retry with a live camera capture.",
+      });
+  if (
+    !Number.isFinite(Number(matchScore)) ||
+    Number(matchScore) < 0 ||
+    Number(matchScore) > 1
+  )
+    return res
+      .status(400)
+      .json({ error: "A biometric matcher score between 0 and 1 is required" });
+  const buf = Buffer.from(String(imageData).split(",")[1] || "", "base64");
+  if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
+    return res.status(400).json({ error: "Invalid camera capture" });
+  const dir = path.resolve("uploads/attendance-evidence");
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, p.id + "-" + Date.now() + ".jpg");
+  fs.writeFileSync(file, buf);
+  if (Number(matchScore) < 0.75) {
+    const ex = (
+      await q(
+        "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold','DETECTED',$2) RETURNING *",
+        [
+          p.id,
+          {
+            matchScore: Number(matchScore),
+            livenessScore: Number(livenessScore),
+            challengeType,
+          },
+        ],
+      )
+    ).rows[0];
+    return res
+      .status(422)
+      .json({
+        error: "Face match failed. Attendance was not recorded.",
+        exception: ex,
+      });
+  }
+  const alloc = (
+    await q(
+      "SELECT * FROM batch_allocations WHERE intern_id=$1 AND current_date BETWEEN intern_start AND intern_end ORDER BY intern_start DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  if (!alloc)
+    return res
+      .status(409)
+      .json({ error: "No active internship allocation for today" });
+  const today = (
+    await q(
+      "SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date",
+      [p.id],
+    )
+  ).rows[0];
+  if (eventType === "CHECK_IN" && today?.check_in)
+    return res.status(409).json({ error: "Already checked in today" });
+  if (eventType === "CHECK_OUT" && !today?.check_in)
+    return res.status(409).json({ error: "Check in before checking out" });
+  if (eventType === "CHECK_OUT" && today?.check_out)
+    return res.status(409).json({ error: "Already checked out today" });
+  const ev = (
+    await q(
+      `INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,true,$8) RETURNING *`,
+      [
+        p.id,
+        alloc.batch_id,
+        eventType,
+        Number(matchScore),
+        file,
+        Number(livenessScore),
+        challengeType,
+        file,
+      ],
+    )
+  ).rows[0];
+  let daily;
+  if (eventType === "CHECK_IN")
+    daily = (
+      await q(
+        `INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status) VALUES($1,$2,current_date,now(),'PRESENT') ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status='PRESENT' RETURNING *`,
+        [p.id, alloc.batch_id],
+      )
+    ).rows[0];
+  else
+    daily = (
+      await q(
+        `UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int,status='PRESENT' WHERE intern_id=$1 AND day=current_date RETURNING *`,
+        [p.id],
+      )
+    ).rows[0];
+  res.status(201).json({ event: ev, daily });
+});
+r.get("/work-log", async (req, res) => {
+  const p = await me(req.user.id);
+  const [reports, leaves, holidays, allocation] = await Promise.all([
+    q(
+      "SELECT * FROM daily_reports WHERE intern_id=$1 ORDER BY day DESC LIMIT 90",
+      [p.id],
+    ),
+    q(
+      "SELECT * FROM leave_requests WHERE intern_id=$1 ORDER BY created_at DESC",
+      [p.id],
+    ),
+    q(
+      `SELECT h.* FROM holidays h JOIN batch_allocations ba ON ba.batch_id=h.batch_id WHERE ba.intern_id=$1 AND h.day BETWEEN ba.intern_start AND ba.intern_end ORDER BY h.day`,
+      [p.id],
+    ),
+    q(
+      "SELECT ba.*,b.leave_limit_days,b.name batch_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 ORDER BY ba.intern_start DESC LIMIT 1",
+      [p.id],
+    ),
+  ]);
+  const used = leaves.rows
+    .filter((x) => x.status === "APPROVED")
+    .reduce((n, x) => n + Number(x.requested_days || 0), 0);
+  res.json({
+    reports: reports.rows,
+    leaves: leaves.rows,
+    holidays: holidays.rows,
+    allocation: allocation.rows[0] || null,
+    approvedLeaveDays: used,
+    remainingLeaveDays: Math.max(
+      0,
+      Number(allocation.rows[0]?.leave_limit_days || 0) - used,
+    ),
+  });
+});
+r.post("/daily-report", async (req, res) => {
+  const p = await me(req.user.id);
+  const {
+    plannedTasks,
+    completedTasks,
+    pendingBlockers,
+    proofLinks = [],
+    phase,
+  } = req.body;
+  if (!["MORNING", "EVENING"].includes(phase))
+    return res.status(400).json({ error: "Invalid report phase" });
+  if (phase === "MORNING" && !String(plannedTasks || "").trim())
+    return res.status(400).json({ error: "Planned tasks are required" });
+  if (phase === "EVENING" && !String(completedTasks || "").trim())
+    return res.status(400).json({ error: "Completed work is required" });
+  if (!Array.isArray(proofLinks) || proofLinks.length > 10)
+    return res
+      .status(400)
+      .json({ error: "Proof links must be a list of up to 10 links" });
+  const bad = proofLinks.find((x) => {
+    try {
+      const u = new URL(x);
+      return !["http:", "https:"].includes(u.protocol);
+    } catch {
+      return true;
+    }
+  });
+  if (bad)
+    return res
+      .status(400)
+      .json({ error: "Every proof link must be a valid http/https URL" });
+  const existing = (
+    await q(
+      "SELECT * FROM daily_reports WHERE intern_id=$1 AND day=current_date",
+      [p.id],
+    )
+  ).rows[0];
+  if (phase === "MORNING" && existing?.morning_at)
+    return res
+      .status(409)
+      .json({ error: "Morning plan already submitted today" });
+  if (phase === "EVENING" && !existing?.morning_at)
+    return res
+      .status(409)
+      .json({ error: "Submit the morning plan before the evening report" });
+  if (phase === "EVENING" && existing?.evening_at)
+    return res
+      .status(409)
+      .json({ error: "Evening report already submitted today" });
+  const x = (
+    await q(
+      `INSERT INTO daily_reports(intern_id,day,planned_tasks,completed_tasks,pending_blockers,proof_links,morning_at,evening_at) VALUES($1,current_date,$2,$3,$4,$5,CASE WHEN $6='MORNING' THEN now() END,CASE WHEN $6='EVENING' THEN now() END) ON CONFLICT(intern_id,day) DO UPDATE SET planned_tasks=COALESCE(EXCLUDED.planned_tasks,daily_reports.planned_tasks),completed_tasks=COALESCE(EXCLUDED.completed_tasks,daily_reports.completed_tasks),pending_blockers=COALESCE(EXCLUDED.pending_blockers,daily_reports.pending_blockers),proof_links=CASE WHEN EXCLUDED.proof_links='[]'::jsonb THEN daily_reports.proof_links ELSE EXCLUDED.proof_links END,morning_at=COALESCE(EXCLUDED.morning_at,daily_reports.morning_at),evening_at=COALESCE(EXCLUDED.evening_at,daily_reports.evening_at) RETURNING *`,
+      [
+        p.id,
+        plannedTasks || null,
+        completedTasks || null,
+        pendingBlockers || null,
+        proofLinks,
+        phase,
+      ],
+    )
+  ).rows[0];
+  res.json(x);
+});
+r.post("/leave", async (req, res) => {
+  const p = await me(req.user.id);
+  const { fromDate, toDate, reason } = req.body;
+  if (!fromDate || !toDate || !String(reason || "").trim())
+    return res
+      .status(400)
+      .json({ error: "From date, to date and reason are required" });
+  if (new Date(toDate) < new Date(fromDate))
+    return res
+      .status(400)
+      .json({ error: "Leave end date cannot be before start date" });
+  const alloc = (
+    await q(
+      "SELECT ba.*,b.leave_limit_days FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 AND $2::date BETWEEN ba.intern_start AND ba.intern_end AND $3::date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1",
+      [p.id, fromDate, toDate],
+    )
+  ).rows[0];
+  if (!alloc)
+    return res
+      .status(409)
+      .json({ error: "Leave dates must be inside your internship allocation" });
+  const days = (
+    await q(
+      `SELECT count(*)::int n FROM generate_series($1::date,$2::date,'1 day') d WHERE extract(isodow from d)<6 AND NOT EXISTS(SELECT 1 FROM holidays h WHERE h.batch_id=$3 AND h.day=d::date)`,
+      [fromDate, toDate, alloc.batch_id],
+    )
+  ).rows[0].n;
+  if (!days)
+    return res
+      .status(400)
+      .json({ error: "The selected range contains no working days" });
+  const overlap = (
+    await q(
+      "SELECT 1 FROM leave_requests WHERE intern_id=$1 AND status IN('REQUESTED','APPROVED') AND daterange(from_date,to_date,'[]') && daterange($2::date,$3::date,'[]') LIMIT 1",
+      [p.id, fromDate, toDate],
+    )
+  ).rows[0];
+  if (overlap)
+    return res
+      .status(409)
+      .json({ error: "An active leave request already overlaps these dates" });
+  const used = Number(
+    (
+      await q(
+        "SELECT COALESCE(sum(requested_days),0) n FROM leave_requests WHERE intern_id=$1 AND status='APPROVED'",
+        [p.id],
+      )
+    ).rows[0].n,
+  );
+  if (used + Number(days) > Number(alloc.leave_limit_days || 0))
+    return res
+      .status(409)
+      .json({
+        error:
+          "Leave limit exceeded. Remaining allowance: " +
+          Math.max(0, Number(alloc.leave_limit_days || 0) - used) +
+          " working day(s)",
+      });
+  const x = (
+    await q(
+      "INSERT INTO leave_requests(intern_id,from_date,to_date,reason,status,requested_days) VALUES($1,$2,$3,$4,'REQUESTED',$5) RETURNING *",
+      [p.id, fromDate, toDate, reason.trim(), days],
+    )
+  ).rows[0];
+  res.status(201).json(x);
+});
+r.get("/tasks/:id/submissions", async (req, res) => {
+  const p = await me(req.user.id);
+  res.json(
+    (
+      await q(
+        "SELECT id,content,file_name,mime_type,status,submitted_at,is_late,attempt FROM task_submissions WHERE task_id=$1 AND intern_id=$2 ORDER BY attempt DESC",
+        [req.params.id, p.id],
+      )
+    ).rows,
+  );
+});
+r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
+  const p = await me(req.user.id);
+  const t = (
+    await q("SELECT * FROM weekly_tasks WHERE id=$1 AND status='RELEASED'", [
+      req.params.id,
+    ])
+  ).rows[0];
+  if (!t) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(404).json({ error: "Released task not found" });
+  }
+  const alloc = (
+    await q(
+      "SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) LIMIT 1",
+      [p.id, t.batch_id, t.group_id],
+    )
+  ).rowCount;
+  if (!alloc) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(403).json({ error: "Task is not assigned to you" });
+  }
+  let content = {};
+  try {
+    content = JSON.parse(req.body.content || "{}");
+  } catch {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: "Invalid submission content" });
+  }
+  const allowed = t.submission_types || [];
+  if (content.repositoryUrl && !allowed.includes("REPOSITORY"))
+    return res
+      .status(400)
+      .json({ error: "Repository submission is not enabled for this task" });
+  if (content.videoUrl && !allowed.includes("VIDEO"))
+    return res
+      .status(400)
+      .json({ error: "Video link submission is not enabled for this task" });
+  if (content.link && !allowed.includes("LINK"))
+    return res
+      .status(400)
+      .json({ error: "Link submission is not enabled for this task" });
+  if (content.text && !allowed.includes("TEXT"))
+    return res
+      .status(400)
+      .json({ error: "Text submission is not enabled for this task" });
+  if (
+    req.file &&
+    !["FILE", "DOCUMENT", "PRESENTATION", "VIDEO"].some((x) =>
+      allowed.includes(x),
+    )
+  ) {
+    fs.unlinkSync(req.file.path);
+    return res
+      .status(400)
+      .json({ error: "File submission is not enabled for this task" });
+  }
+  for (const u of [
+    content.repositoryUrl,
+    content.videoUrl,
+    content.link,
+  ].filter(Boolean)) {
+    try {
+      const x = new URL(u);
+      if (!["http:", "https:"].includes(x.protocol)) throw 0;
+    } catch {
+      return res
+        .status(400)
+        .json({ error: "Submission URLs must be valid http/https links" });
+    }
+  }
+  if (!req.file && !Object.values(content).some(Boolean))
+    return res
+      .status(400)
+      .json({ error: "Provide at least one required submission item" });
+  const previous = (
+      await q(
+        "SELECT * FROM task_submissions WHERE task_id=$1 AND intern_id=$2 ORDER BY attempt DESC LIMIT 1",
+        [t.id, p.id],
+      )
+    ).rows[0],
+    prev = Number(previous?.attempt || 0);
+  if (previous && previous.status !== "REWORK_REQUIRED") {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res
+      .status(409)
+      .json({
+        error: "A new attempt is allowed only after Mentor requests rework",
+      });
+  }
+  if (previous && !t.resubmission_allowed) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(409).json({ error: "Resubmission is not allowed" });
+  }
+  const deadline = previous?.rework_due_at || t.due_at;
+  const x = (
+    await q(
+      "INSERT INTO task_submissions(task_id,intern_id,content,file_path,file_name,mime_type,is_late,attempt,status) VALUES($1,$2,$3,$4,$5,$6,now()>$7,$8,$9) RETURNING *",
+      [
+        t.id,
+        p.id,
+        content,
+        req.file?.path || null,
+        req.file?.originalname || null,
+        req.file?.mimetype || null,
+        deadline,
+        prev + 1,
+        prev ? "RESUBMITTED" : "SUBMITTED",
+      ],
+    )
+  ).rows[0];
+  res.status(201).json(x);
+});
+r.get("/assessments", async (req, res) => {
+  const p = await me(req.user.id);
+  res.json(
+    (
+      await q(
+        `SELECT a.*,aa.id attempt_id,aa.status attempt_status,aa.total_score,aa.started_at,aa.submitted_at FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id AND ba.intern_id=$1 LEFT JOIN LATERAL (SELECT * FROM assessment_attempts x WHERE x.assessment_id=a.id AND x.intern_id=$1 ORDER BY x.started_at DESC LIMIT 1) aa ON true WHERE a.status IN ('PUBLISHED','ACTIVE') ORDER BY a.window_start NULLS FIRST`,
+        [p.id],
+      )
+    ).rows,
+  );
+});
+r.post("/assessments/:id/start", async (req, res) => {
+  const p = await me(req.user.id);
+  const a = (
+    await q(
+      `SELECT a.* FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id WHERE a.id=$1 AND ba.intern_id=$2 AND a.status IN ('PUBLISHED','ACTIVE')`,
+      [req.params.id, p.id],
+    )
+  ).rows[0];
+  if (!a) return res.status(404).json({ error: "Assessment not available" });
+  const now = new Date();
+  if (a.window_start && now < new Date(a.window_start))
+    return res.status(409).json({ error: "Assessment has not opened yet" });
+  if (a.window_end && now > new Date(a.window_end))
+    return res.status(409).json({ error: "Assessment window has closed" });
+  const count = Number(
+    (
+      await q(
+        "SELECT count(*) n FROM assessment_attempts WHERE assessment_id=$1 AND intern_id=$2",
+        [a.id, p.id],
+      )
+    ).rows[0].n,
+  );
+  if (count >= Number(a.attempt_count || 1))
+    return res
+      .status(409)
+      .json({ error: "Maximum assessment attempts reached" });
+  const at = (
+    await q(
+      "INSERT INTO assessment_attempts(assessment_id,intern_id,status,started_at) VALUES($1,$2,'IN_PROGRESS',now()) RETURNING *",
+      [a.id, p.id],
+    )
+  ).rows[0];
+  res.status(201).json(at);
+});
+r.get("/assessments/:id/questions", async (req, res) => {
+  const p = await me(req.user.id);
+  const at = (
+    await q(
+      `SELECT aa.*,a.duration_minutes,a.randomize,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.assessment_id=$1 AND aa.intern_id=$2 AND aa.status='IN_PROGRESS' ORDER BY aa.started_at DESC LIMIT 1`,
+      [req.params.id, p.id],
+    )
+  ).rows[0];
+  if (!at) return res.status(409).json({ error: "Start the assessment first" });
+  const deadline = new Date(
+    new Date(at.started_at).getTime() +
+      Number(at.duration_minutes || 60) * 60000,
+  );
+  if (at.window_end && new Date(at.window_end) < deadline)
+    deadline.setTime(new Date(at.window_end).getTime());
+  const sec = (
+    await q(
+      "SELECT * FROM assessment_sections WHERE assessment_id=$1 ORDER BY id",
+      [req.params.id],
+    )
+  ).rows;
+  const ids = sec.flatMap((x) => x.question_ids || []);
+  let qs = ids.length
+    ? (
+        await q(
+          "SELECT id,topic,difficulty,type,question,options,marks FROM question_bank WHERE id=ANY($1::uuid[])",
+          [ids],
+        )
+      ).rows
+    : [];
+  const order = new Map(ids.map((id, i) => [id, i]));
+  qs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  if (at.randomize) qs = qs.sort(() => Math.random() - 0.5);
+  res.json({
+    attemptId: at.id,
+    startedAt: at.started_at,
+    deadline: deadline.toISOString(),
+    sections: sec,
+    questions: qs,
+  });
+});
+r.post("/assessments/:id/submit", async (req, res) => {
+  const p = await me(req.user.id);
+  const { attemptId, answers = [] } = req.body;
+  let at = (
+    await q(
+      `SELECT aa.*,a.duration_minutes,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.id=$1 AND aa.assessment_id=$2 AND aa.intern_id=$3 AND aa.status='IN_PROGRESS'`,
+      [attemptId, req.params.id, p.id],
+    )
+  ).rows[0];
+  if (!at)
+    return res.status(409).json({ error: "No active assessment attempt" });
+  const validIds = (
+    await q(
+      "SELECT question_ids FROM assessment_sections WHERE assessment_id=$1",
+      [req.params.id],
+    )
+  ).rows.flatMap((x) => x.question_ids || []);
+  let total = 0,
+    manualPending = false;
+  for (const ans of answers) {
+    if (!validIds.includes(ans.questionId)) continue;
+    const qu = (
+      await q(
+        "SELECT correct_answer,marks,type FROM question_bank WHERE id=$1",
+        [ans.questionId],
+      )
+    ).rows[0];
+    let score = null,
+      status = "SUBMITTED";
+    if (["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(qu?.type)) {
+      const norm = (v) =>
+        Array.isArray(v)
+          ? [...v].map(String).sort()
+          : String(v ?? "")
+              .trim()
+              .toLowerCase();
+      score =
+        JSON.stringify(norm(qu.correct_answer)) ===
+        JSON.stringify(norm(ans.answer))
+          ? Number(qu.marks || 0)
+          : 0;
+      total += score;
+    } else manualPending = true;
+    await q(
+      "INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,$5)",
+      [at.id, ans.questionId, ans.answer ?? null, score, status],
+    );
+  }
+  at = (
+    await q(
+      "UPDATE assessment_attempts SET total_score=$1,status=$2,submitted_at=now() WHERE id=$3 RETURNING *",
+      [total, manualPending ? "PENDING_EVALUATION" : "EVALUATED", at.id],
+    )
+  ).rows[0];
+  res.status(201).json({ ...at, manualEvaluationPending: manualPending });
+});
+r.get("/group", async (req, res) => {
+  const p = await me(req.user.id);
+  const g = (
+    await q(
+      `SELECT g.*,pa.project_id,pr.title project_title,pr.description project_description FROM group_members gm JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=$1 AND gm.active ORDER BY g.created_at DESC LIMIT 1`,
+      [p.id],
+    )
+  ).rows[0];
+  if (!g) return res.json(null);
+  g.members = (
+    await q(
+      "SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active",
+      [g.id],
+    )
+  ).rows;
+  g.mentors = (
+    await q(
+      "SELECT m.full_name,ma.is_lead FROM mentor_assignments ma JOIN mentors m ON m.id=ma.mentor_id WHERE ma.group_id=$1 AND ma.active",
+      [g.id],
+    )
+  ).rows;
+  res.json(g);
+});
+r.get("/reviews", async (req, res) => {
+  const p = await me(req.user.id);
+  res.json(
+    (
+      await q(
+        `SELECT fr.* FROM fortnight_reviews fr JOIN group_members gm ON gm.group_id=fr.group_id WHERE gm.intern_id=$1 AND fr.status IN ('CONDUCTED','PUBLISHED') ORDER BY fr.review_date DESC`,
+        [p.id],
+      )
+    ).rows,
+  );
+});
+r.get("/offer-letters", async (req, res) => {
+  const p = await me(req.user.id);
+  res.json(
+    (
+      await q(
+        `SELECT ol.id,ol.student_name_snapshot,ol.college_snapshot,ol.batch_snapshot,ol.from_date,ol.to_date,ol.duration_text,ol.issue_at,ol.reference_number,ol.status,ol.reason,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ba.intern_id=$1 AND ol.status IN ('ISSUED','REVOKED') ORDER BY ol.created_at DESC`,
+        [p.id],
+      )
+    ).rows,
+  );
+});
+r.get("/offer-letters/:id/view", async (req, res) => {
+  const p = await me(req.user.id);
+  const x = (
+    await q(
+      `SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status IN ('ISSUED','REVOKED')`,
+      [req.params.id, p.id],
+    )
+  ).rows[0];
+  if (!x) return res.status(404).json({ error: "Offer letter not found" });
+  const values = {
+    student_name: x.student_name_snapshot,
+    college: x.college_snapshot,
+    batch: x.batch_snapshot,
+    from_date: String(x.from_date).slice(0, 10),
+    to_date: String(x.to_date).slice(0, 10),
+    duration: x.duration_text,
+    reference_number: x.reference_number,
+  };
+  let body = x.template_body || "";
+  for (const [k, v] of Object.entries(values))
+    body = body.replaceAll("{{" + k + "}}", v || "");
+  res.json({ ...x, rendered_body: body });
+});
+r.get("/completion", async (req, res) => {
+  const p = await me(req.user.id);
+  const evaluation = (
+    await q(
+      "SELECT * FROM final_evaluations WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  const approval = (
+    await q(
+      "SELECT * FROM completion_approvals WHERE intern_id=$1 ORDER BY approved_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  const certificate = (
+    await q(
+      "SELECT * FROM certificates WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  res.json({ evaluation, approval, certificate });
+});
 export default r;

@@ -1,10 +1,62 @@
-const endpoint=process.env.AI_API_URL||'https://api.openai.com/v1/chat/completions';
-function cleanJson(s){const t=String(s||'').trim().replace(/^\`\`\`(?:json)?/i,'').replace(/\`\`\`$/,'').trim();return JSON.parse(t)}
-export async function generateQuestions({domain,topic,difficulty,count,types,marks}){
- const key=process.env.OPENAI_API_KEY||process.env.AI_API_KEY;if(!key)throw Object.assign(new Error('AI provider is not configured. Set OPENAI_API_KEY (or AI_API_KEY) on the backend.'),{status:503});
- const model=process.env.AI_MODEL||'gpt-5-mini';const prompt=`Create ${count} internship assessment questions for domain "${domain||'General'}", topic "${topic||'General fundamentals'}", difficulty ${difficulty}. Allowed types: ${types.join(', ')}. Default marks: ${marks}. Return ONLY valid JSON as {"questions":[...]}. Each question must have: type, question, options (array or null), correctAnswer (string/array/null), markingGuide (string/null), marks (number), explanation (short string). For MCQ provide 4 plausible options and one exact correctAnswer. For MULTI_SELECT provide 4 options and correctAnswer as an array. TRUE_FALSE uses options ["True","False"]. SHORT_TEXT and DESCRIPTIVE must have correctAnswer null and a useful markingGuide. Avoid duplicates and ambiguous questions.`;
- const resp=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:'You generate technically accurate assessment questions. Output strict JSON only.'},{role:'user',content:prompt}],response_format:{type:'json_object'}})});
- if(!resp.ok){const t=await resp.text();throw Object.assign(new Error('AI generation failed: '+t.slice(0,300)),{status:502})}
- const data=await resp.json();const parsed=cleanJson(data.choices?.[0]?.message?.content);if(!Array.isArray(parsed.questions))throw Object.assign(new Error('AI provider returned an invalid question set'),{status:502});
- return parsed.questions.slice(0,count);
+const endpoint =
+  process.env.AI_API_URL || "https://api.openai.com/v1/chat/completions";
+function cleanJson(s) {
+  const t = String(s || "")
+    .trim()
+    .replace(/^\`\`\`(?:json)?/i, "")
+    .replace(/\`\`\`$/, "")
+    .trim();
+  return JSON.parse(t);
+}
+export async function generateQuestions({
+  domain,
+  topic,
+  difficulty,
+  count,
+  types,
+  marks,
+}) {
+  const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  if (!key)
+    throw Object.assign(
+      new Error(
+        "AI provider is not configured. Set OPENAI_API_KEY (or AI_API_KEY) on the backend.",
+      ),
+      { status: 503 },
+    );
+  const model = process.env.AI_MODEL || "gpt-5-mini";
+  const prompt = `Create ${count} internship assessment questions for domain "${domain || "General"}", topic "${topic || "General fundamentals"}", difficulty ${difficulty}. Allowed types: ${types.join(", ")}. Default marks: ${marks}. Return ONLY valid JSON as {"questions":[...]}. Each question must have: type, question, options (array or null), correctAnswer (string/array/null), markingGuide (string/null), marks (number), explanation (short string). For MCQ provide 4 plausible options and one exact correctAnswer. For MULTI_SELECT provide 4 options and correctAnswer as an array. TRUE_FALSE uses options ["True","False"]. SHORT_TEXT and DESCRIPTIVE must have correctAnswer null and a useful markingGuide. Avoid duplicates and ambiguous questions.`;
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + key,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You generate technically accurate assessment questions. Output strict JSON only.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw Object.assign(new Error("AI generation failed: " + t.slice(0, 300)), {
+      status: 502,
+    });
+  }
+  const data = await resp.json();
+  const parsed = cleanJson(data.choices?.[0]?.message?.content);
+  if (!Array.isArray(parsed.questions))
+    throw Object.assign(
+      new Error("AI provider returned an invalid question set"),
+      { status: 502 },
+    );
+  return parsed.questions.slice(0, count);
 }

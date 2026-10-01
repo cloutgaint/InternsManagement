@@ -1,12 +1,319 @@
-import {Router} from 'express';import {q} from '../config/db.js';import {auth,permit} from '../middleware/auth.js';const r=Router();r.use(auth,permit('MENTOR'));
-async function mid(uid){return (await q('SELECT id FROM mentors WHERE user_id=$1',[uid])).rows[0]?.id}
-r.get('/dashboard',async(req,res)=>{const m=await mid(req.user.id);const groups=(await q(`SELECT g.* FROM groups g JOIN mentor_assignments ma ON ma.group_id=g.id WHERE ma.mentor_id=$1 AND ma.active`,[m])).rows;const submissions=(await q(`SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,[m])).rows;res.json({groups,submissions})});
-r.get('/submissions/:id',async(req,res)=>{const m=await mid(req.user.id);const x=(await q(`SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,[m,req.params.id])).rows[0];if(!x)return res.status(403).json({error:'Submission is not assigned to you'});res.json(x)});
-r.post('/submissions/:id/evaluate',async(req,res)=>{const m=await mid(req.user.id);const row=(await q(`SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE ts.id=$2`,[m,req.params.id])).rows[0];if(!row)return res.status(403).json({error:'Submission is not assigned to you'});if(!['SUBMITTED','RESUBMITTED'].includes(row.status))return res.status(409).json({error:'Only submitted work can be evaluated'});const decision=req.body.decision;if(!['APPROVED','REWORK_REQUIRED'].includes(decision))return res.status(400).json({error:'Choose Approved or Rework Required'});let marks=Number(req.body.marks),rubricScores=[];if(row.rubric_id){const cs=(await q('SELECT * FROM rubric_criteria WHERE rubric_id=$1 ORDER BY name',[row.rubric_id])).rows;try{rubricScores=cs.map(c=>{const v=(req.body.rubricScores||[]).find(x=>x.criterionId===c.id),awarded=Number(v?.awarded);if(!Number.isFinite(awarded)||awarded<0||awarded>Number(c.max_marks))throw new Error();return {criterionId:c.id,name:c.name,awarded,maxMarks:Number(c.max_marks),weight:Number(c.weight)}})}catch{return res.status(400).json({error:'Complete every rubric criterion within its maximum marks'})}const weighted=rubricScores.reduce((n,c)=>n+(c.awarded/c.maxMarks)*c.weight,0);marks=Number(((weighted/100)*Number(row.task_marks||100)).toFixed(2))}if(!Number.isFinite(marks)||marks<0||marks>Number(row.task_marks||100))return res.status(400).json({error:'Marks are outside the task maximum'});if(!String(req.body.feedback||'').trim())return res.status(400).json({error:'Mentor feedback is required'});if(decision==='REWORK_REQUIRED'&&(!String(req.body.reworkInstructions||'').trim()||!req.body.reworkDueAt))return res.status(400).json({error:'Rework instructions and due date are required'});const x=(await q('INSERT INTO task_evaluations(submission_id,mentor_id,marks,feedback,status,rubric_scores,decision,rework_instructions,rework_due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[row.id,m,marks,req.body.feedback,decision,rubricScores,decision,req.body.reworkInstructions||null,req.body.reworkDueAt||null])).rows[0];await q('UPDATE task_submissions SET status=$1,rework_due_at=$2,mentor_feedback=$3 WHERE id=$4',[decision,decision==='REWORK_REQUIRED'?req.body.reworkDueAt:null,req.body.feedback,row.id]);res.status(201).json(x)});
-r.get('/assessment-evaluations',async(req,res)=>{const m=await mid(req.user.id);res.json((await q(`SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,[m])).rows));
-r.get('/assessment-evaluations/:attemptId',async(req,res)=>{const m=await mid(req.user.id);const at=(await q(`SELECT DISTINCT aa.*,a.name assessment_name,ip.full_name FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE aa.id=$2`,[m,req.params.attemptId])).rows[0];if(!at)return res.status(403).json({error:'This intern is not assigned to you'});at.answers=(await q(`SELECT ans.*,qb.question,qb.type,qb.marks,qb.marking_guide,qb.correct_answer,s.name section_name,s.pass_score,s.rubric_id,r.name rubric_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=$2 AND s.question_ids ? qb.id::text LEFT JOIN rubrics r ON r.id=s.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ans.attempt_id=$2 GROUP BY ans.id,qb.id,s.id,r.id ORDER BY ans.id`,[m,at.id])).rows;res.json(at)});
-r.post('/assessment-answers/:answerId/evaluate',async(req,res)=>{const m=await mid(req.user.id);const row=(await q(`SELECT ans.*,qb.marks,qb.type,s.rubric_id FROM assessment_answers ans JOIN assessment_attempts aa ON aa.id=ans.attempt_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=aa.assessment_id AND s.question_ids ? qb.id::text WHERE ans.id=$2`,[m,req.params.answerId])).rows[0];if(!row)return res.status(403).json({error:'Answer not found or intern is not assigned to you'});if(!['SHORT_TEXT','DESCRIPTIVE'].includes(row.type))return res.status(409).json({error:'Only written answers require mentor evaluation'});let score=Number(req.body.score),rubricScores=[];if(row.rubric_id){const criteria=(await q('SELECT * FROM rubric_criteria WHERE rubric_id=$1 ORDER BY name',[row.rubric_id])).rows;rubricScores=criteria.map(c=>{const input=(req.body.rubricScores||[]).find(x=>x.criterionId===c.id);const awarded=Number(input?.awarded??-1);if(awarded<0||awarded>Number(c.max_marks))throw Object.assign(new Error('Complete every rubric criterion within its maximum marks'),{status:400});return {criterionId:c.id,name:c.name,awarded,maxMarks:Number(c.max_marks),weight:Number(c.weight)}});const weighted=rubricScores.reduce((n,c)=>n+(c.awarded/c.maxMarks)*c.weight,0);score=Number(((weighted/100)*Number(row.marks)).toFixed(2))}if(!Number.isFinite(score)||score<0||score>Number(row.marks))return res.status(400).json({error:'Score must be between 0 and '+row.marks});const x=(await q("UPDATE assessment_answers SET manual_score=$1,rubric_scores=$2,feedback=$3,status='EVALUATED',evaluator_id=$4,evaluated_at=now() WHERE id=$5 RETURNING *",[score,rubricScores,req.body.feedback||null,req.user.id,row.id])).rows[0];await q(`UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE 'PENDING_EVALUATION' END WHERE aa.id=$1`,[x.attempt_id]);res.json(x)});
-r.post('/reviews',async(req,res)=>{const m=await mid(req.user.id);const b=req.body;const allowed=(await q('SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active',[m,b.groupId])).rowCount;if(!allowed)return res.status(403).json({error:'Not assigned'});const x=(await q('INSERT INTO fortnight_reviews(group_id,period_no,review_date,status,progress,domain_review,presentation_review,group_marks,feedback,action_items,next_expectations,published_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,CASE WHEN $4=\'PUBLISHED\' THEN now() END) RETURNING *',[b.groupId,b.periodNo,b.reviewDate,b.status||'CONDUCTED',b.progress,b.domainReview,b.presentationReview,b.groupMarks,b.feedback,b.actionItems,b.nextExpectations])).rows[0];for(const im of b.individualMarks||[])await q('INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)',[x.id,im.internId,im.marks,im.note||null]);res.status(201).json(x)});
-r.get('/groups/:id/members',async(req,res)=>{const m=await mid(req.user.id);const ok=(await q('SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active',[m,req.params.id])).rowCount;if(!ok)return res.status(403).json({error:'Not assigned'});res.json((await q('SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active',[req.params.id])).rows)});
-r.post('/final-evaluations',async(req,res)=>{const m=await mid(req.user.id);const b=req.body;const ok=(await q('SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active',[m,b.groupId])).rowCount;if(!ok)return res.status(403).json({error:'Not assigned'});const x=(await q('INSERT INTO final_evaluations(intern_id,group_id,group_marks,individual_marks,mentor_feedback,recommendation) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[b.internId,b.groupId,b.groupMarks,b.individualMarks,b.mentorFeedback,b.recommendation])).rows[0];res.status(201).json(x)});
+import { Router } from "express";
+import { q } from "../config/db.js";
+import { auth, permit } from "../middleware/auth.js";
+const r = Router();
+r.use(auth, permit("MENTOR"));
+async function mid(uid) {
+  return (await q("SELECT id FROM mentors WHERE user_id=$1", [uid])).rows[0]
+    ?.id;
+}
+r.get("/dashboard", async (req, res) => {
+  const m = await mid(req.user.id);
+  const groups = (
+    await q(
+      `SELECT g.* FROM groups g JOIN mentor_assignments ma ON ma.group_id=g.id WHERE ma.mentor_id=$1 AND ma.active`,
+      [m],
+    )
+  ).rows;
+  const submissions = (
+    await q(
+      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
+      [m],
+    )
+  ).rows;
+  res.json({ groups, submissions });
+});
+r.get("/submissions/:id", async (req, res) => {
+  const m = await mid(req.user.id);
+  const x = (
+    await q(
+      `SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,
+      [m, req.params.id],
+    )
+  ).rows[0];
+  if (!x)
+    return res.status(403).json({ error: "Submission is not assigned to you" });
+  res.json(x);
+});
+r.post("/submissions/:id/evaluate", async (req, res) => {
+  const m = await mid(req.user.id);
+  const row = (
+    await q(
+      `SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE ts.id=$2`,
+      [m, req.params.id],
+    )
+  ).rows[0];
+  if (!row)
+    return res.status(403).json({ error: "Submission is not assigned to you" });
+  if (!["SUBMITTED", "RESUBMITTED"].includes(row.status))
+    return res
+      .status(409)
+      .json({ error: "Only submitted work can be evaluated" });
+  const decision = req.body.decision;
+  if (!["APPROVED", "REWORK_REQUIRED"].includes(decision))
+    return res
+      .status(400)
+      .json({ error: "Choose Approved or Rework Required" });
+  let marks = Number(req.body.marks),
+    rubricScores = [];
+  if (row.rubric_id) {
+    const cs = (
+      await q(
+        "SELECT * FROM rubric_criteria WHERE rubric_id=$1 ORDER BY name",
+        [row.rubric_id],
+      )
+    ).rows;
+    try {
+      rubricScores = cs.map((c) => {
+        const v = (req.body.rubricScores || []).find(
+            (x) => x.criterionId === c.id,
+          ),
+          awarded = Number(v?.awarded);
+        if (
+          !Number.isFinite(awarded) ||
+          awarded < 0 ||
+          awarded > Number(c.max_marks)
+        )
+          throw new Error();
+        return {
+          criterionId: c.id,
+          name: c.name,
+          awarded,
+          maxMarks: Number(c.max_marks),
+          weight: Number(c.weight),
+        };
+      });
+    } catch {
+      return res
+        .status(400)
+        .json({
+          error: "Complete every rubric criterion within its maximum marks",
+        });
+    }
+    const weighted = rubricScores.reduce(
+      (n, c) => n + (c.awarded / c.maxMarks) * c.weight,
+      0,
+    );
+    marks = Number(
+      ((weighted / 100) * Number(row.task_marks || 100)).toFixed(2),
+    );
+  }
+  if (
+    !Number.isFinite(marks) ||
+    marks < 0 ||
+    marks > Number(row.task_marks || 100)
+  )
+    return res
+      .status(400)
+      .json({ error: "Marks are outside the task maximum" });
+  if (!String(req.body.feedback || "").trim())
+    return res.status(400).json({ error: "Mentor feedback is required" });
+  if (
+    decision === "REWORK_REQUIRED" &&
+    (!String(req.body.reworkInstructions || "").trim() || !req.body.reworkDueAt)
+  )
+    return res
+      .status(400)
+      .json({ error: "Rework instructions and due date are required" });
+  const x = (
+    await q(
+      "INSERT INTO task_evaluations(submission_id,mentor_id,marks,feedback,status,rubric_scores,decision,rework_instructions,rework_due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
+      [
+        row.id,
+        m,
+        marks,
+        req.body.feedback,
+        decision,
+        rubricScores,
+        decision,
+        req.body.reworkInstructions || null,
+        req.body.reworkDueAt || null,
+      ],
+    )
+  ).rows[0];
+  await q(
+    "UPDATE task_submissions SET status=$1,rework_due_at=$2,mentor_feedback=$3 WHERE id=$4",
+    [
+      decision,
+      decision === "REWORK_REQUIRED" ? req.body.reworkDueAt : null,
+      req.body.feedback,
+      row.id,
+    ],
+  );
+  res.status(201).json(x);
+});
+r.get("/assessment-evaluations", async (req, res) => {
+  const m = await mid(req.user.id);
+  res.json(
+    (
+      await q(
+        `SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,
+        [m],
+      )
+    ).rows,
+  );
+});
+r.get("/assessment-evaluations/:attemptId", async (req, res) => {
+  const m = await mid(req.user.id);
+  const at = (
+    await q(
+      `SELECT DISTINCT aa.*,a.name assessment_name,ip.full_name FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE aa.id=$2`,
+      [m, req.params.attemptId],
+    )
+  ).rows[0];
+  if (!at)
+    return res
+      .status(403)
+      .json({ error: "This intern is not assigned to you" });
+  at.answers = (
+    await q(
+      `SELECT ans.*,qb.question,qb.type,qb.marks,qb.marking_guide,qb.correct_answer,s.name section_name,s.pass_score,s.rubric_id,r.name rubric_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=$2 AND s.question_ids ? qb.id::text LEFT JOIN rubrics r ON r.id=s.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ans.attempt_id=$2 GROUP BY ans.id,qb.id,s.id,r.id ORDER BY ans.id`,
+      [m, at.id],
+    )
+  ).rows;
+  res.json(at);
+});
+r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
+  const m = await mid(req.user.id);
+  const row = (
+    await q(
+      `SELECT ans.*,qb.marks,qb.type,s.rubric_id FROM assessment_answers ans JOIN assessment_attempts aa ON aa.id=ans.attempt_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=aa.assessment_id AND s.question_ids ? qb.id::text WHERE ans.id=$2`,
+      [m, req.params.answerId],
+    )
+  ).rows[0];
+  if (!row)
+    return res
+      .status(403)
+      .json({ error: "Answer not found or intern is not assigned to you" });
+  if (!["SHORT_TEXT", "DESCRIPTIVE"].includes(row.type))
+    return res
+      .status(409)
+      .json({ error: "Only written answers require mentor evaluation" });
+  let score = Number(req.body.score),
+    rubricScores = [];
+  if (row.rubric_id) {
+    const criteria = (
+      await q(
+        "SELECT * FROM rubric_criteria WHERE rubric_id=$1 ORDER BY name",
+        [row.rubric_id],
+      )
+    ).rows;
+    rubricScores = criteria.map((c) => {
+      const input = (req.body.rubricScores || []).find(
+        (x) => x.criterionId === c.id,
+      );
+      const awarded = Number(input?.awarded ?? -1);
+      if (awarded < 0 || awarded > Number(c.max_marks))
+        throw Object.assign(
+          new Error("Complete every rubric criterion within its maximum marks"),
+          { status: 400 },
+        );
+      return {
+        criterionId: c.id,
+        name: c.name,
+        awarded,
+        maxMarks: Number(c.max_marks),
+        weight: Number(c.weight),
+      };
+    });
+    const weighted = rubricScores.reduce(
+      (n, c) => n + (c.awarded / c.maxMarks) * c.weight,
+      0,
+    );
+    score = Number(((weighted / 100) * Number(row.marks)).toFixed(2));
+  }
+  if (!Number.isFinite(score) || score < 0 || score > Number(row.marks))
+    return res
+      .status(400)
+      .json({ error: "Score must be between 0 and " + row.marks });
+  const x = (
+    await q(
+      "UPDATE assessment_answers SET manual_score=$1,rubric_scores=$2,feedback=$3,status='EVALUATED',evaluator_id=$4,evaluated_at=now() WHERE id=$5 RETURNING *",
+      [score, rubricScores, req.body.feedback || null, req.user.id, row.id],
+    )
+  ).rows[0];
+  await q(
+    `UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE 'PENDING_EVALUATION' END WHERE aa.id=$1`,
+    [x.attempt_id],
+  );
+  res.json(x);
+});
+r.post("/reviews", async (req, res) => {
+  const m = await mid(req.user.id);
+  const b = req.body;
+  const allowed = (
+    await q(
+      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      [m, b.groupId],
+    )
+  ).rowCount;
+  if (!allowed) return res.status(403).json({ error: "Not assigned" });
+  const x = (
+    await q(
+      "INSERT INTO fortnight_reviews(group_id,period_no,review_date,status,progress,domain_review,presentation_review,group_marks,feedback,action_items,next_expectations,published_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,CASE WHEN $4='PUBLISHED' THEN now() END) RETURNING *",
+      [
+        b.groupId,
+        b.periodNo,
+        b.reviewDate,
+        b.status || "CONDUCTED",
+        b.progress,
+        b.domainReview,
+        b.presentationReview,
+        b.groupMarks,
+        b.feedback,
+        b.actionItems,
+        b.nextExpectations,
+      ],
+    )
+  ).rows[0];
+  for (const im of b.individualMarks || [])
+    await q(
+      "INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)",
+      [x.id, im.internId, im.marks, im.note || null],
+    );
+  res.status(201).json(x);
+});
+r.get("/groups/:id/members", async (req, res) => {
+  const m = await mid(req.user.id);
+  const ok = (
+    await q(
+      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      [m, req.params.id],
+    )
+  ).rowCount;
+  if (!ok) return res.status(403).json({ error: "Not assigned" });
+  res.json(
+    (
+      await q(
+        "SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active",
+        [req.params.id],
+      )
+    ).rows,
+  );
+});
+r.post("/final-evaluations", async (req, res) => {
+  const m = await mid(req.user.id);
+  const b = req.body;
+  const ok = (
+    await q(
+      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      [m, b.groupId],
+    )
+  ).rowCount;
+  if (!ok) return res.status(403).json({ error: "Not assigned" });
+  const x = (
+    await q(
+      "INSERT INTO final_evaluations(intern_id,group_id,group_marks,individual_marks,mentor_feedback,recommendation) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
+      [
+        b.internId,
+        b.groupId,
+        b.groupMarks,
+        b.individualMarks,
+        b.mentorFeedback,
+        b.recommendation,
+      ],
+    )
+  ).rows[0];
+  res.status(201).json(x);
+});
 export default r;

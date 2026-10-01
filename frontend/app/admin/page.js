@@ -1,29 +1,437 @@
 "use client";
-import {useEffect,useState} from 'react';import Link from 'next/link';import Dashboard from '../../components/Dashboard';import {api,apiBlob} from '../../lib/api';
-export default function Page(){
- const [proofs,setProofs]=useState([]),[interns,setInterns]=useState([]),[domains,setDomains]=useState([]),[batches,setBatches]=useState([]),[groups,setGroups]=useState([]),[mentors,setMentors]=useState([]),[projects,setProjects]=useState([]),[completions,setCompletions]=useState([]),[err,setErr]=useState(''),[success,setSuccess]=useState(''),[busy,setBusy]=useState('');
- async function load(){try{setErr('');const [p,i,d,b,g,m,pr,c]=await Promise.all([api('/admin/proofs'),api('/admin/interns'),api('/admin/domains'),api('/admin/batches'),api('/admin/groups'),api('/admin/mentors'),api('/admin/projects'),api('/admin/completions')]);setProofs(p);setInterns(i);setDomains(d);setBatches(b);setGroups(g);setMentors(m);setProjects(pr);setCompletions(c)}catch(e){setErr(e.message)}}useEffect(()=>{load()},[]);
- const ok=t=>{setSuccess(t);setErr('');load()},fail=e=>setErr(e.message);
- async function view(id){try{const b=await apiBlob('/admin/proofs/'+id+'/file');const url=URL.createObjectURL(b);window.open(url,'_blank','noopener,noreferrer');setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){fail(e)}}
- async function decide(id,outcome){let reason='';if(outcome!=='VERIFIED'){reason=prompt(outcome==='REUPLOAD_REQUESTED'?'What must the student correct?':'Rejection reason:')||'';if(!reason)return}try{setBusy(id);await api('/admin/proofs/'+id+'/verify',{method:'POST',body:JSON.stringify({outcome,reason})});ok(outcome==='VERIFIED'?'Proof verified successfully. Account approval is now available.':outcome==='REUPLOAD_REQUESTED'?'Re-upload request saved.':'Proof rejected.')}catch(e){fail(e)}finally{setBusy('')}}
- async function approve(p){try{setBusy(p.id);await api('/admin/interns/'+p.user_id+'/approve',{method:'POST',body:'{}'});ok(p.full_name+' account activated successfully.')}catch(e){fail(e)}finally{setBusy('')}}
- async function addDomain(){const name=prompt('Domain name:');if(!name)return;const code=prompt('Domain code:');if(!code)return;try{await api('/admin/domains',{method:'POST',body:JSON.stringify({name,code})});ok('Domain created.')}catch(e){fail(e)}}
- async function addBatch(){if(!interns.length)return fail(new Error('Register/approve an intern first.'));const name=prompt('Batch name (example: KLU Batch-1):');if(!name)return;const code=prompt('Unique batch code:');const startDate=prompt('Start date YYYY-MM-DD:');const endDate=prompt('End date YYYY-MM-DD:');const collegeId=interns.find(x=>x.college_id)?.college_id;if(!collegeId)return fail(new Error('No college available for batch.'));try{await api('/admin/batches',{method:'POST',body:JSON.stringify({collegeId,name,code,startDate,endDate})});ok('Batch created.')}catch(e){fail(e)}}
- async function allocate(i){if(!batches.length)return fail(new Error('Create a batch first.'));const n=Number(prompt(batches.map((b,x)=>(x+1)+'. '+b.name).join('\n')+'\nChoose batch number:'))-1;if(!batches[n])return;try{await api('/admin/allocate',{method:'POST',body:JSON.stringify({batchId:batches[n].id,internId:i.id})});ok(i.full_name+' allocated to '+batches[n].name+'.')}catch(e){fail(e)}}
- async function confirmDomain(i){if(!domains.length)return fail(new Error('Create domains first.'));const n=Number(prompt(domains.map((d,x)=>(x+1)+'. '+d.name).join('\n')+'\nChoose final domain:'))-1;if(!domains[n]||!i.batch_id)return fail(new Error('Batch allocation is required first.'));try{await api('/admin/domain-confirm',{method:'POST',body:JSON.stringify({internId:i.id,batchId:i.batch_id,domainId:domains[n].id,preferences:i.preferred_domains||[],recommendations:[]})});ok('Final domain confirmed for '+i.full_name+'.')}catch(e){fail(e)}}
- async function createGroup(){if(!batches.length)return fail(new Error('Create a batch first.'));const name=prompt('Group name:');if(!name)return;const bn=Number(prompt(batches.map((b,x)=>(x+1)+'. '+b.name).join('\n')+'\nBatch:'))-1;const eligible=interns.filter(i=>i.batch_id===batches[bn]?.id);const raw=prompt('Member numbers, comma separated:\n'+eligible.map((i,x)=>(x+1)+'. '+i.full_name).join('\n'));if(!raw)return;const internIds=raw.split(',').map(x=>eligible[Number(x.trim())-1]?.id).filter(Boolean);try{await api('/admin/groups',{method:'POST',body:JSON.stringify({batchId:batches[bn].id,name,internIds})});ok('Group draft created.')}catch(e){fail(e)}}
- async function approveGroup(g){try{await api('/admin/groups/'+g.id+'/approve',{method:'POST',body:'{}'});ok(g.name+' approved.')}catch(e){fail(e)}}
- async function assignMentor(g){if(!mentors.length)return fail(new Error('No active mentors found.'));const n=Number(prompt(mentors.map((m,x)=>(x+1)+'. '+m.full_name).join('\n')+'\nMentor:'))-1;if(!mentors[n])return;try{await api('/admin/mentor-assignments',{method:'POST',body:JSON.stringify({mentorId:mentors[n].id,groupId:g.id,isLead:true})});ok('Mentor assigned to '+g.name+'.')}catch(e){fail(e)}}
- async function addProject(){const title=prompt('Project title:');if(!title)return;const description=prompt('Project description:')||'';try{await api('/admin/projects',{method:'POST',body:JSON.stringify({title,description})});ok('Project created.')}catch(e){fail(e)}}
- async function assignProject(g){if(!projects.length)return fail(new Error('Create a project first.'));const n=Number(prompt(projects.map((p,x)=>(x+1)+'. '+p.title).join('\n')+'\nProject:'))-1;if(!projects[n])return;try{await api('/admin/project-assignments',{method:'POST',body:JSON.stringify({projectId:projects[n].id,groupId:g.id})});ok('Project assigned to '+g.name+'.')}catch(e){fail(e)}}
- async function addTask(){if(!batches.length)return fail(new Error('Create a batch first.'));const title=prompt('Weekly task title:');if(!title)return;const bn=Number(prompt(batches.map((b,x)=>(x+1)+'. '+b.name).join('\n')+'\nBatch:'))-1;const dueAt=prompt('Due date/time (YYYY-MM-DD):');try{await api('/admin/tasks',{method:'POST',body:JSON.stringify({batchId:batches[bn].id,title,dueAt,status:'RELEASED'})});ok('Weekly task released.')}catch(e){fail(e)}}
- async function completion(x,status){const reason=status==='REJECTED'?prompt('Reason:')||'Requirements incomplete':'';try{await api('/admin/completions/'+x.intern_id+'/decision',{method:'POST',body:JSON.stringify({status,reason})});ok('Completion '+status.toLowerCase()+'.')}catch(e){fail(e)}}
- async function certificate(x){try{await api('/admin/certificates/'+x.intern_id+'/issue',{method:'POST',body:JSON.stringify({mode:'IN_APP'})});ok('Certificate issued for '+x.full_name+'.')}catch(e){fail(e)}}
- return <><Dashboard role="GAINT Admin" path="/admin/dashboard"/><main className="wrap">{err&&<p className="error">{err}</p>}{success&&<p className="success">{success}</p>}
- <section className="card"><h2>Quick Actions</h2><p className="muted">Open the required workspace. Detailed student and workflow information is kept out of the dashboard.</p><div className="admin-module-grid">
-  <Link className="module-card" href="/admin/colleges"><b>College Master</b><span>Add, edit, activate or deactivate registration colleges</span></Link>
-  <Link className="module-card" href="/admin/verification"><b>Registration & Verification</b><span>Proof review and account approval</span></Link>
-  <Link className="module-card" href="/admin/batches"><b>Batches & Domains</b><span>Batch allocation and final domain</span></Link>
-  <Link className="module-card" href="/admin/offers"><b>Offer Letters</b><span>Draft, preview, approve, issue, reissue and revoke</span></Link>\n  <Link className="module-card" href="/admin/domain-master"><b>Domain Master</b><span>Domains, sub-domains, deliverables, rubrics and capacities</span></Link>\n  <Link className="module-card" href="/admin/leave"><b>Leave & Holidays</b><span>Leave limits, holiday calendar and approval queue</span></Link>\n  <Link className="module-card" href="/admin/attendance"><b>Face & Attendance</b><span>Face approvals, camera attendance records and exception decisions</span></Link>\n  <Link className="module-card" href="/admin/projects"><b>Project Master</b><span>Projects, milestones, resources, deliverables and group assignment</span></Link>\n  <Link className="module-card" href="/admin/mentors"><b>Mentor Assignment</b><span>Assign/reassign mentors with expertise and workload capacity checks</span></Link>\n  <Link className="module-card" href="/admin/groups"><b>Group Proposals</b><span>Generate, review, edit and approve system-proposed groups</span></Link>\n  <Link className="module-card" href="/admin/domains"><b>Domain Recommendations</b><span>Calculate assessment-based recommendations and confirm final domains</span></Link>\n  <Link className="module-card" href="/admin/assessments"><b>Assessments</b><span>Create exams, sections, schedules and evaluate written answers</span></Link>\n  <Link className="module-card" href="/admin/questions"><b>Question Bank</b><span>Create and manage domain assessment questions</span></Link>\n  <Link className="module-card" href="/admin/work"><b>Internship Management</b><span>Groups, mentors, projects and weekly tasks</span></Link>
-  <Link className="module-card" href="/admin/completion"><b>Completion</b><span>Final evaluation and certificates</span></Link>
- </div></section></main></>}
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import Dashboard from "../../components/Dashboard";
+import { api, apiBlob } from "../../lib/api";
+export default function Page() {
+  const [proofs, setProofs] = useState([]),
+    [interns, setInterns] = useState([]),
+    [domains, setDomains] = useState([]),
+    [batches, setBatches] = useState([]),
+    [groups, setGroups] = useState([]),
+    [mentors, setMentors] = useState([]),
+    [projects, setProjects] = useState([]),
+    [completions, setCompletions] = useState([]),
+    [err, setErr] = useState(""),
+    [success, setSuccess] = useState(""),
+    [busy, setBusy] = useState("");
+  async function load() {
+    try {
+      setErr("");
+      const [p, i, d, b, g, m, pr, c] = await Promise.all([
+        api("/admin/proofs"),
+        api("/admin/interns"),
+        api("/admin/domains"),
+        api("/admin/batches"),
+        api("/admin/groups"),
+        api("/admin/mentors"),
+        api("/admin/projects"),
+        api("/admin/completions"),
+      ]);
+      setProofs(p);
+      setInterns(i);
+      setDomains(d);
+      setBatches(b);
+      setGroups(g);
+      setMentors(m);
+      setProjects(pr);
+      setCompletions(c);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+  const ok = (t) => {
+      setSuccess(t);
+      setErr("");
+      load();
+    },
+    fail = (e) => setErr(e.message);
+  async function view(id) {
+    try {
+      const b = await apiBlob("/admin/proofs/" + id + "/file");
+      const url = URL.createObjectURL(b);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function decide(id, outcome) {
+    let reason = "";
+    if (outcome !== "VERIFIED") {
+      reason =
+        prompt(
+          outcome === "REUPLOAD_REQUESTED"
+            ? "What must the student correct?"
+            : "Rejection reason:",
+        ) || "";
+      if (!reason) return;
+    }
+    try {
+      setBusy(id);
+      await api("/admin/proofs/" + id + "/verify", {
+        method: "POST",
+        body: JSON.stringify({ outcome, reason }),
+      });
+      ok(
+        outcome === "VERIFIED"
+          ? "Proof verified successfully. Account approval is now available."
+          : outcome === "REUPLOAD_REQUESTED"
+            ? "Re-upload request saved."
+            : "Proof rejected.",
+      );
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy("");
+    }
+  }
+  async function approve(p) {
+    try {
+      setBusy(p.id);
+      await api("/admin/interns/" + p.user_id + "/approve", {
+        method: "POST",
+        body: "{}",
+      });
+      ok(p.full_name + " account activated successfully.");
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy("");
+    }
+  }
+  async function addDomain() {
+    const name = prompt("Domain name:");
+    if (!name) return;
+    const code = prompt("Domain code:");
+    if (!code) return;
+    try {
+      await api("/admin/domains", {
+        method: "POST",
+        body: JSON.stringify({ name, code }),
+      });
+      ok("Domain created.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function addBatch() {
+    if (!interns.length)
+      return fail(new Error("Register/approve an intern first."));
+    const name = prompt("Batch name (example: KLU Batch-1):");
+    if (!name) return;
+    const code = prompt("Unique batch code:");
+    const startDate = prompt("Start date YYYY-MM-DD:");
+    const endDate = prompt("End date YYYY-MM-DD:");
+    const collegeId = interns.find((x) => x.college_id)?.college_id;
+    if (!collegeId) return fail(new Error("No college available for batch."));
+    try {
+      await api("/admin/batches", {
+        method: "POST",
+        body: JSON.stringify({ collegeId, name, code, startDate, endDate }),
+      });
+      ok("Batch created.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function allocate(i) {
+    if (!batches.length) return fail(new Error("Create a batch first."));
+    const n =
+      Number(
+        prompt(
+          batches.map((b, x) => x + 1 + ". " + b.name).join("\n") +
+            "\nChoose batch number:",
+        ),
+      ) - 1;
+    if (!batches[n]) return;
+    try {
+      await api("/admin/allocate", {
+        method: "POST",
+        body: JSON.stringify({ batchId: batches[n].id, internId: i.id }),
+      });
+      ok(i.full_name + " allocated to " + batches[n].name + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function confirmDomain(i) {
+    if (!domains.length) return fail(new Error("Create domains first."));
+    const n =
+      Number(
+        prompt(
+          domains.map((d, x) => x + 1 + ". " + d.name).join("\n") +
+            "\nChoose final domain:",
+        ),
+      ) - 1;
+    if (!domains[n] || !i.batch_id)
+      return fail(new Error("Batch allocation is required first."));
+    try {
+      await api("/admin/domain-confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          internId: i.id,
+          batchId: i.batch_id,
+          domainId: domains[n].id,
+          preferences: i.preferred_domains || [],
+          recommendations: [],
+        }),
+      });
+      ok("Final domain confirmed for " + i.full_name + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function createGroup() {
+    if (!batches.length) return fail(new Error("Create a batch first."));
+    const name = prompt("Group name:");
+    if (!name) return;
+    const bn =
+      Number(
+        prompt(
+          batches.map((b, x) => x + 1 + ". " + b.name).join("\n") + "\nBatch:",
+        ),
+      ) - 1;
+    const eligible = interns.filter((i) => i.batch_id === batches[bn]?.id);
+    const raw = prompt(
+      "Member numbers, comma separated:\n" +
+        eligible.map((i, x) => x + 1 + ". " + i.full_name).join("\n"),
+    );
+    if (!raw) return;
+    const internIds = raw
+      .split(",")
+      .map((x) => eligible[Number(x.trim()) - 1]?.id)
+      .filter(Boolean);
+    try {
+      await api("/admin/groups", {
+        method: "POST",
+        body: JSON.stringify({ batchId: batches[bn].id, name, internIds }),
+      });
+      ok("Group draft created.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function approveGroup(g) {
+    try {
+      await api("/admin/groups/" + g.id + "/approve", {
+        method: "POST",
+        body: "{}",
+      });
+      ok(g.name + " approved.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function assignMentor(g) {
+    if (!mentors.length) return fail(new Error("No active mentors found."));
+    const n =
+      Number(
+        prompt(
+          mentors.map((m, x) => x + 1 + ". " + m.full_name).join("\n") +
+            "\nMentor:",
+        ),
+      ) - 1;
+    if (!mentors[n]) return;
+    try {
+      await api("/admin/mentor-assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          mentorId: mentors[n].id,
+          groupId: g.id,
+          isLead: true,
+        }),
+      });
+      ok("Mentor assigned to " + g.name + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function addProject() {
+    const title = prompt("Project title:");
+    if (!title) return;
+    const description = prompt("Project description:") || "";
+    try {
+      await api("/admin/projects", {
+        method: "POST",
+        body: JSON.stringify({ title, description }),
+      });
+      ok("Project created.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function assignProject(g) {
+    if (!projects.length) return fail(new Error("Create a project first."));
+    const n =
+      Number(
+        prompt(
+          projects.map((p, x) => x + 1 + ". " + p.title).join("\n") +
+            "\nProject:",
+        ),
+      ) - 1;
+    if (!projects[n]) return;
+    try {
+      await api("/admin/project-assignments", {
+        method: "POST",
+        body: JSON.stringify({ projectId: projects[n].id, groupId: g.id }),
+      });
+      ok("Project assigned to " + g.name + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function addTask() {
+    if (!batches.length) return fail(new Error("Create a batch first."));
+    const title = prompt("Weekly task title:");
+    if (!title) return;
+    const bn =
+      Number(
+        prompt(
+          batches.map((b, x) => x + 1 + ". " + b.name).join("\n") + "\nBatch:",
+        ),
+      ) - 1;
+    const dueAt = prompt("Due date/time (YYYY-MM-DD):");
+    try {
+      await api("/admin/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          batchId: batches[bn].id,
+          title,
+          dueAt,
+          status: "RELEASED",
+        }),
+      });
+      ok("Weekly task released.");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function completion(x, status) {
+    const reason =
+      status === "REJECTED"
+        ? prompt("Reason:") || "Requirements incomplete"
+        : "";
+    try {
+      await api("/admin/completions/" + x.intern_id + "/decision", {
+        method: "POST",
+        body: JSON.stringify({ status, reason }),
+      });
+      ok("Completion " + status.toLowerCase() + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  async function certificate(x) {
+    try {
+      await api("/admin/certificates/" + x.intern_id + "/issue", {
+        method: "POST",
+        body: JSON.stringify({ mode: "IN_APP" }),
+      });
+      ok("Certificate issued for " + x.full_name + ".");
+    } catch (e) {
+      fail(e);
+    }
+  }
+  return (
+    <>
+      <Dashboard role="GAINT Admin" path="/admin/dashboard" />
+      <main className="wrap">
+        {err && <p className="error">{err}</p>}
+        {success && <p className="success">{success}</p>}
+        <section className="card">
+          <h2>Quick Actions</h2>
+          <p className="muted">
+            Open the required workspace. Detailed student and workflow
+            information is kept out of the dashboard.
+          </p>
+          <div className="admin-module-grid">
+            <Link className="module-card" href="/admin/colleges">
+              <b>College Master</b>
+              <span>
+                Add, edit, activate or deactivate registration colleges
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/verification">
+              <b>Registration & Verification</b>
+              <span>Proof review and account approval</span>
+            </Link>
+            <Link className="module-card" href="/admin/batches">
+              <b>Batches & Domains</b>
+              <span>Batch allocation and final domain</span>
+            </Link>
+            <Link className="module-card" href="/admin/offers">
+              <b>Offer Letters</b>
+              <span>Draft, preview, approve, issue, reissue and revoke</span>
+            </Link>
+            <Link className="module-card" href="/admin/domain-master">
+              <b>Domain Master</b>
+              <span>
+                Domains, sub-domains, deliverables, rubrics and capacities
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/leave">
+              <b>Leave & Holidays</b>
+              <span>Leave limits, holiday calendar and approval queue</span>
+            </Link>
+            <Link className="module-card" href="/admin/attendance">
+              <b>Face & Attendance</b>
+              <span>
+                Face approvals, camera attendance records and exception
+                decisions
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/projects">
+              <b>Project Master</b>
+              <span>
+                Projects, milestones, resources, deliverables and group
+                assignment
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/mentors">
+              <b>Mentor Assignment</b>
+              <span>
+                Assign/reassign mentors with expertise and workload capacity
+                checks
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/groups">
+              <b>Group Proposals</b>
+              <span>
+                Generate, review, edit and approve system-proposed groups
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/domains">
+              <b>Domain Recommendations</b>
+              <span>
+                Calculate assessment-based recommendations and confirm final
+                domains
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/assessments">
+              <b>Assessments</b>
+              <span>
+                Create exams, sections, schedules and evaluate written answers
+              </span>
+            </Link>
+            <Link className="module-card" href="/admin/questions">
+              <b>Question Bank</b>
+              <span>Create and manage domain assessment questions</span>
+            </Link>
+            <Link className="module-card" href="/admin/work">
+              <b>Internship Management</b>
+              <span>Groups, mentors, projects and weekly tasks</span>
+            </Link>
+            <Link className="module-card" href="/admin/completion">
+              <b>Completion</b>
+              <span>Final evaluation and certificates</span>
+            </Link>
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}

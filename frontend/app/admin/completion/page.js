@@ -1,5 +1,72 @@
-"use client";import {useEffect,useState} from 'react';import {api} from '../../../lib/api';
-export default function Page(){const [rows,setRows]=useState([]),[msg,setMsg]=useState(''),[err,setErr]=useState('');const load=()=>api('/admin/completions').then(setRows).catch(e=>setErr(e.message));useEffect(()=>{load()},[]);
-async function approve(x){try{await api('/admin/completions/'+x.intern_id+'/decision',{method:'POST',body:JSON.stringify({status:'APPROVED',reason:''})});setMsg('Completion approved.');load()}catch(e){setErr(e.message)}}
-async function cert(x){try{await api('/admin/certificates/'+x.intern_id+'/issue',{method:'POST',body:JSON.stringify({mode:'IN_APP'})});setMsg('Certificate issued.');load()}catch(e){setErr(e.message)}}
-return <main className="wrap"><h1>Completion & Certificates</h1>{msg&&<p className="success">{msg}</p>}{err&&<p className="error">{err}</p>}{rows.map(x=><section className="card workflow-row" key={x.intern_id}><div><b>{x.full_name}</b><div className="muted">Evaluation: {x.individual_marks??'Pending'} · Completion: {x.completion_status||'Pending'} · Certificate: {x.certificate_status||'Not issued'}</div></div><div className="action-row">{x.individual_marks!=null&&x.completion_status!=='APPROVED'&&<button className="btn" onClick={()=>approve(x)}>Approve Completion</button>}{x.completion_status==='APPROVED'&&x.certificate_status!=='ISSUED'&&<button className="btn" onClick={()=>cert(x)}>Issue Certificate</button>}</div></section>)}</main>}
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "../../../lib/api";
+export default function Page() {
+  const [rows, setRows] = useState([]),
+    [msg, setMsg] = useState(""),
+    [err, setErr] = useState("");
+  const load = () =>
+    api("/admin/completions")
+      .then(setRows)
+      .catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
+  }, []);
+  async function approve(x) {
+    try {
+      await api("/admin/completions/" + x.intern_id + "/decision", {
+        method: "POST",
+        body: JSON.stringify({ status: "APPROVED", reason: "" }),
+      });
+      setMsg("Completion approved.");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function cert(x) {
+    try {
+      await api("/admin/certificates/" + x.intern_id + "/issue", {
+        method: "POST",
+        body: JSON.stringify({ mode: "IN_APP" }),
+      });
+      setMsg("Certificate issued.");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  return (
+    <main className="wrap">
+      <h1>Completion & Certificates</h1>
+      {msg && <p className="success">{msg}</p>}
+      {err && <p className="error">{err}</p>}
+      {rows.map((x) => (
+        <section className="card workflow-row" key={x.intern_id}>
+          <div>
+            <b>{x.full_name}</b>
+            <div className="muted">
+              Evaluation: {x.individual_marks ?? "Pending"} · Completion:{" "}
+              {x.completion_status || "Pending"} · Certificate:{" "}
+              {x.certificate_status || "Not issued"}
+            </div>
+          </div>
+          <div className="action-row">
+            {x.individual_marks != null &&
+              x.completion_status !== "APPROVED" && (
+                <button className="btn" onClick={() => approve(x)}>
+                  Approve Completion
+                </button>
+              )}
+            {x.completion_status === "APPROVED" &&
+              x.certificate_status !== "ISSUED" && (
+                <button className="btn" onClick={() => cert(x)}>
+                  Issue Certificate
+                </button>
+              )}
+          </div>
+        </section>
+      ))}
+    </main>
+  );
+}

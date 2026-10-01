@@ -1,36 +1,629 @@
 "use client";
-import {useEffect,useState} from 'react';import {api} from '../../lib/api';
-const PROGRAMS=['B.Tech','B.E.','BBA','B.Com','B.Des','B.Sc','M.Sc','BCA','MCA','M.Tech','MBA','Diploma','Other'];
-const BRANCHES=['CSE','IT','ECE','EEE','Mechanical','Civil','AI & ML','Data Science','Cyber Security','Other'];
-const PROOFS=['College Allotment Order','No Objection Certificate (NOC)','Internship Permission / Recommendation Letter','Bonafide Certificate with internship permission','Other'];
-export default function Register(){
- const [f,setF]=useState({email:'',password:'',fullName:'',mobile:'',dob:'',address:'',collegeId:'',collegeOther:'',university:'',program:'',programOther:'',branch:'',branchOther:'',yearSemester:'',rollNumber:'',preferredDomains:'',preferredBatch:'',modePreference:'',skillsTools:'',resumePortfolioUrl:'',proofType:'',issuingAuthority:'',referenceNumber:'',issueDate:'',approvedFrom:'',approvedTo:'',coordinatorName:'',coordinatorDesignation:'',coordinatorEmail:'',coordinatorPhone:'',consentGenuine:false,consentStorage:false}),[files,setFiles]=useState([]),[photo,setPhoto]=useState(null),[msg,setMsg]=useState(''),[err,setErr]=useState(''),[showPassword,setShowPassword]=useState(false),[busy,setBusy]=useState(false),[colleges,setColleges]=useState([]),[collegeLoad,setCollegeLoad]=useState(true);
- useEffect(()=>{api('/auth/colleges').then(setColleges).catch(e=>setErr(e.message)).finally(()=>setCollegeLoad(false))},[]);
- const set=(k,v)=>setF(x=>({...x,[k]:v}));
- async function submit(e){e.preventDefault();setErr('');setMsg('');try{
- const email=f.email.trim().toLowerCase(),mobile=f.mobile.replace(/\D/g,''),coordPhone=f.coordinatorPhone.replace(/\D/g,'');
- if(f.fullName.trim().length<3)throw new Error('Enter the student full name as shown in college records.');
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Enter a valid student email address.');
- if(!/^[6-9]\d{9}$/.test(mobile))throw new Error('Enter a valid 10-digit Indian mobile number.');
- if(!f.dob)throw new Error('Date of birth is required.');
- const dob=new Date(f.dob),today=new Date();if(dob>=today)throw new Error('Date of birth must be in the past.');
- if(f.password.length<10||!/[A-Z]/.test(f.password)||!/[a-z]/.test(f.password)||!/[0-9]/.test(f.password)||!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(f.password))throw new Error('Password must be 10+ characters and include uppercase, lowercase, number and special character.');
- if(!f.collegeId&&!f.collegeOther.trim())throw new Error('Select your college or choose Other and enter the college name.');if(!f.university.trim()||!f.rollNumber.trim())throw new Error('University and roll number are required.');
- if(f.program==='Other'&&!f.programOther.trim())throw new Error('Enter your program name.');
- if(f.branch==='Other'&&!f.branchOther.trim())throw new Error('Enter your branch / department.');
- if(f.approvedFrom&&f.approvedTo&&new Date(f.approvedTo)<new Date(f.approvedFrom))throw new Error('Internship end date cannot be before the start date.');
- if(f.issueDate&&new Date(f.issueDate)>today)throw new Error('Proof issue date cannot be in the future.');
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.coordinatorEmail.trim()))throw new Error('Enter a valid faculty coordinator email.');
- if(!/^\d{10}$/.test(coordPhone))throw new Error('Enter a valid 10-digit faculty coordinator phone number.');
- if(!photo)throw new Error('Student photo is required. Please upload a JPG or PNG photo.');if(!['image/jpeg','image/png'].includes(photo.type))throw new Error('Student photo must be JPG or PNG.');if(photo.size>5*1024*1024)throw new Error('Student photo must be 5 MB or smaller.');if(!files.length)throw new Error('Please upload the college permission proof.');if(files.length>2)throw new Error('Maximum 2 proof files are allowed.');if(files.some(x=>x.size>5*1024*1024))throw new Error('Each proof file must be 5 MB or smaller.');const prefs=f.preferredDomains.split(',').map(x=>x.trim()).filter(Boolean);if(prefs.length>3)throw new Error('Choose up to 3 preferred domains only.');setBusy(true);const body=new FormData();Object.entries(f).forEach(([k,v])=>body.append(k,String(v)));body.set('preferredDomains',JSON.stringify(prefs));files.forEach(x=>body.append('proofFiles',x));if(photo)body.append('photo',photo);await api('/auth/register',{method:'POST',body});setMsg('Application received. Your college permission proof is pending Admin verification. Login remains disabled until verification and Admin approval.')}catch(x){setErr(x.message)}finally{setBusy(false)}}
- return <main className="wrap"><div className="card registration-card"><div className="registration-head"><div><h1>Intern Application</h1><p className="muted">Complete your profile and college permission details.</p></div><span className="badge">Student Registration</span></div>{msg&&<p className="success">{msg}</p>}{err&&<p className="error">{err}</p>}<form onSubmit={submit} className="registration-form">
- <h3 className="form-section-title">Personal Details</h3><div className="form-grid"><div className="form-field"><label>Full Name (as in college records)</label><input className="input" value={f.fullName} onChange={e=>set('fullName',e.target.value)} required/></div><div className="form-field"><label>Email</label><input className="input" type="email" value={f.email} onChange={e=>set('email',e.target.value)} required/></div><div className="form-field"><label>Mobile</label><input className="input" inputMode="numeric" maxLength="10" value={f.mobile} onChange={e=>set('mobile',e.target.value.replace(/\\D/g,'').slice(0,10))} required placeholder="10-digit mobile number"/></div><div className="form-field"><label>Date of Birth</label><input className="input" type="date" value={f.dob} onChange={e=>set('dob',e.target.value)} required/></div><div className="form-field"><label>Address</label><textarea className="input" value={f.address} onChange={e=>set('address',e.target.value)} required/></div><div className="form-field"><label>Student Photo (required)</label><input className="input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onChange={e=>setPhoto(e.target.files?.[0]||null)} required/><span className="muted">JPG or PNG, maximum 5 MB.</span></div>
- </div><h3 className="form-section-title">Academic Details</h3><div className="form-grid"><div className="form-field"><label>College</label><select className="input" value={f.collegeId||'OTHER'} onChange={e=>{const id=e.target.value==='OTHER'?'':e.target.value;const c=colleges.find(x=>x.id===id);setF(x=>({...x,collegeId:id,collegeOther:'',university:c?.university||''}))}} required disabled={collegeLoad}><option value="" disabled>{collegeLoad?'Loading colleges…':'Select college'}</option>{colleges.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}<option value="OTHER">Other / College not listed</option></select><span className="field-help">College list is maintained by GAINT Admin.</span></div>{!f.collegeId&&<div className="form-field"><label>College Name (Other)</label><input className="input" value={f.collegeOther} onChange={e=>set('collegeOther',e.target.value)} required placeholder="Enter official college name"/></div>}<div className="form-field"><label>University</label><input className="input" value={f.university} onChange={e=>set('university',e.target.value)} required readOnly={!!f.collegeId}/></div>
- <div className="form-field"><label>Program</label><select className="input" value={f.program} onChange={e=>{set('program',e.target.value);if(e.target.value!=='Other')set('programOther','')}} required><option value="">Select program</option>{PROGRAMS.map(x=><option key={x}>{x}</option>)}</select></div>{f.program==='Other'&&<div className="form-field"><label>Enter Program Name</label><input className="input" value={f.programOther} onChange={e=>set('programOther',e.target.value)} required/></div>}
- <div className="form-field"><label>Branch / Department</label><select className="input" value={f.branch} onChange={e=>{set('branch',e.target.value);if(e.target.value!=='Other')set('branchOther','')}} required><option value="">Select branch / department</option>{BRANCHES.map(x=><option key={x}>{x}</option>)}</select></div>{f.branch==='Other'&&<div className="form-field"><label>Enter Branch / Department</label><input className="input" value={f.branchOther} onChange={e=>set('branchOther',e.target.value)} required/></div>}
- <div className="form-field"><label>Year / Semester</label><input className="input" value={f.yearSemester} onChange={e=>set('yearSemester',e.target.value)} required/></div><div className="form-field"><label>Roll / Registration Number</label><input className="input" value={f.rollNumber} onChange={e=>set('rollNumber',e.target.value)} required/></div>
- </div><h3 className="form-section-title">Internship Preference</h3><div className="form-grid"><div className="form-field"><label>Preferred Domains (up to 3, in preference order)</label><input className="input" value={f.preferredDomains} onChange={e=>set('preferredDomains',e.target.value)} placeholder="Example: Data Analytics, AI/ML, Full Stack"/></div><div className="form-field"><label>Preferred Batch / Start Month</label><input className="input" value={f.preferredBatch} onChange={e=>set('preferredBatch',e.target.value)}/></div><div className="form-field"><label>Mode Preference</label><select className="input" value={f.modePreference} onChange={e=>set('modePreference',e.target.value)}><option value="">Select if offered</option><option value="ONSITE">On-site</option><option value="REMOTE">Remote</option></select></div><div className="form-field"><label>Skills & Tools Known</label><textarea className="input" value={f.skillsTools} onChange={e=>set('skillsTools',e.target.value)}/></div><div className="form-field"><label>Resume / Portfolio Link (optional)</label><input className="input" type="url" value={f.resumePortfolioUrl} onChange={e=>set('resumePortfolioUrl',e.target.value)}/></div>
- </div><h3 className="form-section-title">College Permission Proof</h3><div className="form-grid"><div className="form-field"><label>Proof Type</label><select className="input" value={f.proofType} onChange={e=>set('proofType',e.target.value)} required><option value="">Select proof type</option>{PROOFS.map(x=><option key={x}>{x}</option>)}</select></div><div className="form-field"><label>Issuing Authority / Signatory Designation</label><input className="input" value={f.issuingAuthority} onChange={e=>set('issuingAuthority',e.target.value)} required placeholder="Principal / HoD / TPO / Dean"/></div><div className="form-field"><label>Letter / Reference Number</label><input className="input" value={f.referenceNumber} onChange={e=>set('referenceNumber',e.target.value)} required/></div><div className="form-field"><label>Issue Date</label><input className="input" type="date" value={f.issueDate} max={new Date().toISOString().slice(0,10)} onChange={e=>set('issueDate',e.target.value)} required/></div><div className="form-field"><label>College-approved Internship From</label><input className="input" type="date" value={f.approvedFrom} onChange={e=>set('approvedFrom',e.target.value)} required/></div><div className="form-field"><label>College-approved Internship To</label><input className="input" type="date" value={f.approvedTo} min={f.approvedFrom||undefined} onChange={e=>set('approvedTo',e.target.value)} required/></div>
- </div><h4 className="form-subtitle">Faculty Coordinator</h4><div className="form-grid"><div className="form-field"><label>Name</label><input className="input" value={f.coordinatorName} onChange={e=>set('coordinatorName',e.target.value)} required/></div><div className="form-field"><label>Designation</label><input className="input" value={f.coordinatorDesignation} onChange={e=>set('coordinatorDesignation',e.target.value)} required/></div><div className="form-field"><label>Official Email</label><input className="input" type="email" value={f.coordinatorEmail} onChange={e=>set('coordinatorEmail',e.target.value)} required/></div><div className="form-field"><label>Phone</label><input className="input" inputMode="numeric" maxLength="10" value={f.coordinatorPhone} onChange={e=>set('coordinatorPhone',e.target.value.replace(/\\D/g,'').slice(0,10))} required/></div><div className="form-field"><label>Upload Proof (PDF/JPG/PNG, max 5 MB each, up to 2 files)</label><input className="input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e=>setFiles(Array.from(e.target.files||[]).slice(0,2))} required/></div>
- </div><div className="form-grid form-grid-final"><div className="form-field"><label>Password</label><div className="password-wrap"><input className="input" type={showPassword?'text':'password'} minLength="10" value={f.password} onChange={e=>set('password',e.target.value)} required placeholder="Create a strong password"/><button className="eye-btn" type="button" aria-label={showPassword?'Hide password':'Show password'} onClick={()=>setShowPassword(v=>!v)}>◉</button></div><span className="field-help">10+ characters with uppercase, lowercase, number and special character.</span></div></div><div className="consent-box"><label><input type="checkbox" checked={f.consentGenuine} onChange={e=>set('consentGenuine',e.target.checked)} required/> I confirm the uploaded document is genuine and issued by my college.</label><br/><label><input type="checkbox" checked={f.consentStorage} onChange={e=>set('consentStorage',e.target.checked)} required/> I consent to GAINT storing and verifying the document for internship administration.</label></div><div className="form-actions"><button className="btn" disabled={busy}>{busy?'Submitting…':'Submit Application'}</button></div>
- </form></div></main>}
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
+const PROGRAMS = [
+  "B.Tech",
+  "B.E.",
+  "BBA",
+  "B.Com",
+  "B.Des",
+  "B.Sc",
+  "M.Sc",
+  "BCA",
+  "MCA",
+  "M.Tech",
+  "MBA",
+  "Diploma",
+  "Other",
+];
+const BRANCHES = [
+  "CSE",
+  "IT",
+  "ECE",
+  "EEE",
+  "Mechanical",
+  "Civil",
+  "AI & ML",
+  "Data Science",
+  "Cyber Security",
+  "Other",
+];
+const PROOFS = [
+  "College Allotment Order",
+  "No Objection Certificate (NOC)",
+  "Internship Permission / Recommendation Letter",
+  "Bonafide Certificate with internship permission",
+  "Other",
+];
+export default function Register() {
+  const [f, setF] = useState({
+      email: "",
+      password: "",
+      fullName: "",
+      mobile: "",
+      dob: "",
+      address: "",
+      collegeId: "",
+      collegeOther: "",
+      university: "",
+      program: "",
+      programOther: "",
+      branch: "",
+      branchOther: "",
+      yearSemester: "",
+      rollNumber: "",
+      preferredDomains: "",
+      preferredBatch: "",
+      modePreference: "",
+      skillsTools: "",
+      resumePortfolioUrl: "",
+      proofType: "",
+      issuingAuthority: "",
+      referenceNumber: "",
+      issueDate: "",
+      approvedFrom: "",
+      approvedTo: "",
+      coordinatorName: "",
+      coordinatorDesignation: "",
+      coordinatorEmail: "",
+      coordinatorPhone: "",
+      consentGenuine: false,
+      consentStorage: false,
+    }),
+    [files, setFiles] = useState([]),
+    [photo, setPhoto] = useState(null),
+    [msg, setMsg] = useState(""),
+    [err, setErr] = useState(""),
+    [showPassword, setShowPassword] = useState(false),
+    [busy, setBusy] = useState(false),
+    [colleges, setColleges] = useState([]),
+    [collegeLoad, setCollegeLoad] = useState(true);
+  useEffect(() => {
+    api("/auth/colleges")
+      .then(setColleges)
+      .catch((e) => setErr(e.message))
+      .finally(() => setCollegeLoad(false));
+  }, []);
+  const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  async function submit(e) {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+    try {
+      const email = f.email.trim().toLowerCase(),
+        mobile = f.mobile.replace(/\D/g, ""),
+        coordPhone = f.coordinatorPhone.replace(/\D/g, "");
+      if (f.fullName.trim().length < 3)
+        throw new Error(
+          "Enter the student full name as shown in college records.",
+        );
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new Error("Enter a valid student email address.");
+      if (!/^[6-9]\d{9}$/.test(mobile))
+        throw new Error("Enter a valid 10-digit Indian mobile number.");
+      if (!f.dob) throw new Error("Date of birth is required.");
+      const dob = new Date(f.dob),
+        today = new Date();
+      if (dob >= today) throw new Error("Date of birth must be in the past.");
+      if (
+        f.password.length < 10 ||
+        !/[A-Z]/.test(f.password) ||
+        !/[a-z]/.test(f.password) ||
+        !/[0-9]/.test(f.password) ||
+        !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(f.password)
+      )
+        throw new Error(
+          "Password must be 10+ characters and include uppercase, lowercase, number and special character.",
+        );
+      if (!f.collegeId && !f.collegeOther.trim())
+        throw new Error(
+          "Select your college or choose Other and enter the college name.",
+        );
+      if (!f.university.trim() || !f.rollNumber.trim())
+        throw new Error("University and roll number are required.");
+      if (f.program === "Other" && !f.programOther.trim())
+        throw new Error("Enter your program name.");
+      if (f.branch === "Other" && !f.branchOther.trim())
+        throw new Error("Enter your branch / department.");
+      if (
+        f.approvedFrom &&
+        f.approvedTo &&
+        new Date(f.approvedTo) < new Date(f.approvedFrom)
+      )
+        throw new Error("Internship end date cannot be before the start date.");
+      if (f.issueDate && new Date(f.issueDate) > today)
+        throw new Error("Proof issue date cannot be in the future.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.coordinatorEmail.trim()))
+        throw new Error("Enter a valid faculty coordinator email.");
+      if (!/^\d{10}$/.test(coordPhone))
+        throw new Error(
+          "Enter a valid 10-digit faculty coordinator phone number.",
+        );
+      if (!photo)
+        throw new Error(
+          "Student photo is required. Please upload a JPG or PNG photo.",
+        );
+      if (!["image/jpeg", "image/png"].includes(photo.type))
+        throw new Error("Student photo must be JPG or PNG.");
+      if (photo.size > 5 * 1024 * 1024)
+        throw new Error("Student photo must be 5 MB or smaller.");
+      if (!files.length)
+        throw new Error("Please upload the college permission proof.");
+      if (files.length > 2)
+        throw new Error("Maximum 2 proof files are allowed.");
+      if (files.some((x) => x.size > 5 * 1024 * 1024))
+        throw new Error("Each proof file must be 5 MB or smaller.");
+      const prefs = f.preferredDomains
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (prefs.length > 3)
+        throw new Error("Choose up to 3 preferred domains only.");
+      setBusy(true);
+      const body = new FormData();
+      Object.entries(f).forEach(([k, v]) => body.append(k, String(v)));
+      body.set("preferredDomains", JSON.stringify(prefs));
+      files.forEach((x) => body.append("proofFiles", x));
+      if (photo) body.append("photo", photo);
+      await api("/auth/register", { method: "POST", body });
+      setMsg(
+        "Application received. Your college permission proof is pending Admin verification. Login remains disabled until verification and Admin approval.",
+      );
+    } catch (x) {
+      setErr(x.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <main className="wrap">
+      <div className="card registration-card">
+        <div className="registration-head">
+          <div>
+            <h1>Intern Application</h1>
+            <p className="muted">
+              Complete your profile and college permission details.
+            </p>
+          </div>
+          <span className="badge">Student Registration</span>
+        </div>
+        {msg && <p className="success">{msg}</p>}
+        {err && <p className="error">{err}</p>}
+        <form onSubmit={submit} className="registration-form">
+          <h3 className="form-section-title">Personal Details</h3>
+          <div className="form-grid">
+            <div className="form-field">
+              <label>Full Name (as in college records)</label>
+              <input
+                className="input"
+                value={f.fullName}
+                onChange={(e) => set("fullName", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Email</label>
+              <input
+                className="input"
+                type="email"
+                value={f.email}
+                onChange={(e) => set("email", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Mobile</label>
+              <input
+                className="input"
+                inputMode="numeric"
+                maxLength="10"
+                value={f.mobile}
+                onChange={(e) =>
+                  set("mobile", e.target.value.replace(/\\D/g, "").slice(0, 10))
+                }
+                required
+                placeholder="10-digit mobile number"
+              />
+            </div>
+            <div className="form-field">
+              <label>Date of Birth</label>
+              <input
+                className="input"
+                type="date"
+                value={f.dob}
+                onChange={(e) => set("dob", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Address</label>
+              <textarea
+                className="input"
+                value={f.address}
+                onChange={(e) => set("address", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Student Photo (required)</label>
+              <input
+                className="input"
+                type="file"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                required
+              />
+              <span className="muted">JPG or PNG, maximum 5 MB.</span>
+            </div>
+          </div>
+          <h3 className="form-section-title">Academic Details</h3>
+          <div className="form-grid">
+            <div className="form-field">
+              <label>College</label>
+              <select
+                className="input"
+                value={f.collegeId || "OTHER"}
+                onChange={(e) => {
+                  const id = e.target.value === "OTHER" ? "" : e.target.value;
+                  const c = colleges.find((x) => x.id === id);
+                  setF((x) => ({
+                    ...x,
+                    collegeId: id,
+                    collegeOther: "",
+                    university: c?.university || "",
+                  }));
+                }}
+                required
+                disabled={collegeLoad}
+              >
+                <option value="" disabled>
+                  {collegeLoad ? "Loading colleges…" : "Select college"}
+                </option>
+                {colleges.map((c) => (
+                  <option value={c.id} key={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="OTHER">Other / College not listed</option>
+              </select>
+              <span className="field-help">
+                College list is maintained by GAINT Admin.
+              </span>
+            </div>
+            {!f.collegeId && (
+              <div className="form-field">
+                <label>College Name (Other)</label>
+                <input
+                  className="input"
+                  value={f.collegeOther}
+                  onChange={(e) => set("collegeOther", e.target.value)}
+                  required
+                  placeholder="Enter official college name"
+                />
+              </div>
+            )}
+            <div className="form-field">
+              <label>University</label>
+              <input
+                className="input"
+                value={f.university}
+                onChange={(e) => set("university", e.target.value)}
+                required
+                readOnly={!!f.collegeId}
+              />
+            </div>
+            <div className="form-field">
+              <label>Program</label>
+              <select
+                className="input"
+                value={f.program}
+                onChange={(e) => {
+                  set("program", e.target.value);
+                  if (e.target.value !== "Other") set("programOther", "");
+                }}
+                required
+              >
+                <option value="">Select program</option>
+                {PROGRAMS.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </div>
+            {f.program === "Other" && (
+              <div className="form-field">
+                <label>Enter Program Name</label>
+                <input
+                  className="input"
+                  value={f.programOther}
+                  onChange={(e) => set("programOther", e.target.value)}
+                  required
+                />
+              </div>
+            )}
+            <div className="form-field">
+              <label>Branch / Department</label>
+              <select
+                className="input"
+                value={f.branch}
+                onChange={(e) => {
+                  set("branch", e.target.value);
+                  if (e.target.value !== "Other") set("branchOther", "");
+                }}
+                required
+              >
+                <option value="">Select branch / department</option>
+                {BRANCHES.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </div>
+            {f.branch === "Other" && (
+              <div className="form-field">
+                <label>Enter Branch / Department</label>
+                <input
+                  className="input"
+                  value={f.branchOther}
+                  onChange={(e) => set("branchOther", e.target.value)}
+                  required
+                />
+              </div>
+            )}
+            <div className="form-field">
+              <label>Year / Semester</label>
+              <input
+                className="input"
+                value={f.yearSemester}
+                onChange={(e) => set("yearSemester", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Roll / Registration Number</label>
+              <input
+                className="input"
+                value={f.rollNumber}
+                onChange={(e) => set("rollNumber", e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <h3 className="form-section-title">Internship Preference</h3>
+          <div className="form-grid">
+            <div className="form-field">
+              <label>Preferred Domains (up to 3, in preference order)</label>
+              <input
+                className="input"
+                value={f.preferredDomains}
+                onChange={(e) => set("preferredDomains", e.target.value)}
+                placeholder="Example: Data Analytics, AI/ML, Full Stack"
+              />
+            </div>
+            <div className="form-field">
+              <label>Preferred Batch / Start Month</label>
+              <input
+                className="input"
+                value={f.preferredBatch}
+                onChange={(e) => set("preferredBatch", e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label>Mode Preference</label>
+              <select
+                className="input"
+                value={f.modePreference}
+                onChange={(e) => set("modePreference", e.target.value)}
+              >
+                <option value="">Select if offered</option>
+                <option value="ONSITE">On-site</option>
+                <option value="REMOTE">Remote</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Skills & Tools Known</label>
+              <textarea
+                className="input"
+                value={f.skillsTools}
+                onChange={(e) => set("skillsTools", e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label>Resume / Portfolio Link (optional)</label>
+              <input
+                className="input"
+                type="url"
+                value={f.resumePortfolioUrl}
+                onChange={(e) => set("resumePortfolioUrl", e.target.value)}
+              />
+            </div>
+          </div>
+          <h3 className="form-section-title">College Permission Proof</h3>
+          <div className="form-grid">
+            <div className="form-field">
+              <label>Proof Type</label>
+              <select
+                className="input"
+                value={f.proofType}
+                onChange={(e) => set("proofType", e.target.value)}
+                required
+              >
+                <option value="">Select proof type</option>
+                {PROOFS.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Issuing Authority / Signatory Designation</label>
+              <input
+                className="input"
+                value={f.issuingAuthority}
+                onChange={(e) => set("issuingAuthority", e.target.value)}
+                required
+                placeholder="Principal / HoD / TPO / Dean"
+              />
+            </div>
+            <div className="form-field">
+              <label>Letter / Reference Number</label>
+              <input
+                className="input"
+                value={f.referenceNumber}
+                onChange={(e) => set("referenceNumber", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Issue Date</label>
+              <input
+                className="input"
+                type="date"
+                value={f.issueDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => set("issueDate", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>College-approved Internship From</label>
+              <input
+                className="input"
+                type="date"
+                value={f.approvedFrom}
+                onChange={(e) => set("approvedFrom", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>College-approved Internship To</label>
+              <input
+                className="input"
+                type="date"
+                value={f.approvedTo}
+                min={f.approvedFrom || undefined}
+                onChange={(e) => set("approvedTo", e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <h4 className="form-subtitle">Faculty Coordinator</h4>
+          <div className="form-grid">
+            <div className="form-field">
+              <label>Name</label>
+              <input
+                className="input"
+                value={f.coordinatorName}
+                onChange={(e) => set("coordinatorName", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Designation</label>
+              <input
+                className="input"
+                value={f.coordinatorDesignation}
+                onChange={(e) => set("coordinatorDesignation", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Official Email</label>
+              <input
+                className="input"
+                type="email"
+                value={f.coordinatorEmail}
+                onChange={(e) => set("coordinatorEmail", e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Phone</label>
+              <input
+                className="input"
+                inputMode="numeric"
+                maxLength="10"
+                value={f.coordinatorPhone}
+                onChange={(e) =>
+                  set(
+                    "coordinatorPhone",
+                    e.target.value.replace(/\\D/g, "").slice(0, 10),
+                  )
+                }
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>
+                Upload Proof (PDF/JPG/PNG, max 5 MB each, up to 2 files)
+              </label>
+              <input
+                className="input"
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(e) =>
+                  setFiles(Array.from(e.target.files || []).slice(0, 2))
+                }
+                required
+              />
+            </div>
+          </div>
+          <div className="form-grid form-grid-final">
+            <div className="form-field">
+              <label>Password</label>
+              <div className="password-wrap">
+                <input
+                  className="input"
+                  type={showPassword ? "text" : "password"}
+                  minLength="10"
+                  value={f.password}
+                  onChange={(e) => set("password", e.target.value)}
+                  required
+                  placeholder="Create a strong password"
+                />
+                <button
+                  className="eye-btn"
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  ◉
+                </button>
+              </div>
+              <span className="field-help">
+                10+ characters with uppercase, lowercase, number and special
+                character.
+              </span>
+            </div>
+          </div>
+          <div className="consent-box">
+            <label>
+              <input
+                type="checkbox"
+                checked={f.consentGenuine}
+                onChange={(e) => set("consentGenuine", e.target.checked)}
+                required
+              />{" "}
+              I confirm the uploaded document is genuine and issued by my
+              college.
+            </label>
+            <br />
+            <label>
+              <input
+                type="checkbox"
+                checked={f.consentStorage}
+                onChange={(e) => set("consentStorage", e.target.checked)}
+                required
+              />{" "}
+              I consent to GAINT storing and verifying the document for
+              internship administration.
+            </label>
+          </div>
+          <div className="form-actions">
+            <button className="btn" disabled={busy}>
+              {busy ? "Submitting…" : "Submit Application"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
+  );
+}
