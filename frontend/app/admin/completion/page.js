@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { api, apiBlob } from "../../../lib/api";
 export default function Page() {
   const [rows, setRows] = useState([]),
     [msg, setMsg] = useState(""),
@@ -36,6 +36,7 @@ export default function Page() {
       setErr(e.message);
     }
   }
+  async function download(x){try{const b=await apiBlob("/admin/certificates/"+x.certificate_db_id+"/file"),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(x.certificate_id||"certificate")+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)}catch(e){setErr(e.message)}}
   return (
     <main className="wrap">
       <h1>Completion & Certificates</h1>
@@ -48,7 +49,7 @@ export default function Page() {
             <div className="muted">
               Evaluation: {x.individual_marks ?? "Pending"} · Completion:{" "}
               {x.completion_status || "Pending"} · Certificate:{" "}
-              {x.certificate_status || "Not issued"}
+              {x.certificate_status || "Not issued"} {x.certificate_id ? "· "+x.certificate_id : ""}
             </div>
           </div>
           <div className="action-row">
@@ -58,7 +59,7 @@ export default function Page() {
                   Approve Completion
                 </button>
               )}
-            {x.completion_status === "APPROVED" &&
+            {x.certificate_status === "ISSUED" && <button className="btn secondary" onClick={()=>download(x)}>Download Certificate</button>}{x.completion_status === "APPROVED" &&
               x.certificate_status !== "ISSUED" && (
                 <button className="btn" onClick={() => cert(x)}>
                   Issue Certificate
