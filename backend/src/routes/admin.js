@@ -4,7 +4,7 @@ import path from "path";
 import { q, tx } from "../config/db.js";
 import { auth, permit } from "../middleware/auth.js";
 import { audit } from "../utils/audit.js";
-import { generateQuestions } from "../services/aiQuestionService.js";
+import { generateQuestions } from "../services/aiQuestionService.js";import { generateCertificate } from "../services/certificateService.js";import { notify } from "../services/collaborationService.js";
 const r = Router();
 r.use(auth, permit("ADMIN", "SUPER_ADMIN"));
 r.get("/dashboard", async (req, res) => {
@@ -2038,60 +2038,9 @@ r.get("/completions", async (req, res) =>
     ).rows,
   ),
 );
-r.post("/completions/:internId/decision", async (req, res) => {
-  const { status, reason } = req.body;
-  if (!["APPROVED", "REJECTED"].includes(status))
-    return res.status(400).json({ error: "Invalid completion decision" });
-  const x = (
-    await q(
-      "INSERT INTO completion_approvals(intern_id,status,reason,approved_by) VALUES($1,$2,$3,$4) RETURNING *",
-      [req.params.internId, status, reason || null, req.user.id],
-    )
-  ).rows[0];
-  await audit(
-    req,
-    "COMPLETION_" + status,
-    "intern",
-    req.params.internId,
-    null,
-    x,
-  );
-  res.status(201).json(x);
-});
-r.post("/certificates/:internId/issue", async (req, res) => {
-  const ok = (
-    await q(
-      "SELECT 1 FROM completion_approvals WHERE intern_id=$1 AND status='APPROVED' ORDER BY approved_at DESC LIMIT 1",
-      [req.params.internId],
-    )
-  ).rowCount;
-  if (!ok)
-    return res.status(409).json({ error: "Completion approval required" });
-  const p = (
-    await q(
-      "SELECT ip.*,d.name domain_name FROM intern_profiles ip LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE ip.id=$1",
-      [req.params.internId],
-    )
-  ).rows[0];
-  const certId =
-    "GAINT-CERT-" +
-    new Date().getFullYear() +
-    "-" +
-    Math.random().toString(36).slice(2, 10).toUpperCase();
-  const x = (
-    await q(
-      `INSERT INTO certificates(intern_id,mode,status,certificate_id,issue_date,domain_snapshot,date_snapshot) VALUES($1,$2,'ISSUED',$3,current_date,$4,$5) ON CONFLICT(certificate_id) DO NOTHING RETURNING *`,
-      [
-        p.id,
-        req.body.mode || "IN_APP",
-        certId,
-        p.domain_name || "",
-        req.body.dateSnapshot || "",
-      ],
-    )
-  ).rows[0];
-  res.status(201).json(x);
-});
+r.post("/completions/:internId/decision",async(req,res)=>{const{status,reason}=req.body;if(!["APPROVED","REJECTED"].includes(status))return res.status(400).json({error:"Invalid completion decision"});const p=(await q("SELECT ip.user_id,ip.full_name FROM intern_profiles ip WHERE ip.id=$1",[req.params.internId])).rows[0];if(!p)return res.status(404).json({error:"Intern not found"});const evaluation=(await q("SELECT * FROM final_evaluations WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",[req.params.internId])).rows[0];if(status==="APPROVED"&&!evaluation)return res.status(409).json({error:"Mentor final evaluation is required before completion approval"});if(status==="REJECTED"&&!String(reason||"").trim())return res.status(400).json({error:"Rejection reason is required"});const x=(await q("INSERT INTO completion_approvals(intern_id,status,reason,approved_by) VALUES($1,$2,$3,$4) RETURNING *",[req.params.internId,status,reason||null,req.user.id])).rows[0];await audit(req,"COMPLETION_"+status,"intern",req.params.internId,null,x);await notify(p.user_id,"COMPLETION_"+status,status==="APPROVED"?"Internship completion approved":"Completion needs attention",status==="APPROVED"?"Your internship completion has been approved.":"Completion was not approved: "+reason,"/intern","COMPLETION:"+x.id);res.status(201).json(x)});
+r.post("/certificates/:internId/issue",async(req,res)=>{const ok=(await q("SELECT 1 FROM completion_approvals WHERE intern_id=$1 AND status='APPROVED' ORDER BY approved_at DESC LIMIT 1",[req.params.internId])).rowCount;if(!ok)return res.status(409).json({error:"Completion approval required"});const existing=(await q("SELECT * FROM certificates WHERE intern_id=$1 AND status='ISSUED' ORDER BY created_at DESC LIMIT 1",[req.params.internId])).rows[0];if(existing)return res.status(409).json({error:"Certificate already issued",certificate:existing});const p=(await q(`SELECT ip.*,d.name domain_name,u.id user_id,ba.intern_start,ba.intern_end FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL(SELECT * FROM batch_allocations x WHERE x.intern_id=ip.id ORDER BY x.intern_start DESC LIMIT 1)ba ON true WHERE ip.id=$1`,[req.params.internId])).rows[0];if(!p)return res.status(404).json({error:"Intern not found"});const certId="GAINT-CERT-"+new Date().getFullYear()+"-"+Math.random().toString(36).slice(2,10).toUpperCase(),issueDate=new Date().toISOString().slice(0,10),period=p.intern_start&&p.intern_end?String(p.intern_start).slice(0,10)+" to "+String(p.intern_end).slice(0,10):"";const filePath=await generateCertificate({certificateId:certId,name:p.full_name,domain:p.domain_name,period,issueDate});const x=(await q(`INSERT INTO certificates(intern_id,mode,status,certificate_id,issue_date,file_path,domain_snapshot,date_snapshot) VALUES($1,$2,'ISSUED',$3,$4,$5,$6,$7) RETURNING *`,[p.id,req.body.mode||"IN_APP",certId,issueDate,filePath,p.domain_name||"",period])).rows[0];await audit(req,"CERTIFICATE_ISSUED","certificate",x.id,null,x);await notify(p.user_id,"CERTIFICATE_ISSUED","Internship certificate issued","Your internship certificate is ready to download.","/intern/certificate","CERTIFICATE:"+x.id);res.status(201).json(x)});
+r.get("/certificates/:id/file",async(req,res)=>{const x=(await q("SELECT * FROM certificates WHERE id=$1 AND status='ISSUED'",[req.params.id])).rows[0];if(!x?.file_path||!fs.existsSync(x.file_path))return res.status(404).json({error:"Certificate file not found"});res.download(path.resolve(x.file_path),x.certificate_id+".pdf")});
 r.get("/audit", async (req, res) =>
   res.json(
     (await q("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500"))
