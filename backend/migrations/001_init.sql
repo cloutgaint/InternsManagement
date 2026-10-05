@@ -101,3 +101,9 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_key text;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id,read_at,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_group_created ON chat_messages(group_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_documents_group_created ON documents(group_id,created_at DESC);
+
+-- MFA for privileged roles
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_verified_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery_hashes jsonb DEFAULT '[]';
