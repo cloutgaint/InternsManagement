@@ -339,7 +339,7 @@ export default function Page() {
           )}
         </section>
         <section className="card">
-          <h2>Completion & Certificate</h2>
+          <div className="verification-title"><h2>Completion & Certificate</h2><a className="btn secondary" href="/intern/certificate">Open Certificate</a></div>
           <div className="status-row">
             <span>Final evaluation</span>
             <b>{completion?.evaluation ? "Completed" : "Pending"}</b>
