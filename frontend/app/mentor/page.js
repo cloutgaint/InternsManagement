@@ -150,7 +150,7 @@ export default function Page() {
     );
   return (
     <main className="wrap">
-      <div className="verification-title"><h1>Mentor Dashboard</h1><div className="action-row"><a className="btn secondary" href="/mentor/operations">Intern Operations</a><a className="btn secondary" href="/mentor/collaboration">Group Workspace</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a></div></div>
+      <div className="verification-title"><h1>Mentor Dashboard</h1><div className="action-row"><a className="btn secondary" href="/mentor/final-evaluations">Final Evaluations</a><a className="btn secondary" href="/mentor/operations">Intern Operations</a><a className="btn secondary" href="/mentor/collaboration">Group Workspace</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a></div></div>
       <p className="muted">
         Manage assigned groups, evaluate weekly work, publish fortnight reviews
         and submit final evaluations.
