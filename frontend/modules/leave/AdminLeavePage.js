@@ -1,0 +1,213 @@
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "@/shared/api/client";
+const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
+export default function AdminLeavePage() {
+  const [requests, setRequests] = useState([]),
+    [holidays, setHolidays] = useState([]),
+    [batches, setBatches] = useState([]),
+    [holiday, setHoliday] = useState({ batchId: "", day: "", name: "" }),
+    [reason, setReason] = useState({}),
+    [limits, setLimits] = useState({}),
+    [msg, setMsg] = useState(""),
+    [err, setErr] = useState("");
+  const load = () =>
+    Promise.all([
+      api("/admin/leave-requests"),
+      api("/admin/holidays"),
+      api("/admin/batches"),
+    ])
+      .then(([r, h, b]) => {
+        setRequests(r);
+        setHolidays(h);
+        setBatches(b);
+        setLimits(
+          Object.fromEntries(b.map((x) => [x.id, x.leave_limit_days ?? 3])),
+        );
+        if (!holiday.batchId && b[0])
+          setHoliday((x) => ({ ...x, batchId: b[0].id }));
+      })
+      .catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
+  }, []);
+  async function decide(x, status) {
+    try {
+      await api("/admin/leave-requests/" + x.id + "/decision", {
+        method: "POST",
+        body: JSON.stringify({ status, reason: reason[x.id] || "" }),
+      });
+      setMsg("Leave " + status.toLowerCase() + ".");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function addHoliday(e) {
+    e.preventDefault();
+    try {
+      await api("/admin/holidays", {
+        method: "POST",
+        body: JSON.stringify(holiday),
+      });
+      setHoliday((x) => ({ ...x, day: "", name: "" }));
+      setMsg("Holiday calendar updated.");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function saveLimit(b) {
+    try {
+      await api("/admin/batches/" + b.id + "/leave-policy", {
+        method: "PATCH",
+        body: JSON.stringify({ leaveLimitDays: Number(limits[b.id]) }),
+      });
+      setMsg("Leave policy updated for " + b.name + ".");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  return (
+    <main className="wrap">
+      <div className="intern-head">
+        <div>
+          <h1>Leave & Holiday Management</h1>
+          <p className="muted">
+            Configure batch leave limits and holidays, then approve or reject
+            intern leave requests.
+          </p>
+        </div>
+      </div>
+      {msg && <p className="success">{msg}</p>}
+      {err && <p className="error">{err}</p>}
+      <section className="card">
+        <h2>Batch Leave Policy</h2>
+        {batches.map((b) => (
+          <div className="workflow-row" key={b.id}>
+            <div>
+              <b>{b.name}</b>
+              <div className="muted">
+                Maximum approved working-day leave during the internship
+                allocation.
+              </div>
+            </div>
+            <div className="action-row">
+              <input
+                className="input leave-limit"
+                type="number"
+                min="0"
+                max="60"
+                value={limits[b.id] ?? 3}
+                onChange={(e) =>
+                  setLimits((x) => ({ ...x, [b.id]: e.target.value }))
+                }
+              />
+              <button className="btn secondary" onClick={() => saveLimit(b)}>
+                Save Limit
+              </button>
+            </div>
+          </div>
+        ))}
+      </section>
+      <section className="card">
+        <h2>Holiday Calendar</h2>
+        <form className="form-grid" onSubmit={addHoliday}>
+          <label>
+            Batch
+            <select
+              className="input"
+              value={holiday.batchId}
+              onChange={(e) =>
+                setHoliday((x) => ({ ...x, batchId: e.target.value }))
+              }
+            >
+              {batches.map((b) => (
+                <option value={b.id} key={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Date
+            <input
+              className="input"
+              type="date"
+              required
+              value={holiday.day}
+              onChange={(e) =>
+                setHoliday((x) => ({ ...x, day: e.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Holiday Name
+            <input
+              className="input"
+              required
+              value={holiday.name}
+              onChange={(e) =>
+                setHoliday((x) => ({ ...x, name: e.target.value }))
+              }
+            />
+          </label>
+          <div className="form-actions">
+            <button className="btn">Add / Update Holiday</button>
+          </div>
+        </form>
+        <div className="master-tags">
+          {holidays.map((h) => (
+            <span key={h.id}>
+              {h.batch_name}: {fmt(h.day)} · {h.name}
+            </span>
+          ))}
+        </div>
+      </section>
+      <section className="card workflow-section">
+        <h2>Leave Approval Queue</h2>
+        {requests.map((x) => (
+          <div className="leave-admin-row" key={x.id}>
+            <div>
+              <b>{x.full_name}</b>
+              <div className="muted">
+                {x.batch_name || "No batch"} · {fmt(x.from_date)} to{" "}
+                {fmt(x.to_date)} · {x.requested_days} working day(s)
+              </div>
+              <p>{x.reason}</p>
+              <small>
+                Approved usage: {x.approved_days || 0}/{x.leave_limit_days ?? 0}{" "}
+                days
+              </small>
+            </div>
+            <span className="status-pill">{x.status}</span>
+            {x.status === "REQUESTED" && (
+              <div className="face-admin-actions">
+                <input
+                  className="input"
+                  placeholder="Reason required when rejecting"
+                  value={reason[x.id] || ""}
+                  onChange={(e) =>
+                    setReason((r) => ({ ...r, [x.id]: e.target.value }))
+                  }
+                />
+                <div className="action-row">
+                  <button className="btn" onClick={() => decide(x, "APPROVED")}>
+                    Approve
+                  </button>
+                  <button
+                    className="btn secondary"
+                    onClick={() => decide(x, "REJECTED")}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </section>
+    </main>
+  );
+}

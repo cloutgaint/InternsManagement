@@ -4,7 +4,9 @@ Production-oriented monorepo generated from the **GAINT Intern Management App Ma
 
 ## Architecture
 
-- **Frontend:** Next.js + React + JavaScript, responsive role dashboards.
+- **Frontend:** Next.js + React + JavaScript, responsive role dashboards. Thin
+  `frontend/app/` route entries render screens from compact feature folders in
+  `frontend/modules/`; see [frontend structure](frontend/README.md).
 - **Backend:** Node.js + Express REST API, modular route/middleware structure.
 - **Database:** PostgreSQL 16; plain SQL migration so it is fully visible/manageable in pgAdmin.
 - **Auth:** JWT, bcrypt password hashing, approved-account login gate, RBAC for Super Admin/Admin/Mentor/Intern.
