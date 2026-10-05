@@ -5,7 +5,7 @@ import { z } from "zod";
 import multer from "multer";
 import crypto from "crypto";
 import fs from "fs";
-import path from "path";
+import path from "path";import { authenticator } from "otplib";import QRCode from "qrcode";
 import { q, tx } from "../config/db.js";
 import { auth } from "../middleware/auth.js";
 const r = Router();
@@ -63,7 +63,7 @@ r.post(
       const s = z
         .object({
           email: z.string().email(),
-          password: z.string().min(10),
+          password: z.string().min(10).max(128).regex(/[a-z]/,"Password requires a lowercase letter").regex(/[A-Z]/,"Password requires an uppercase letter").regex(/[0-9]/,"Password requires a number").regex(/[^A-Za-z0-9]/,"Password requires a special character"),
           fullName: z.string().min(2),
           mobile: z.string().min(1),
           dob: z.string().min(1),
@@ -247,20 +247,11 @@ r.post(
     }
   },
 );
-r.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const u = (await q("SELECT * FROM users WHERE email=$1", [email])).rows[0];
-  if (!u || !(await bcrypt.compare(password, u.password_hash)))
-    return res.status(401).json({ error: "Invalid credentials" });
-  if (!u.is_active)
-    return res.status(403).json({ error: "Account not approved/active" });
-  const token = jwt.sign(
-    { id: u.id, email: u.email, role: u.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "8h" },
-  );
-  res.json({ token, user: { id: u.id, email: u.email, role: u.role } });
-});
+const privileged=role=>["ADMIN","SUPER_ADMIN","MENTOR"].includes(role);const sign=u=>jwt.sign({id:u.id,email:u.email,role:u.role,mfa:true},process.env.JWT_SECRET,{expiresIn:"8h"});
+r.post("/login",async(req,res)=>{const{email,password}=req.body,u=(await q("SELECT * FROM users WHERE email=$1",[String(email||"").trim().toLowerCase()])).rows[0];if(!u||!(await bcrypt.compare(String(password||""),u.password_hash)))return res.status(401).json({error:"Invalid credentials"});if(!u.is_active)return res.status(403).json({error:"Account not approved/active"});if(privileged(u.role)){const challenge=jwt.sign({id:u.id,purpose:"MFA_CHALLENGE"},process.env.JWT_SECRET,{expiresIn:"5m"});return res.json({mfaRequired:true,mfaSetupRequired:!u.mfa_enabled,challenge,user:{id:u.id,email:u.email,role:u.role}})}const token=jwt.sign({id:u.id,email:u.email,role:u.role},process.env.JWT_SECRET,{expiresIn:"8h"});res.json({token,user:{id:u.id,email:u.email,role:u.role}})});
+function challengeUser(token){const x=jwt.verify(token,process.env.JWT_SECRET);if(x.purpose!=="MFA_CHALLENGE")throw new Error("Invalid MFA challenge");return x}
+r.post("/mfa/setup",async(req,res)=>{try{const x=challengeUser(req.body.challenge),u=(await q("SELECT * FROM users WHERE id=$1",[x.id])).rows[0];if(!u||!privileged(u.role))return res.status(403).json({error:"MFA is only available for privileged roles"});if(u.mfa_enabled)return res.status(409).json({error:"MFA is already enabled"});const secret=authenticator.generateSecret(),uri=authenticator.keyuri(u.email,"GAINT Intern Management",secret),qrDataUrl=await QRCode.toDataURL(uri);await q("UPDATE users SET mfa_secret=$1 WHERE id=$2",[secret,u.id]);res.json({qrDataUrl,secret})}catch{return res.status(401).json({error:"MFA challenge expired. Sign in again."})}});
+r.post("/mfa/verify",async(req,res)=>{try{const x=challengeUser(req.body.challenge),u=(await q("SELECT * FROM users WHERE id=$1",[x.id])).rows[0];if(!u?.mfa_secret||!authenticator.check(String(req.body.code||""),u.mfa_secret))return res.status(401).json({error:"Invalid authentication code"});if(!u.mfa_enabled)await q("UPDATE users SET mfa_enabled=true,mfa_verified_at=now() WHERE id=$1",[u.id]);res.json({token:sign(u),user:{id:u.id,email:u.email,role:u.role}})}catch{return res.status(401).json({error:"MFA challenge expired. Sign in again."})}});
 r.get("/me", auth, async (req, res) =>
   res.json(
     (
