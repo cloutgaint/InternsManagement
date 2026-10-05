@@ -425,7 +425,7 @@ export default function Page() {
               <b>Internship Management</b>
               <span>Groups, mentors, projects and weekly tasks</span>
             </Link>
-            <Link className="module-card" href="/admin/completion">
+            <Link className="module-card" href="/admin/performance"><b>Performance Dashboard</b><span>Attendance, tasks, reviews, projects and individual performance</span></Link><Link className="module-card" href="/admin/completion">
               <b>Completion</b>
               <span>Final evaluation and certificates</span>
             </Link>
