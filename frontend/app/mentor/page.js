@@ -7,7 +7,7 @@ export default function Page() {
     [err, setErr] = useState(""),
     [assess, setAssess] = useState([]),
     [attempt, setAttempt] = useState(null),
-    [scores, setScores] = useState({});
+    [scores, setScores] = useState({}), [taskEval,setTaskEval]=useState(null);
   const load = () =>
     Promise.all([
       api("/mentor/dashboard"),
@@ -21,35 +21,8 @@ export default function Page() {
   useEffect(() => {
     load();
   }, []);
-  async function evaluate(s) {
-    try {
-      const x = await api("/mentor/submissions/" + s.id);
-      const marks = Number(
-        window.prompt("Marks / " + (x.task_marks || 100) + ":"),
-      );
-      if (!Number.isFinite(marks)) return;
-      const feedback = window.prompt("Feedback:") || "";
-      const rework = window.confirm("Does this submission require rework?");
-      let body = {
-        marks,
-        feedback,
-        decision: rework ? "REWORK_REQUIRED" : "APPROVED",
-      };
-      if (rework) {
-        body.reworkInstructions = window.prompt("Rework instructions:") || "";
-        body.reworkDueAt =
-          window.prompt("Rework due date/time (YYYY-MM-DDTHH:MM):") || "";
-      }
-      await api("/mentor/submissions/" + s.id + "/evaluate", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-      setMsg(rework ? "Rework requested." : "Task approved.");
-      load();
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
+  async function evaluate(s){try{const x=await api("/mentor/submissions/"+s.id);setTaskEval({...x,decision:"APPROVED",feedback:"",marks:"",rubricScores:{},reworkInstructions:"",reworkDueAt:""})}catch(e){setErr(e.message)}}
+  async function saveTaskEval(){try{const x=taskEval,criteria=x.rubric_criteria||[];const body={decision:x.decision,feedback:x.feedback,reworkInstructions:x.reworkInstructions,reworkDueAt:x.reworkDueAt};if(criteria.length)body.rubricScores=criteria.map(c=>({criterionId:c.id,awarded:Number(x.rubricScores[c.id]||0)}));else body.marks=Number(x.marks);await api("/mentor/submissions/"+x.id+"/evaluate",{method:"POST",body:JSON.stringify(body)});setMsg(x.decision==="REWORK_REQUIRED"?"Rework requested.":"Task approved.");setTaskEval(null);load()}catch(e){setErr(e.message)}}
   async function review(g) {
     const periodNo = prompt("Review period number:");
     if (!periodNo) return;
@@ -227,6 +200,7 @@ export default function Page() {
           )}
         </section>
       </div>
+      {taskEval&&<div className="modal-backdrop" onMouseDown={()=>setTaskEval(null)}><section className="modal-card" onMouseDown={e=>e.stopPropagation()}><div className="verification-title"><div><h2>{taskEval.title}</h2><p className="muted">{taskEval.full_name} · Attempt {taskEval.attempt}</p></div><button className="icon-close" onClick={()=>setTaskEval(null)}>×</button></div><p>{taskEval.content?.text||taskEval.content?.repositoryUrl||taskEval.content?.link||"Submission evidence attached."}</p>{(taskEval.rubric_criteria||[]).length?(<div className="rubric-eval"><h3>{taskEval.rubric_name}</h3>{taskEval.rubric_criteria.map(c=><label key={c.id}>{c.name} <small>max {c.max_marks}</small><input className="input" type="number" min="0" max={c.max_marks} value={taskEval.rubricScores[c.id]||""} onChange={e=>setTaskEval(x=>({...x,rubricScores:{...x.rubricScores,[c.id]:e.target.value}}))}/></label>)}</div>):<label>Marks / {taskEval.task_marks||100}<input className="input" type="number" min="0" max={taskEval.task_marks||100} value={taskEval.marks} onChange={e=>setTaskEval(x=>({...x,marks:e.target.value}))}/></label>}<label>Feedback<textarea className="input" required value={taskEval.feedback} onChange={e=>setTaskEval(x=>({...x,feedback:e.target.value}))}/></label><label>Decision<select className="input" value={taskEval.decision} onChange={e=>setTaskEval(x=>({...x,decision:e.target.value}))}><option value="APPROVED">Approve</option><option value="REWORK_REQUIRED">Request Rework</option></select></label>{taskEval.decision==="REWORK_REQUIRED"&&<><label>Rework Instructions<textarea className="input" value={taskEval.reworkInstructions} onChange={e=>setTaskEval(x=>({...x,reworkInstructions:e.target.value}))}/></label><label>Rework Due<input className="input" type="datetime-local" value={taskEval.reworkDueAt} onChange={e=>setTaskEval(x=>({...x,reworkDueAt:e.target.value}))}/></label></>}<div className="form-actions"><button className="btn" onClick={saveTaskEval}>Save Evaluation</button><button className="btn secondary" onClick={()=>setTaskEval(null)}>Cancel</button></div></section></div>}
       {attempt && (
         <div className="modal-backdrop" onMouseDown={() => setAttempt(null)}>
           <section
