@@ -1,4 +1,5 @@
-import { q } from "../config/db.js";
+import { q } from "../common/database/index.js";
+import { notify } from "../common/notifications/notification.service.js";
 let timer = null,
   running = false;
 export async function releaseDueTasks() {
@@ -25,18 +26,16 @@ export async function releaseDueTasks() {
         )
       ).rows;
       for (const u of users)
-        await q(
-          "INSERT INTO notifications(user_id,type,title,body) VALUES($1,'TASK_RELEASED',$2,$3)",
-          [
-            u.user_id,
-            "Weekly task released: " + t.title,
-            t.due_at
-              ? "Due " +
+        await notify(
+          u.user_id,
+          "TASK_RELEASED",
+          "Weekly task released: " + t.title,
+          t.due_at
+            ? "Due " +
                 new Date(t.due_at).toLocaleString("en-IN", {
                   timeZone: "Asia/Kolkata",
                 })
-              : "Open your Tasks workspace for details.",
-          ],
+            : "Open your Tasks workspace for details.",
         );
     }
   } finally {

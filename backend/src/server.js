@@ -1,4 +1,4 @@
-import "./config/env.js";
+import "./common/config/env.js";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -8,7 +8,7 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import internRoutes from "./routes/intern.js";
 import mentorRoutes from "./routes/mentor.js";
-import { errorHandler } from "./middleware/error.js";
+import { errorHandler } from "./common/middleware/error-handler.js";
 import { startTaskReleaseScheduler } from "./services/taskReleaseScheduler.js";
 const app = express();
 app.set("trust proxy", 1);

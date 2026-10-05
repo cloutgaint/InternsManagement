@@ -1,3 +1,2 @@
-import dotenv from "dotenv";
-
-dotenv.config({ path: new URL("../../../.env", import.meta.url) });
+// Compatibility adapter. New code should import common/config/env.js.
+import "../common/config/env.js";

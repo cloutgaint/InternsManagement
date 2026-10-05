@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { q, pool } from "./config/db.js";
+import { q, pool } from "./common/database/index.js";
 const pw = await bcrypt.hash("ChangeMe123!", 12);
 await q(
   `INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,$2,'SUPER_ADMIN','ACTIVE',true) ON CONFLICT(email) DO NOTHING`,

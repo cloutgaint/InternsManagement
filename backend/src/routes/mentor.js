@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { q } from "../config/db.js";import { audit } from "../utils/audit.js";import fs from "fs";import path from "path";import {documentUpload,notifyGroup} from "../services/collaborationService.js";
-import { auth, permit } from "../middleware/auth.js";
+import { q } from "../common/database/index.js";import { audit } from "../common/audit/audit.service.js";import fs from "fs";import path from "path";import {documentUpload} from "../services/collaborationService.js";import {notifyGroup} from "../common/notifications/notification.service.js";
+import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
 r.use(auth, permit("MENTOR"));
 async function mid(uid) {

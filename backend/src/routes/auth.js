@@ -6,8 +6,8 @@ import multer from "multer";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";import { authenticator } from "otplib";import QRCode from "qrcode";
-import { q, tx } from "../config/db.js";
-import { auth } from "../middleware/auth.js";
+import { q, tx } from "../common/database/index.js";
+import { auth } from "../common/security/auth.middleware.js";
 const r = Router();
 r.get("/colleges", async (_req, res) =>
   res.json(

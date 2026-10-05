@@ -1,10 +1,10 @@
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
-import { q, tx } from "../config/db.js";
-import { auth, permit } from "../middleware/auth.js";
-import { audit } from "../utils/audit.js";
-import { generateQuestions } from "../services/aiQuestionService.js";import { generateCertificate } from "../services/certificateService.js";import { generateCompletionReport } from "../services/completionReportService.js";import { notify } from "../services/collaborationService.js";
+import { q, tx } from "../common/database/index.js";
+import { auth, permit } from "../common/security/auth.middleware.js";
+import { audit } from "../common/audit/audit.service.js";
+import { generateQuestions } from "../services/aiQuestionService.js";import { generateCertificate } from "../services/certificateService.js";import { generateCompletionReport } from "../services/completionReportService.js";import { notify } from "../common/notifications/notification.service.js";
 const r = Router();
 r.use(auth, permit("ADMIN", "SUPER_ADMIN"));
 r.get("/dashboard", async (req, res) => {

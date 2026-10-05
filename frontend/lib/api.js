@@ -1,4 +1,2 @@
-export const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:8000/api';
-function headers(opts,token){const isForm=opts.body instanceof FormData;return {...(!isForm?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{}),...(opts.headers||{})}}
-export async function api(path,opts={}){const token=typeof window!=='undefined'?localStorage.getItem('token'):null;const r=await fetch(API+path,{...opts,headers:headers(opts,token)});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Request failed');return data}
-export async function apiBlob(path,opts={}){const token=typeof window!=='undefined'?localStorage.getItem('token'):null;const r=await fetch(API+path,{...opts,headers:headers(opts,token)});if(!r.ok){const data=await r.json().catch(()=>({}));throw new Error(data.error||'Request failed')}return r.blob()}
+// Compatibility adapter for pages that have not migrated to the @/shared alias yet.
+export { API, api, apiBlob } from "../shared/api/client.js";
