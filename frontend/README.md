@@ -1,5 +1,22 @@
 # Frontend structure
 
+## Editor workspace
+
+Open `gaint-intern-management.code-workspace` from the repository root using
+VS Code's **File → Open Workspace from File**. Its Explorer presents feature
+screens first, followed by shared frontend code, backend, Next.js routes, and
+project configuration. Keep the Next.js routes section collapsed while working
+on screens. Automatic file reveal is disabled so navigating to a route adapter
+does not repeatedly expand the routing tree.
+
+The project configuration view excludes directories already exposed as their
+own workspace roots. Dependency and build output folders are hidden from the
+Explorer. These are workspace display settings; all source files remain on
+disk and application routing and build commands are unchanged. Opening the
+repository as an ordinary folder still shows the original directory tree.
+
+## Source layout
+
 Next.js App Router uses directories as URL segments. For example,
 `app/admin/tasks/page.js` defines `/admin/tasks`. Keep these route files in
 place when organizing application code; naming a file `app/admin/tasks.js`

@@ -1,0 +1,21 @@
+{
+  "folders": [
+    { "name": "Feature screens", "path": "frontend/modules" },
+    { "name": "Shared frontend", "path": "frontend/shared" },
+    { "name": "Backend", "path": "backend" },
+    { "name": "Next.js routes", "path": "frontend/app" },
+    { "name": "Project configuration", "path": "." }
+  ],
+  "settings": {
+    "explorer.compactFolders": true,
+    "explorer.autoReveal": false,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.next": true,
+      "backend": true,
+      "frontend/modules": true,
+      "frontend/shared": true,
+      "frontend/app": true
+    }
+  }
+}
