@@ -796,6 +796,7 @@ r.get("/offer-letters/:id/view", async (req, res) => {
     body = body.replaceAll("{{" + k + "}}", v || "");
   res.json({ ...x, rendered_body: body });
 });
+r.get("/certificate/file",async(req,res)=>{const p=await me(req.user.id);const x=(await q("SELECT * FROM certificates WHERE intern_id=$1 AND status='ISSUED' ORDER BY created_at DESC LIMIT 1",[p.id])).rows[0];if(!x?.file_path||!fs.existsSync(x.file_path))return res.status(404).json({error:"Certificate is not available"});res.download(path.resolve(x.file_path),x.certificate_id+".pdf")});
 r.get("/completion", async (req, res) => {
   const p = await me(req.user.id);
   const evaluation = (
