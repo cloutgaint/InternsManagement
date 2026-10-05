@@ -4,7 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import authRoutes from "./routes/auth.js";
+import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./routes/admin.js";
 import internRoutes from "./routes/intern.js";
 import mentorRoutes from "./routes/mentor.js";
