@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { createCollege, getColleges, updateCollege } from "../api/colleges.api";
 export default function Page() {
   const [rows, setRows] = useState([]),
     [form, setForm] = useState({ name: "", university: "" }),
@@ -9,7 +9,7 @@ export default function Page() {
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false);
   const load = () =>
-    api("/admin/colleges")
+    getColleges()
       .then(setRows)
       .catch((e) => setErr(e.message));
   useEffect(() => {
@@ -21,10 +21,7 @@ export default function Page() {
     if (!form.name.trim()) return setErr("College name is required.");
     try {
       setBusy(true);
-      await api("/admin/colleges", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      await createCollege(form);
       setForm({ name: "", university: "" });
       setMsg("College added to the registration master.");
       load();
@@ -37,13 +34,10 @@ export default function Page() {
   async function save(c) {
     try {
       setBusy(true);
-      await api("/admin/colleges/" + c.id, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: edit.name,
-          university: edit.university,
-          active: edit.active,
-        }),
+      await updateCollege(c.id, {
+        name: edit.name,
+        university: edit.university,
+        active: edit.active,
       });
       setEdit(null);
       setMsg("College updated successfully.");
