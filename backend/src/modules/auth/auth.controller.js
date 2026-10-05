@@ -39,7 +39,8 @@ export async function login(req, res) {
 export async function setupMfa(req, res) {
   try {
     res.json(await service.setupMfa(req.body.challenge));
-  } catch {
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     return res.status(401).json({ error: "MFA challenge expired. Sign in again." });
   }
 }
@@ -48,9 +49,8 @@ export async function verifyMfa(req, res) {
   try {
     res.json(await service.verifyMfa(req.body.challenge, req.body.code));
   } catch (error) {
-    if (error.message === "Invalid authentication code")
-      return res.status(401).json({ error: "Invalid authentication code" });
-    return res.status(401).json({ error: "MFA challenge expired. Sign in again." });
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    return res.status(401).json({ error: "401 challenge expired. Sign in again." });
   }
 }
 
