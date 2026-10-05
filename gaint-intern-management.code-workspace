@@ -3,7 +3,7 @@
     { "name": "Feature screens", "path": "frontend/modules" },
     { "name": "Shared frontend", "path": "frontend/shared" },
     { "name": "Backend", "path": "backend" },
-    { "name": "Next.js routes", "path": "frontend/app" },
+    { "name": "Next.js pages", "path": "frontend/pages" },
     { "name": "Project configuration", "path": "." }
   ],
   "settings": {
@@ -15,7 +15,7 @@
       "backend": true,
       "frontend/modules": true,
       "frontend/shared": true,
-      "frontend/app": true
+      "frontend/pages": true
     }
   }
 }

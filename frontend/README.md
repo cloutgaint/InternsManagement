@@ -1,35 +1,35 @@
 # Frontend structure
 
-## Editor workspace
-
-Open `gaint-intern-management.code-workspace` from the repository root using
-VS Code's **File → Open Workspace from File**. Its Explorer presents feature
-screens first, followed by shared frontend code, backend, Next.js routes, and
-project configuration. Keep the Next.js routes section collapsed while working
-on screens. Automatic file reveal is disabled so navigating to a route adapter
-does not repeatedly expand the routing tree.
-
-The project configuration view excludes directories already exposed as their
-own workspace roots. Dependency and build output folders are hidden from the
-Explorer. These are workspace display settings; all source files remain on
-disk and application routing and build commands are unchanged. Opening the
-repository as an ordinary folder still shows the original directory tree.
-
-## Source layout
-
-Next.js App Router uses directories as URL segments. For example,
-`app/admin/tasks/page.js` defines `/admin/tasks`. Keep these route files in
-place when organizing application code; naming a file `app/admin/tasks.js`
-would not define the same route.
-
-Route folders consume negligible disk space. The benefit of this structure is
-clear ownership and easier navigation through descriptive implementation names.
+The frontend uses Next.js Pages Router. Each screen has a named route file,
+so a separate directory is not needed for each page.
 
 ```text
 frontend/
-  app/                         Next.js URLs, layout, global styles
-    admin/tasks/page.js        Thin entry for /admin/tasks
-    intern/tasks/page.js       Thin entry for /intern/tasks
+  pages/
+    _app.js                      Shared navigation, metadata, and global CSS
+    _document.js                 HTML document with lang="en"
+    index.js                     /
+    login.js                     /login
+    register.js                  /register
+    admin/
+      index.js                   /admin
+      assessments.js             /admin/assessments
+      attendance.js              /admin/attendance
+      audit.js                   /admin/audit
+      batches.js                 /admin/batches
+      colleges.js                /admin/colleges
+      ...                        Remaining admin route files
+    mentor/
+      index.js                   /mentor
+      collaboration.js           /mentor/collaboration
+      final-evaluations.js        /mentor/final-evaluations
+      operations.js              /mentor/operations
+      reports.js                 /mentor/reports
+    intern/
+      index.js                   /intern
+      assessments.js             /intern/assessments
+      attendance.js              /intern/attendance
+      ...                        Remaining intern route files
   modules/
     tasks/
       AdminTasksPage.js
@@ -38,32 +38,38 @@ frontend/
       AdminAssessmentsPage.js
       AdminQuestionsPage.js
       InternAssessmentsPage.js
-    attendance/
-      AdminAttendancePage.js
-      InternAttendancePage.js
-      InternFaceEnrollmentPage.js
-    auth/
-      LoginPage.js
-      RegisterPage.js
-    ...                        Other feature folders follow the same pattern
-  shared/api/client.js         Shared JSON, upload, and download client
-  components/Dashboard.js      Existing reusable dashboard component
-  lib/api.js                   Compatibility export for existing imports
+    ...                          Other business features
+  shared/
+    globals.css                  Existing application styles
+    api/client.js                Shared HTTP client
+  components/Dashboard.js         Existing reusable dashboard component
+  lib/api.js                      Compatibility export for existing imports
 ```
 
-Feature files live directly inside their feature folder. Role names appear in
-filenames, so related admin, mentor, and intern screens stay together. Add
-component, hook, or API files only when they have a concrete responsibility;
-create subfolders only when a feature has enough files to justify them.
+The three role folders contain files directly. Route files render feature
+screens from `modules/`; feature files contain the existing UI and workflows.
+Keep related admin, mentor, and intern implementations in the same feature
+folder with descriptive filenames. Add subfolders only when the feature has
+enough files to justify them.
 
-Use `@/modules/...`, `@/shared/...`, and `@/components/...` imports. Each role,
-login, and registration route renders its corresponding feature page. The
-small home page, root layout, and global stylesheet stay under `app/`.
+Use `@/modules/...`, `@/shared/...`, and `@/components/...` imports.
+Global styles are imported once in `pages/_app.js`. Shared navigation and
+page metadata also live there; `pages/_document.js` defines the HTML shell.
 
-The dashboards folder contains the role dashboards and the existing combined
-work/operations screens. Onboarding verification and offers belong to interns;
-completion and certificates belong to certificates; questions belong to
-assessments; audit, performance, and work logs belong to reports.
+All 37 application URLs retain their existing paths. For example,
+`pages/admin/attendance.js` still serves `/admin/attendance`. The original
+route files were relocated from `app/`, and the empty route directories
+were removed. Feature screens and backend behavior are unchanged.
 
-This relocation preserves existing page implementations and workflows. Further
-splitting of large pages should be done feature by feature with behavior checks.
+## Optional editor workspace
+
+Open `gaint-intern-management.code-workspace` from the repository root using
+VS Code's **File → Open Workspace from File**. It presents feature screens,
+shared frontend code, backend, Next.js pages, and project configuration as
+separate roots. Dependency and build output folders are hidden in this view.
+The flat page-file structure also works when opening the repository normally.
+
+## Development
+
+Run `npm run dev` from `frontend/`. Run `npm run build` to verify routes,
+compilation, and static rendering before using `npm start`.
