@@ -300,29 +300,6 @@ r.get("/groups/:id/members", async (req, res) => {
     ).rows,
   );
 });
-r.post("/final-evaluations", async (req, res) => {
-  const m = await mid(req.user.id);
-  const b = req.body;
-  const ok = (
-    await q(
-      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
-      [m, b.groupId],
-    )
-  ).rowCount;
-  if (!ok) return res.status(403).json({ error: "Not assigned" });
-  const x = (
-    await q(
-      "INSERT INTO final_evaluations(intern_id,group_id,group_marks,individual_marks,mentor_feedback,recommendation) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
-      [
-        b.internId,
-        b.groupId,
-        b.groupMarks,
-        b.individualMarks,
-        b.mentorFeedback,
-        b.recommendation,
-      ],
-    )
-  ).rows[0];
-  res.status(201).json(x);
-});
+r.get("/final-evaluations/candidates",async(req,res)=>{const m=await mid(req.user.id);res.json((await q(`SELECT ip.id intern_id,ip.full_name,ip.roll_number,g.id group_id,g.name group_name,p.title project_title,COALESCE(att.pct,0) attendance_pct,COALESCE(ts.avg_marks,0) task_avg,COALESCE(rv.avg_marks,0) review_avg,fe.id evaluation_id,fe.group_marks,fe.individual_marks,fe.mentor_feedback,fe.recommendation FROM intern_profiles ip JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id LEFT JOIN LATERAL(SELECT CASE WHEN count(*)=0 THEN 0 ELSE round(count(*) FILTER(WHERE status='PRESENT')*100.0/count(*),1) END pct FROM attendance_daily WHERE intern_id=ip.id)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true ORDER BY g.name,ip.full_name`,[m])).rows)});
+r.post("/final-evaluations",async(req,res)=>{const m=await mid(req.user.id),b=req.body;const ok=(await q("SELECT 1 FROM mentor_assignments ma JOIN group_members gm ON gm.group_id=ma.group_id AND gm.intern_id=$3 AND gm.active WHERE ma.mentor_id=$1 AND ma.group_id=$2 AND ma.active",[m,b.groupId,b.internId])).rowCount;if(!ok)return res.status(403).json({error:"Intern is not in your assigned group"});const groupMarks=Number(b.groupMarks),individualMarks=Number(b.individualMarks);if(!Number.isFinite(groupMarks)||groupMarks<0||groupMarks>100||!Number.isFinite(individualMarks)||individualMarks<0||individualMarks>100)return res.status(400).json({error:"Group and individual marks must be between 0 and 100"});if(!String(b.mentorFeedback||"").trim())return res.status(400).json({error:"Mentor feedback is required"});if(!["COMPLETED","NEEDS_WORK"].includes(b.recommendation))return res.status(400).json({error:"Choose COMPLETED or NEEDS_WORK"});const existing=(await q("SELECT 1 FROM completion_approvals WHERE intern_id=$1 AND status='APPROVED'",[b.internId])).rowCount;if(existing)return res.status(409).json({error:"Final evaluation is locked after completion approval"});const x=(await q("INSERT INTO final_evaluations(intern_id,group_id,group_marks,individual_marks,mentor_feedback,recommendation) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[b.internId,b.groupId,groupMarks,individualMarks,b.mentorFeedback,b.recommendation])).rows[0];res.status(201).json(x)});
 export default r;
