@@ -1,7 +1,105 @@
-"use client";import {useEffect,useState} from 'react';import {api} from "@/shared/api/client";
-export default function AdminWorkPage(){const [groups,setGroups]=useState([]),[mentors,setMentors]=useState([]),[projects,setProjects]=useState([]),[batches,setBatches]=useState([]),[msg,setMsg]=useState(''),[err,setErr]=useState('');const load=()=>Promise.all([api('/admin/groups'),api('/admin/mentors'),api('/admin/projects'),api('/admin/batches')]).then(([g,m,p,b])=>{setGroups(g);setMentors(m);setProjects(p);setBatches(b)}).catch(e=>setErr(e.message));useEffect(()=>{load()},[]);
-async function project(){const title=prompt('Project title:');if(!title)return;await api('/admin/projects',{method:'POST',body:JSON.stringify({title})});setMsg('Project created.');load()}
-async function task(){const title=prompt('Task title:');if(!title||!batches.length)return;await api('/admin/tasks',{method:'POST',body:JSON.stringify({batchId:batches[0].id,title,status:'RELEASED'})});setMsg('Weekly task released.')}
-async function mentor(g){if(!mentors.length)return setErr('No active mentors found.');await api('/admin/mentor-assignments',{method:'POST',body:JSON.stringify({mentorId:mentors[0].id,groupId:g.id,isLead:true})});setMsg('Mentor assigned.')}
-async function assignProject(g){if(!projects.length)return setErr('Create a project first.');await api('/admin/project-assignments',{method:'POST',body:JSON.stringify({projectId:projects[0].id,groupId:g.id})});setMsg('Project assigned.')}
-return <main className="wrap"><h1>Internship Management</h1><p className="muted">Manage groups, mentors, projects and weekly tasks.</p>{msg&&<p className="success">{msg}</p>}{err&&<p className="error">{err}</p>}<div className="action-row"><button className="btn" onClick={project}>Create Project</button><button className="btn secondary" onClick={task}>Release Weekly Task</button></div>{groups.map(g=><section className="card workflow-row" key={g.id}><div><b>{g.name}</b><div className="muted">{g.status}</div></div><div className="action-row"><button className="btn" onClick={()=>mentor(g)}>Assign Mentor</button><button className="btn secondary" onClick={()=>assignProject(g)}>Assign Project</button></div></section>)}</main>}
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "@/shared/api/client";
+export default function AdminWorkPage() {
+  const [groups, setGroups] = useState([]),
+    [mentors, setMentors] = useState([]),
+    [projects, setProjects] = useState([]),
+    [batches, setBatches] = useState([]),
+    [msg, setMsg] = useState(""),
+    [err, setErr] = useState("");
+  const load = () =>
+    Promise.all([
+      api("/admin/groups"),
+      api("/admin/mentors"),
+      api("/admin/projects"),
+      api("/admin/batches"),
+    ])
+      .then(([g, m, p, b]) => {
+        setGroups(g);
+        setMentors(m);
+        setProjects(p);
+        setBatches(b);
+      })
+      .catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
+  }, []);
+  async function project() {
+    const title = prompt("Project title:");
+    if (!title) return;
+    await api("/admin/projects", {
+      method: "POST",
+      body: JSON.stringify({ title }),
+    });
+    setMsg("Project created.");
+    load();
+  }
+  async function task() {
+    const title = prompt("Task title:");
+    if (!title || !batches.length) return;
+    await api("/admin/tasks", {
+      method: "POST",
+      body: JSON.stringify({
+        batchId: batches[0].id,
+        title,
+        status: "RELEASED",
+      }),
+    });
+    setMsg("Weekly task released.");
+  }
+  async function mentor(g) {
+    if (!mentors.length) return setErr("No active mentors found.");
+    await api("/admin/mentor-assignments", {
+      method: "POST",
+      body: JSON.stringify({
+        mentorId: mentors[0].id,
+        groupId: g.id,
+        isLead: true,
+      }),
+    });
+    setMsg("Mentor assigned.");
+  }
+  async function assignProject(g) {
+    if (!projects.length) return setErr("Create a project first.");
+    await api("/admin/project-assignments", {
+      method: "POST",
+      body: JSON.stringify({ projectId: projects[0].id, groupId: g.id }),
+    });
+    setMsg("Project assigned.");
+  }
+  return (
+    <main className="wrap">
+      <h1>Internship Management</h1>
+      <p className="muted">
+        Manage groups, mentors, projects and weekly tasks.
+      </p>
+      {msg && <p className="success">{msg}</p>}
+      {err && <p className="error">{err}</p>}
+      <div className="action-row">
+        <button className="btn" onClick={project}>
+          Create Project
+        </button>
+        <button className="btn secondary" onClick={task}>
+          Release Weekly Task
+        </button>
+      </div>
+      {groups.map((g) => (
+        <section className="card workflow-row" key={g.id}>
+          <div>
+            <b>{g.name}</b>
+            <div className="muted">{g.status}</div>
+          </div>
+          <div className="action-row">
+            <button className="btn" onClick={() => mentor(g)}>
+              Assign Mentor
+            </button>
+            <button className="btn secondary" onClick={() => assignProject(g)}>
+              Assign Project
+            </button>
+          </div>
+        </section>
+      ))}
+    </main>
+  );
+}
