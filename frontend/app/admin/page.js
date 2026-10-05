@@ -4,7 +4,7 @@ import Link from "next/link";
 import Dashboard from "../../components/Dashboard";
 import { api, apiBlob } from "../../lib/api";
 export default function Page() {
-  const [proofs, setProofs] = useState([]),
+  const [summary,setSummary]=useState(null), [proofs, setProofs] = useState([]),
     [interns, setInterns] = useState([]),
     [domains, setDomains] = useState([]),
     [batches, setBatches] = useState([]),
@@ -18,7 +18,7 @@ export default function Page() {
   async function load() {
     try {
       setErr("");
-      const [p, i, d, b, g, m, pr, c] = await Promise.all([
+      const [sum,p, i, d, b, g, m, pr, c] = await Promise.all([api("/admin/dashboard"),
         api("/admin/proofs"),
         api("/admin/interns"),
         api("/admin/domains"),
@@ -28,7 +28,7 @@ export default function Page() {
         api("/admin/projects"),
         api("/admin/completions"),
       ]);
-      setProofs(p);
+      setSummary(sum);setProofs(p);
       setInterns(i);
       setDomains(d);
       setBatches(b);
@@ -342,6 +342,7 @@ export default function Page() {
       <main className="wrap">
         {err && <p className="error">{err}</p>}
         {success && <p className="success">{success}</p>}
+        {summary&&<><div className="admin-ops-summary">{[["Active Interns",summary.active_interns],["Pending Proofs",summary.proofs_pending],["Account Approvals",summary.approvals_pending],["Face Approvals",summary.faces_pending],["Leave Requests",summary.leave_pending],["Attendance Exceptions",summary.attendance_exceptions],["Task Evaluations",summary.task_evaluations_pending],["Group Proposals",summary.groups_pending],["Active Internships",summary.active_allocations],["Published Reviews",summary.published_reviews],["Completion Approvals",summary.completions_pending],["Certificates Issued",summary.certificates_issued]].map(([k,v])=><div className="card admin-kpi" key={k}><span>{k}</span><strong>{v||0}</strong></div>)}</div><section className="card attention-panel"><h2>Operational Attention</h2><p className="muted">Use these queues to clear pending internship operations.</p><div className="form-actions"><Link className="btn" href="/admin/verification">Proof & Account Queue</Link><Link className="btn secondary" href="/admin/attendance">Face / Attendance</Link><Link className="btn secondary" href="/admin/leave">Leave Queue</Link><Link className="btn secondary" href="/admin/groups">Group Approvals</Link><Link className="btn secondary" href="/admin/completion">Completion Queue</Link></div></section></>}
         <section className="card">
           <h2>Quick Actions</h2>
           <p className="muted">
