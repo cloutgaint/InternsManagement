@@ -263,7 +263,7 @@ export default function Page() {
           )}
         </section>
         <section className="card">
-          <h2>Daily Work & Leave</h2>
+          <h2>Daily Work, Reports & Leave</h2>
           <p className="muted">
             Morning plans, evening reports, blockers, evidence and leave
             history.
@@ -306,7 +306,7 @@ export default function Page() {
           </div>
         </section>
         <section className="card">
-          <h2>Team & Project</h2>
+          <div className="verification-title"><h2>Team & Project</h2><a className="btn secondary" href="/intern/collaboration">Group Workspace</a></div>
           {group ? (
             <>
               <p>
@@ -355,7 +355,7 @@ export default function Page() {
         </section>
         <section className="card"><h2>Group Workspace</h2><p className="muted">Documents, shared resources and group chat with your mentor.</p><div className="form-actions"><a className="btn" href="/intern/collaboration">Open Group Workspace</a></div></section>
         <section className="card">
-          <h2>Notifications</h2>
+          <div className="verification-title"><h2>Notifications</h2><a className="btn secondary" href="/intern/notifications">View All</a></div>
           {(data.notifications || []).length ? (
             <div className="mini-list">
               {data.notifications.slice(0, 5).map((n) => (
