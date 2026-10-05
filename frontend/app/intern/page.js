@@ -353,6 +353,7 @@ export default function Page() {
             <b>{completion?.certificate?.status || "Not issued"}</b>
           </div>
         </section>
+        <section className="card"><h2>Group Workspace</h2><p className="muted">Documents, shared resources and group chat with your mentor.</p><div className="form-actions"><a className="btn" href="/intern/collaboration">Open Group Workspace</a></div></section>
         <section className="card">
           <h2>Notifications</h2>
           {(data.notifications || []).length ? (
