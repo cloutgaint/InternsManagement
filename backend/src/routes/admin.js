@@ -11,6 +11,17 @@ r.get("/dashboard", async (req, res) => {
   const sql = `SELECT (SELECT count(*) FROM users WHERE role='INTERN') interns,(SELECT count(*) FROM college_proofs WHERE status IN ('UPLOADED','UNDER_REVIEW')) proofs_pending,(SELECT count(*) FROM users WHERE role='INTERN' AND status='PENDING_APPROVAL') approvals_pending,(SELECT count(*) FROM face_enrollments WHERE status='PENDING_ADMIN_APPROVAL') faces_pending,(SELECT count(*) FROM task_submissions WHERE status='SUBMITTED') task_evaluations_pending,(SELECT count(*) FROM attendance_exceptions WHERE status NOT IN ('CLOSED','REJECTED')) attendance_exceptions`;
   res.json((await q(sql)).rows[0]);
 });
+r.get("/performance",async(req,res)=>{const rows=(await q(`SELECT ip.id,ip.full_name,ip.roll_number,c.name college_name,b.name batch_name,d.name domain_name,g.name group_name,p.title project_title,
+COALESCE(att.present_days,0)::int present_days,COALESCE(att.total_days,0)::int attendance_days,CASE WHEN COALESCE(att.total_days,0)=0 THEN 0 ELSE round(att.present_days*100.0/att.total_days,1) END attendance_pct,
+COALESCE(ts.task_count,0)::int task_count,COALESCE(ts.approved_tasks,0)::int approved_tasks,COALESCE(ts.avg_task_marks,0)::numeric(10,1) avg_task_marks,
+COALESCE(rv.review_count,0)::int review_count,COALESCE(rv.avg_individual_marks,0)::numeric(10,1) avg_individual_marks,
+COALESCE(fe.individual_marks,0)::numeric(10,1) final_individual_marks,fe.recommendation
+FROM intern_profiles ip LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT ba.* FROM batch_allocations ba WHERE ba.intern_id=ip.id ORDER BY ba.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id
+LEFT JOIN LATERAL(SELECT count(*) total_days,count(*) FILTER(WHERE status='PRESENT') present_days FROM attendance_daily a WHERE a.intern_id=ip.id)att ON true
+LEFT JOIN LATERAL(SELECT count(*) task_count,count(*) FILTER(WHERE x.status='APPROVED') approved_tasks,avg(te.marks) avg_task_marks FROM task_submissions x LEFT JOIN LATERAL(SELECT marks FROM task_evaluations e WHERE e.submission_id=x.id ORDER BY e.created_at DESC LIMIT 1)te ON true WHERE x.intern_id=ip.id)ts ON true
+LEFT JOIN LATERAL(SELECT count(*) review_count,avg(rim.marks) avg_individual_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true
+LEFT JOIN LATERAL(SELECT individual_marks,recommendation FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true ORDER BY ip.full_name`)).rows;
+const summary={interns:rows.length,avgAttendance:rows.length?Number((rows.reduce((n,x)=>n+Number(x.attendance_pct||0),0)/rows.length).toFixed(1)):0,avgTaskMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_task_marks||0),0)/rows.length).toFixed(1)):0,avgIndividualMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_individual_marks||0),0)/rows.length).toFixed(1)):0};res.json({summary,interns:rows})});
 r.get("/proofs", async (req, res) =>
   res.json(
     (
