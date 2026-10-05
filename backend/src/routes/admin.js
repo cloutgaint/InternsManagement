@@ -2033,7 +2033,7 @@ r.get("/completions", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT ip.id intern_id,ip.full_name,d.name domain_name,fe.group_marks,fe.individual_marks,fe.mentor_feedback,ca.status completion_status,ca.reason,c.certificate_id,c.status certificate_status FROM intern_profiles ip LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL (SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) fe ON true LEFT JOIN LATERAL (SELECT * FROM completion_approvals x WHERE x.intern_id=ip.id ORDER BY x.approved_at DESC LIMIT 1) ca ON true LEFT JOIN certificates c ON c.intern_id=ip.id ORDER BY ip.full_name`,
+        `SELECT ip.id intern_id,ip.full_name,d.name domain_name,fe.group_marks,fe.individual_marks,fe.mentor_feedback,ca.status completion_status,ca.reason,c.id certificate_db_id,c.certificate_id,c.status certificate_status FROM intern_profiles ip LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL (SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) fe ON true LEFT JOIN LATERAL (SELECT * FROM completion_approvals x WHERE x.intern_id=ip.id ORDER BY x.approved_at DESC LIMIT 1) ca ON true LEFT JOIN certificates c ON c.intern_id=ip.id ORDER BY ip.full_name`,
       )
     ).rows,
   ),
