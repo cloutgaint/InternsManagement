@@ -5,6 +5,7 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./routes/admin.js";
+import collegeRoutes from "./modules/colleges/college.routes.js";
 import internRoutes from "./routes/intern.js";
 import mentorRoutes from "./routes/mentor.js";
 import { errorHandler } from "./common/middleware/error-handler.js";
@@ -17,6 +18,7 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("combined"));
   app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }), authRoutes);
+  app.use("/api/admin", collegeRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/intern", internRoutes);
   app.use("/api/mentor", mentorRoutes);
