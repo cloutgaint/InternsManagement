@@ -273,6 +273,8 @@ r.post("/reviews", async (req, res) => {
     );
   res.status(201).json(x);
 });
+r.get("/reviews/:id/report", async (req,res)=>{const m=await mid(req.user.id);const review=(await q(`SELECT fr.*,g.name group_name,b.name batch_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active WHERE fr.id=$2`,[m,req.params.id])).rows[0];if(!review)return res.status(404).json({error:"Review not found"});const members=(await q(`SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id WHERE rim.review_id=$1 ORDER BY ip.full_name`,[review.id])).rows;res.json({review,members,generatedAt:new Date().toISOString()})});
+r.get("/reviews",async(req,res)=>{const m=await mid(req.user.id);res.json((await q(`SELECT fr.*,g.name group_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY fr.review_date DESC,fr.period_no DESC`,[m])).rows)});
 r.get("/groups/:id/members", async (req, res) => {
   const m = await mid(req.user.id);
   const ok = (
