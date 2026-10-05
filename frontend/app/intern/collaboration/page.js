@@ -1,3 +1,175 @@
-"use client";import{useEffect,useState}from"react";import{api,apiBlob}from"../../../lib/api";
-export default function Page(){const[d,setD]=useState({group:null,documents:[],messages:[]}),[msg,setMsg]=useState(""),[title,setTitle]=useState(""),[url,setUrl]=useState(""),[file,setFile]=useState(null),[err,setErr]=useState("");const load=()=>api("/intern/collaboration").then(setD).catch(e=>setErr(e.message));useEffect(()=>{load();const x=setInterval(load,15000);return()=>clearInterval(x)},[]);
-async function upload(e){e.preventDefault();try{const f=new FormData();f.append("title",title);if(url)f.append("externalUrl",url);if(file)f.append("file",file);const token=localStorage.getItem("token"),base=process.env.NEXT_PUBLIC_API_URL||"http://localhost:8000/api",r=await fetch(base+"/intern/documents",{method:"POST",headers:{Authorization:"Bearer "+token},body:f}),x=await r.json();if(!r.ok)throw new Error(x.error||"Upload failed");setTitle("");setUrl("");setFile(null);load()}catch(e){setErr(e.message)}}async function send(e){e.preventDefault();if(!msg.trim())return;try{await api("/intern/chat",{method:"POST",body:JSON.stringify({message:msg})});setMsg("");load()}catch(e){setErr(e.message)}}async function download(x){if(x.external_url)return window.open(x.external_url,"_blank","noopener,noreferrer");try{const b=await apiBlob("/intern/documents/"+x.id+"/file"),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=x.original_name||x.title;a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)}catch(e){setErr(e.message)}}return <main className="wrap"><div className="intern-head"><div><h1>Group Workspace</h1><p className="muted">{d.group?d.group.name:"Your active group"} · documents, resources and group communication.</p></div><a className="btn secondary" href="/intern/notifications">Notifications</a></div>{err&&<p className="error">{err}</p>}{!d.group?<section className="card"><p>No active group assigned yet.</p></section>:<div className="collab-grid"><section className="card"><h2>Document Center</h2><form onSubmit={upload}><label>Title<input className="input" required value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Upload File<input className="input" type="file" accept=".pdf,.docx,.pptx,.xlsx,.zip,.txt,.png,.jpg,.jpeg" onChange={e=>setFile(e.target.files?.[0]||null)}/></label><label>or External Link<input className="input" type="url" value={url} onChange={e=>setUrl(e.target.value)}/></label><button className="btn">Share with Group</button></form><div className="document-list">{d.documents.map(x=><button className="document-item" key={x.id} onClick={()=>download(x)}><b>{x.title}</b><small>{x.original_name||x.external_url||"Shared document"} · {new Date(x.created_at).toLocaleString()}</small></button>)}</div></section><section className="card chat-panel"><h2>Group Chat</h2><div className="chat-messages">{d.messages.map(x=><div className={"chat-message "+(x.sender_id===undefined?"":"")} key={x.id}><b>{x.sender_name}</b><p>{x.message}</p>{x.attachment_title&&<small>Attachment: {x.attachment_title}</small>}<small>{new Date(x.created_at).toLocaleString()}</small></div>)}</div><form className="chat-compose" onSubmit={send}><textarea className="input" placeholder="Message your group and mentor…" value={msg} onChange={e=>setMsg(e.target.value)}/><button className="btn">Send</button></form></section></div>}</main>}
+"use client";
+import { useEffect, useState } from "react";
+import { api, apiBlob } from "../../../lib/api";
+export default function Page() {
+  const [d, setD] = useState({ group: null, documents: [], messages: [] }),
+    [msg, setMsg] = useState(""),
+    [title, setTitle] = useState(""),
+    [url, setUrl] = useState(""),
+    [file, setFile] = useState(null),
+    [err, setErr] = useState("");
+  const load = () =>
+    api("/intern/collaboration")
+      .then(setD)
+      .catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
+    const x = setInterval(load, 15000);
+    return () => clearInterval(x);
+  }, []);
+  async function upload(e) {
+    e.preventDefault();
+    try {
+      const f = new FormData();
+      f.append("title", title);
+      if (url) f.append("externalUrl", url);
+      if (file) f.append("file", file);
+      const token = localStorage.getItem("token"),
+        base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
+        r = await fetch(base + "/intern/documents", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+          body: f,
+        }),
+        x = await r.json();
+      if (!r.ok) throw new Error(x.error || "Upload failed");
+      setTitle("");
+      setUrl("");
+      setFile(null);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function send(e) {
+    e.preventDefault();
+    if (!msg.trim()) return;
+    try {
+      await api("/intern/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: msg }),
+      });
+      setMsg("");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function download(x) {
+    if (x.external_url)
+      return window.open(x.external_url, "_blank", "noopener,noreferrer");
+    try {
+      const b = await apiBlob("/intern/documents/" + x.id + "/file"),
+        u = URL.createObjectURL(b),
+        a = document.createElement("a");
+      a.href = u;
+      a.download = x.original_name || x.title;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  return (
+    <main className="wrap">
+      <div className="intern-head">
+        <div>
+          <h1>Group Workspace</h1>
+          <p className="muted">
+            {d.group ? d.group.name : "Your active group"} · documents,
+            resources and group communication.
+          </p>
+        </div>
+        <a className="btn secondary" href="/intern/notifications">
+          Notifications
+        </a>
+      </div>
+      {err && <p className="error">{err}</p>}
+      {!d.group ? (
+        <section className="card">
+          <p>No active group assigned yet.</p>
+        </section>
+      ) : (
+        <div className="collab-grid">
+          <section className="card">
+            <h2>Document Center</h2>
+            <form onSubmit={upload}>
+              <label>
+                Title
+                <input
+                  className="input"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </label>
+              <label>
+                Upload File
+                <input
+                  className="input"
+                  type="file"
+                  accept=".pdf,.docx,.pptx,.xlsx,.zip,.txt,.png,.jpg,.jpeg"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <label>
+                or External Link
+                <input
+                  className="input"
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </label>
+              <button className="btn">Share with Group</button>
+            </form>
+            <div className="document-list">
+              {d.documents.map((x) => (
+                <button
+                  className="document-item"
+                  key={x.id}
+                  onClick={() => download(x)}
+                >
+                  <b>{x.title}</b>
+                  <small>
+                    {x.original_name || x.external_url || "Shared document"} ·{" "}
+                    {new Date(x.created_at).toLocaleString()}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="card chat-panel">
+            <h2>Group Chat</h2>
+            <div className="chat-messages">
+              {d.messages.map((x) => (
+                <div
+                  className={
+                    "chat-message " + (x.sender_id === undefined ? "" : "")
+                  }
+                  key={x.id}
+                >
+                  <b>{x.sender_name}</b>
+                  <p>{x.message}</p>
+                  {x.attachment_title && (
+                    <small>Attachment: {x.attachment_title}</small>
+                  )}
+                  <small>{new Date(x.created_at).toLocaleString()}</small>
+                </div>
+              ))}
+            </div>
+            <form className="chat-compose" onSubmit={send}>
+              <textarea
+                className="input"
+                placeholder="Message your group and mentor…"
+                value={msg}
+                onChange={(e) => setMsg(e.target.value)}
+              />
+              <button className="btn">Send</button>
+            </form>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}

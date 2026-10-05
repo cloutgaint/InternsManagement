@@ -1,2 +1,101 @@
-"use client";import {useEffect,useState} from "react";import {api} from "../../../lib/api";
-export default function Page(){const[d,setD]=useState(null),[q,setQ]=useState("");useEffect(()=>{api("/admin/performance").then(setD)},[]);if(!d)return <main className="wrap">Loading performance dashboard…</main>;const rows=d.interns.filter(x=>(x.full_name+" "+(x.roll_number||"")+" "+(x.batch_name||"")+" "+(x.domain_name||"")).toLowerCase().includes(q.toLowerCase()));return <main className="wrap"><div className="intern-head"><div><h1>Intern Performance Dashboard</h1><p className="muted">Combined attendance, weekly-task, fortnight-review, project and individual-performance view.</p></div></div><div className="work-summary performance-kpis"><div className="card"><span>Interns</span><strong>{d.summary.interns}</strong></div><div className="card"><span>Avg Attendance</span><strong>{d.summary.avgAttendance}%</strong></div><div className="card"><span>Avg Task Marks</span><strong>{d.summary.avgTaskMarks}</strong></div><div className="card"><span>Avg Review Marks</span><strong>{d.summary.avgIndividualMarks}</strong></div></div><section className="card"><input className="input" placeholder="Search intern, roll, batch or domain" value={q} onChange={e=>setQ(e.target.value)}/><div className="performance-table"><b>Intern</b><b>Batch / Domain</b><b>Attendance</b><b>Tasks</b><b>Task Avg</b><b>Reviews</b><b>Individual Avg</b><b>Project</b>{rows.map(x=><div className="performance-row" key={x.id}><span><strong>{x.full_name}</strong><small>{x.roll_number||"—"}</small></span><span>{x.batch_name||"—"}<small>{x.domain_name||"No domain"}</small></span><span>{x.attendance_pct}%<small>{x.present_days}/{x.attendance_days} days</small></span><span>{x.approved_tasks}/{x.task_count}</span><span>{x.avg_task_marks}</span><span>{x.review_count}</span><span>{x.avg_individual_marks}</span><span>{x.project_title||"Not assigned"}<small>{x.recommendation||""}</small></span></div>)}</div></section></main>}
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "../../../lib/api";
+export default function Page() {
+  const [d, setD] = useState(null),
+    [q, setQ] = useState("");
+  useEffect(() => {
+    api("/admin/performance").then(setD);
+  }, []);
+  if (!d) return <main className="wrap">Loading performance dashboard…</main>;
+  const rows = d.interns.filter((x) =>
+    (
+      x.full_name +
+      " " +
+      (x.roll_number || "") +
+      " " +
+      (x.batch_name || "") +
+      " " +
+      (x.domain_name || "")
+    )
+      .toLowerCase()
+      .includes(q.toLowerCase()),
+  );
+  return (
+    <main className="wrap">
+      <div className="intern-head">
+        <div>
+          <h1>Intern Performance Dashboard</h1>
+          <p className="muted">
+            Combined attendance, weekly-task, fortnight-review, project and
+            individual-performance view.
+          </p>
+        </div>
+      </div>
+      <div className="work-summary performance-kpis">
+        <div className="card">
+          <span>Interns</span>
+          <strong>{d.summary.interns}</strong>
+        </div>
+        <div className="card">
+          <span>Avg Attendance</span>
+          <strong>{d.summary.avgAttendance}%</strong>
+        </div>
+        <div className="card">
+          <span>Avg Task Marks</span>
+          <strong>{d.summary.avgTaskMarks}</strong>
+        </div>
+        <div className="card">
+          <span>Avg Review Marks</span>
+          <strong>{d.summary.avgIndividualMarks}</strong>
+        </div>
+      </div>
+      <section className="card">
+        <input
+          className="input"
+          placeholder="Search intern, roll, batch or domain"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="performance-table">
+          <b>Intern</b>
+          <b>Batch / Domain</b>
+          <b>Attendance</b>
+          <b>Tasks</b>
+          <b>Task Avg</b>
+          <b>Reviews</b>
+          <b>Individual Avg</b>
+          <b>Project</b>
+          {rows.map((x) => (
+            <div className="performance-row" key={x.id}>
+              <span>
+                <strong>{x.full_name}</strong>
+                <small>{x.roll_number || "—"}</small>
+              </span>
+              <span>
+                {x.batch_name || "—"}
+                <small>{x.domain_name || "No domain"}</small>
+              </span>
+              <span>
+                {x.attendance_pct}%
+                <small>
+                  {x.present_days}/{x.attendance_days} days
+                </small>
+              </span>
+              <span>
+                {x.approved_tasks}/{x.task_count}
+              </span>
+              <span>{x.avg_task_marks}</span>
+              <span>{x.review_count}</span>
+              <span>{x.avg_individual_marks}</span>
+              <span>
+                {x.project_title || "Not assigned"}
+                <small>{x.recommendation || ""}</small>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
