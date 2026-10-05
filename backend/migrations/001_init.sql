@@ -87,3 +87,17 @@ ALTER TABLE task_evaluations ADD COLUMN IF NOT EXISTS rework_due_at timestamptz;
 ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS rework_due_at timestamptz;
 ALTER TABLE task_submissions ADD COLUMN IF NOT EXISTS mentor_feedback text;
 ALTER TABLE fortnight_reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- Role-controlled document center, group chat and notification lifecycle
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS visibility text DEFAULT 'GROUP';
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_by_role text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_name text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS size_bytes bigint;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS active boolean DEFAULT true;
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS edited_at timestamptz;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS action_url text;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_key text;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id,read_at,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_group_created ON chat_messages(group_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_documents_group_created ON documents(group_id,created_at DESC);
