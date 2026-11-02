@@ -6,8 +6,8 @@ export function sendOfferPdf(res, offer) {
     to_date: String(offer.to_date).slice(0, 10), duration: offer.duration_text,
     reference_number: offer.reference_number,
   };
-  let body = offer.template_body || "";
-  for (const [key, value] of Object.entries(values))
+  let body = offer.issued_snapshot?.rendered_body || offer.template_body || "";
+  if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
   const pdf = new PDFDocument({ size: "A4", margin: 54 });
   res.setHeader("Content-Type", "application/pdf");
@@ -17,6 +17,6 @@ export function sendOfferPdf(res, offer) {
   pdf.moveDown().fontSize(13).text("Internship Offer Letter", { align: "center" });
   pdf.moveDown().fontSize(10).text("Reference: " + offer.reference_number);
   pdf.moveDown().fontSize(11).text(body, { lineGap: 5 });
-  pdf.moveDown(2).text(offer.signatory || "Authorized Signatory");
+  pdf.moveDown(2).text(offer.issued_snapshot?.signatory || offer.signatory || "Authorized Signatory");
   pdf.end();
 }
