@@ -361,13 +361,13 @@ r.post("/allocate", async (req, res) => {
     req.body;
   const info = (
     await q(
-      `SELECT b.*,ip.full_name,ip.college_id intern_college,cp.id proof_id,cp.approved_from,cp.approved_to,cp.reference_number FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT * FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN' AND u.is_active=true AND u.status='ACTIVE'`,
+      `SELECT b.*,ip.full_name,ip.college_id intern_college,cp.id proof_id,cp.status proof_status,cp.approved_from,cp.approved_to,cp.reference_number FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT * FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN' AND u.is_active=true AND u.status='ACTIVE'`,
       [batchId, internId],
     )
   ).rows[0];
   if (!info)
     return res.status(404).json({ error: "Batch or intern not found" });
-  if (!info.proof_id || info.status !== "VERIFIED")
+  if (!info.proof_id || info.proof_status !== "VERIFIED")
     return res.status(409).json({
       error:
         "Verified college permission proof is required before duration allocation",
