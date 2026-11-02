@@ -380,8 +380,11 @@ r.post("/allocate", async (req, res) => {
     });
   if (overrideReason && req.user.role !== "SUPER_ADMIN")
     return res.status(403).json({ error: "Only Super Admin can authorize a college-date override" });
-  const start = internStart || info.start_date,
-    end = internEnd || info.end_date;
+  const start = internStart || String(info.start_date).slice(0, 10),
+    end = internEnd || String(info.end_date).slice(0, 10);
+  const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (!validDate(start) || !validDate(end))
+    return res.status(400).json({ error: "Valid internship start and end dates are required" });
   if (new Date(end) < new Date(start))
     return res
       .status(400)
