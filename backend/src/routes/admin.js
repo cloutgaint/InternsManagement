@@ -585,10 +585,11 @@ r.post("/offer-letters/:id/approve", async (req, res) => {
       .json({ error: "Only draft offer letters can be approved" });
   const x = (
     await q(
-      "UPDATE offer_letters SET status='APPROVED' WHERE id=$1 RETURNING *",
+      "UPDATE offer_letters SET status='APPROVED' WHERE id=$1 AND status='DRAFT' RETURNING *",
       [req.params.id],
     )
   ).rows[0];
+  if (!x) return res.status(409).json({ error: "Offer letter state changed; reload and retry" });
   await audit(req, "OFFER_APPROVED", "offer_letter", x.id, before, x);
   res.json(x);
 });
@@ -603,10 +604,11 @@ r.post("/offer-letters/:id/issue", async (req, res) => {
       .json({ error: "Admin approval is required before issue" });
   const x = (
     await q(
-      "UPDATE offer_letters SET status='ISSUED',issue_at=COALESCE($2::timestamptz,now()),issued_by=$3 WHERE id=$1 RETURNING *",
+      "UPDATE offer_letters SET status='ISSUED',issue_at=COALESCE($2::timestamptz,now()),issued_by=$3 WHERE id=$1 AND status='APPROVED' RETURNING *",
       [req.params.id, req.body.issueAt || null, req.user.id],
     )
   ).rows[0];
+  if (!x) return res.status(409).json({ error: "Offer letter state changed; reload and retry" });
   const uid = (
     await q(
       "SELECT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id WHERE ba.id=$1",
