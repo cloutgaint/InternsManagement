@@ -1,4 +1,5 @@
 import { Router } from "express";
+import batchAllotmentOrders from "./batchAllotmentOrders.js";
 import fs from "fs";
 import path from "path";
 import { q, tx } from "../common/database/index.js";
@@ -7,6 +8,7 @@ import { audit } from "../common/audit/audit.service.js";
 import { generateQuestions } from "../services/aiQuestionService.js";import { generateCertificate } from "../services/certificateService.js";import { generateCompletionReport } from "../services/completionReportService.js";import { notify } from "../common/notifications/notification.service.js";
 const r = Router();
 r.use(auth, permit("ADMIN", "SUPER_ADMIN"));
+r.use(batchAllotmentOrders);
 r.get("/dashboard", async (req, res) => {
   const sql = `SELECT (SELECT count(*) FROM users WHERE role='INTERN') interns,(SELECT count(*) FROM users WHERE role='INTERN' AND is_active) active_interns,(SELECT count(*) FROM college_proofs WHERE status IN ('UPLOADED','UNDER_REVIEW')) proofs_pending,(SELECT count(*) FROM users WHERE role='INTERN' AND status='PENDING_APPROVAL') approvals_pending,(SELECT count(*) FROM face_enrollments WHERE status='PENDING_ADMIN_APPROVAL') faces_pending,(SELECT count(*) FROM task_submissions WHERE status IN ('SUBMITTED','RESUBMITTED')) task_evaluations_pending,(SELECT count(*) FROM attendance_exceptions WHERE status NOT IN ('CLOSED','REJECTED')) attendance_exceptions,(SELECT count(*) FROM leave_requests WHERE status='PENDING') leave_pending,(SELECT count(*) FROM groups WHERE status IN ('SYSTEM_DRAFT','DRAFT')) groups_pending,(SELECT count(*) FROM batch_allocations WHERE current_date BETWEEN intern_start AND intern_end) active_allocations,(SELECT count(*) FROM fortnight_reviews WHERE status='PUBLISHED') published_reviews,(SELECT count(*) FROM completion_approvals WHERE status='PENDING') completions_pending,(SELECT count(*) FROM certificates WHERE status='ISSUED') certificates_issued`;res.json((await q(sql)).rows[0]);
 });
