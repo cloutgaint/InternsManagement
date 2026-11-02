@@ -795,7 +795,7 @@ r.get("/offer-letters/:id/view", async (req, res) => {
   let body = x.template_body || "";
   for (const [k, v] of Object.entries(values))
     body = body.replaceAll("{{" + k + "}}", v || "");
-  res.json({ ...x, rendered_body: body });
+  res.json({ ...x, rendered_body: x.issued_snapshot?.rendered_body ?? body, signatory: x.issued_snapshot?.signatory ?? x.signatory });
 });
 r.get("/offer-letters/:id/pdf", async (req, res) => {
   const p = await me(req.user.id);
