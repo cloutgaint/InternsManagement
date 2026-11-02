@@ -671,10 +671,11 @@ r.post("/offer-letters/:id/revoke", async (req, res) => {
       .json({ error: "Only an issued offer letter can be revoked" });
   const x = (
     await q(
-      "UPDATE offer_letters SET status='REVOKED',reason=$2 WHERE id=$1 RETURNING *",
+      "UPDATE offer_letters SET status='REVOKED',reason=$2 WHERE id=$1 AND status='ISSUED' RETURNING *",
       [req.params.id, reason],
     )
   ).rows[0];
+  if (!x) return res.status(409).json({ error: "Offer letter state changed; reload and retry" });
   await audit(req, "OFFER_REVOKED", "offer_letter", x.id, before, x);
   res.json(x);
 });
