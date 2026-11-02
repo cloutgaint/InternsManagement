@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";import {documentUpload} from "../services/collaborationService.js";import {notifyGroup} from "../common/notifications/notification.service.js";
 import { q } from "../common/database/index.js";
+import { sendOfferPdf } from "../services/offerLetterPdfService.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
 const submissionDir = path.resolve("uploads/task-submissions");
@@ -795,6 +796,15 @@ r.get("/offer-letters/:id/view", async (req, res) => {
   for (const [k, v] of Object.entries(values))
     body = body.replaceAll("{{" + k + "}}", v || "");
   res.json({ ...x, rendered_body: body });
+});
+r.get("/offer-letters/:id/pdf", async (req, res) => {
+  const p = await me(req.user.id);
+  const offer = (await q(
+    "SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status='ISSUED'",
+    [req.params.id, p.id],
+  )).rows[0];
+  if (!offer) return res.status(404).json({ error: "Issued offer letter not found" });
+  sendOfferPdf(res, offer);
 });
 r.get("/certificate/file",async(req,res)=>{const p=await me(req.user.id);const x=(await q("SELECT * FROM certificates WHERE intern_id=$1 AND status='ISSUED' ORDER BY created_at DESC LIMIT 1",[p.id])).rows[0];if(!x?.file_path||!fs.existsSync(x.file_path))return res.status(404).json({error:"Certificate is not available"});res.download(path.resolve(x.file_path),x.certificate_id+".pdf")});
 r.get("/completion", async (req, res) => {
