@@ -112,3 +112,6 @@ ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS status text NOT NULL
 ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verified_by uuid REFERENCES users(id);
 ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verified_at timestamptz;
 ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verification_reason text;
+
+ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS issued_snapshot jsonb;
+ALTER TABLE offer_letter_versions ADD COLUMN IF NOT EXISTS issued_snapshot jsonb;
