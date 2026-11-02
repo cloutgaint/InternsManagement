@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/shared/api/client";
+import { api, apiBlob } from "@/shared/api/client";
 
 const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 export default function InternDashboardPage() {
@@ -105,6 +105,21 @@ export default function InternDashboardPage() {
   async function viewOffer(x) {
     try {
       setOfferView(await api("/intern/offer-letters/" + x.id + "/view"));
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function downloadOffer(x) {
+    try {
+      const blob = await apiBlob("/intern/offer-letters/" + x.id + "/pdf");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "GAINT-Offer-" + x.reference_number.replace(/[^a-zA-Z0-9_-]/g, "") + ".pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) {
       setErr(e.message);
     }
@@ -233,6 +248,11 @@ export default function InternDashboardPage() {
                   >
                     View / Print
                   </button>
+                  {x.status === "ISSUED" && (
+                    <button className="btn secondary" onClick={() => downloadOffer(x)}>
+                      Download PDF
+                    </button>
+                  )}
                 </div>
               </div>
             ))
