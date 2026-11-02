@@ -328,6 +328,14 @@ r.patch("/colleges/:id", async (req, res) => {
 });
 r.post("/batches", async (req, res) => {
   const b = req.body;
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const validDate = (value) => datePattern.test(String(value || "")) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (!b.collegeId || !String(b.name || "").trim() || !String(b.code || "").trim() || !validDate(b.startDate) || !validDate(b.endDate))
+    return res.status(400).json({ error: "College, batch name, code and valid start/end dates are required" });
+  if (b.endDate < b.startDate)
+    return res.status(400).json({ error: "Batch end date cannot be before start date" });
+  if (!["ONSITE", "REMOTE", "HYBRID"].includes(b.mode || "ONSITE"))
+    return res.status(400).json({ error: "Invalid internship mode" });
   const x = (
     await q(
       "INSERT INTO batches(college_id,name,code,start_date,end_date,mode,task_release_rule,review_rule,min_attendance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
