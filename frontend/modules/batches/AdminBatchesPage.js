@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+import BatchAllotmentOrders from "./BatchAllotmentOrders";
 export default function AdminBatchesPage() {
   const [interns, setInterns] = useState([]),
     [batches, setBatches] = useState([]),
@@ -124,6 +125,7 @@ export default function AdminBatchesPage() {
       </div>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
+      <BatchAllotmentOrders batches={batches} />
       <section className="card">
         <h2>Create Batch</h2>
         <form className="form-grid" onSubmit={createBatch}>
