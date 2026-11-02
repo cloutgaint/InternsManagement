@@ -107,3 +107,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_verified_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery_hashes jsonb DEFAULT '[]';
+
+ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'UPLOADED';
+ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verified_by uuid REFERENCES users(id);
+ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verified_at timestamptz;
+ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verification_reason text;
