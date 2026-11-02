@@ -28,6 +28,7 @@ router.post("/batch-allotment-orders", (req, res, next) => {
   });
 }, async (req, res) => {
   const file = req.file;
+  let saved = false;
   try {
     const { batchId, referenceNumber, issueDate, issuingAuthority, approvedFrom, approvedTo } = req.body;
     if (!file) return res.status(400).json({ error: "Allotment document is required" });
@@ -40,15 +41,16 @@ router.post("/batch-allotment-orders", (req, res, next) => {
     const duplicate = (await q("SELECT id FROM batch_allotment_orders WHERE file_hash=$1 OR lower(reference_number)=lower($2) LIMIT 1", [hash, referenceNumber.trim()])).rows[0];
     if (duplicate) return res.status(409).json({ error: "Duplicate document or reference number" });
     const order = (await q("INSERT INTO batch_allotment_orders(batch_id,reference_number,issue_date,issuing_authority,file_path,file_hash,approved_from,approved_to,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'UPLOADED') RETURNING *", [batchId,referenceNumber.trim(),issueDate,issuingAuthority.trim(),file.path,hash,approvedFrom,approvedTo])).rows[0];
+    saved = true;
     await audit(req, "BATCH_ALLOTMENT_UPLOADED", "batch_allotment_order", order.id, null, { ...order, file_path: undefined });
     res.status(201).json({ ...order, file_path: undefined });
   } catch (error) {
     if (!res.headersSent) {
       if (error.code === "23505") res.status(409).json({ error: "Allotment reference already exists" });
-      else throw error;
+      else res.status(500).json({ error: "Unable to save allotment order" });
     }
   } finally {
-    if (file && !res.headersSent) fs.unlink(file.path, () => {});
+    if (file && !saved) fs.unlink(file.path, () => {});
   }
 });
 router.post("/batch-allotment-orders/:id/verify", async (req, res) => {
