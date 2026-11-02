@@ -1,5 +1,6 @@
 import { Router } from "express";
 import batchAllotmentOrders from "./batchAllotmentOrders.js";
+import { offerSnapshot } from "../services/offerLetterSnapshot.js";
 import fs from "fs";
 import path from "path";
 import { q, tx } from "../common/database/index.js";
@@ -574,7 +575,7 @@ r.get("/offer-letters/:id/preview", async (req, res) => {
     "Dear {{student_name}},\n\nYou are offered an internship with GAINT from {{from_date}} to {{to_date}} under {{batch}}.\n\nRegards,\nGAINT Clout Technologies";
   for (const [k, v] of Object.entries(values))
     body = body.replaceAll("{{" + k + "}}", v || "");
-  res.json({ ...x, rendered_body: body });
+  res.json({ ...x, rendered_body: x.issued_snapshot?.rendered_body ?? body, signatory: x.issued_snapshot?.signatory ?? x.signatory });
 });
 r.post("/offer-letters/:id/approve", async (req, res) => {
   const before = (
@@ -604,13 +605,18 @@ r.post("/offer-letters/:id/issue", async (req, res) => {
     return res
       .status(409)
       .json({ error: "Admin approval is required before issue" });
+  const template = (await q("SELECT body template_body,signatory FROM offer_letter_templates WHERE id=$1", [before.template_id])).rows[0];
+  if (!template) return res.status(409).json({ error: "Offer template unavailable" });
+  const issuedAt = req.body.issueAt || new Date().toISOString();
+  const snapshot = offerSnapshot({ ...before, ...template, issue_at: issuedAt });
   const x = (
     await q(
-      "UPDATE offer_letters SET status='ISSUED',issue_at=COALESCE($2::timestamptz,now()),issued_by=$3 WHERE id=$1 AND status='APPROVED' RETURNING *",
-      [req.params.id, req.body.issueAt || null, req.user.id],
+      "UPDATE offer_letters SET status='ISSUED',issue_at=$2::timestamptz,issued_by=$3,issued_snapshot=$4 WHERE id=$1 AND status='APPROVED' RETURNING *",
+      [req.params.id, issuedAt, req.user.id, snapshot],
     )
   ).rows[0];
   if (!x) return res.status(409).json({ error: "Offer letter state changed; reload and retry" });
+  await q("UPDATE offer_letter_versions SET issued_snapshot=$2 WHERE offer_letter_id=$1 AND version=(SELECT max(version) FROM offer_letter_versions WHERE offer_letter_id=$1)", [x.id, snapshot]);
   const uid = (
     await q(
       "SELECT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id WHERE ba.id=$1",
@@ -649,7 +655,7 @@ r.post("/offer-letters/:id/reissue", async (req, res) => {
   ).rows[0].v;
   const x = (
     await q(
-      "UPDATE offer_letters SET status='DRAFT',issue_at=null,reason=$2 WHERE id=$1 RETURNING *",
+      "UPDATE offer_letters SET status='DRAFT',issue_at=null,issued_snapshot=null,reason=$2 WHERE id=$1 RETURNING *",
       [old.id, reason],
     )
   ).rows[0];
