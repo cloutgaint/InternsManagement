@@ -68,6 +68,8 @@ router.post("/batch-allotment-orders/:id/verify", async (req, res) => {
 router.get("/batch-allotment-orders/:id/file", async (req, res) => {
   const order = (await q("SELECT file_path FROM batch_allotment_orders WHERE id=$1", [req.params.id])).rows[0];
   if (!order?.file_path || !fs.existsSync(order.file_path)) return res.status(404).json({ error: "Document unavailable" });
-  res.download(path.resolve(order.file_path), "batch-allotment-document");
+  const bytes = fs.readFileSync(order.file_path);
+  const ext = bytes.subarray(0, 5).toString() === "%PDF-" ? ".pdf" : bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) ? ".png" : ".jpg";
+  res.download(path.resolve(order.file_path), "batch-allotment-document" + ext);
 });
 export default router;
