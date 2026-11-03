@@ -8,17 +8,16 @@ export async function releaseDueTasks() {
   try {
     const due = (
       await q(
-        `SELECT wt.* FROM weekly_tasks wt WHERE wt.status='SCHEDULED' AND wt.release_at IS NOT NULL AND wt.release_at<=now() ORDER BY wt.release_at FOR UPDATE SKIP LOCKED`,
+        `UPDATE weekly_tasks SET status='RELEASED',released_at=now()
+         WHERE id IN (
+           SELECT id FROM weekly_tasks
+           WHERE status='SCHEDULED' AND release_at IS NOT NULL AND release_at<=now()
+           ORDER BY release_at FOR UPDATE SKIP LOCKED
+         ) RETURNING *`,
       )
     ).rows;
-    for (const t of due) {
-      const x = (
-        await q(
-          "UPDATE weekly_tasks SET status='RELEASED',released_at=now() WHERE id=$1 AND status='SCHEDULED' RETURNING *",
-          [t.id],
-        )
-      ).rows[0];
-      if (!x) continue;
+    for (const x of due) {
+      const t = x;
       const users = (
         await q(
           `SELECT DISTINCT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active WHERE ba.batch_id=$1 AND ($2::uuid IS NULL OR ip.final_domain_id=$2) AND ($3::uuid IS NULL OR gm.group_id=$3)`,
