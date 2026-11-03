@@ -42,13 +42,47 @@ export default function InternAttendancePage() {
       });
       video.current.srcObject = stream.current;
       await video.current.play();
+    } catch {
+      return setErr("Allow camera permission to continue.");
+    }
+    setErr("");
+    setPhase("STARTING");
+    try {
+      // The baseline must be a real frame showing the student facing forward,
+      // otherwise the server cannot measure the head-turn challenge.
+      await waitForFrame();
+      await new Promise((r) => setTimeout(r, 700));
+      await requireSingleFace();
+      if (!stream.current) return;
       baselineRef.current = capture();
+      if (!baselineRef.current) throw new Error("Camera is not ready.");
       setChallenge(challenges[Math.floor(Math.random() * challenges.length)]);
       setPhase("CHALLENGE");
-      setErr("");
-    } catch {
-      setErr("Allow camera permission to continue.");
+    } catch (e) {
+      if (!stream.current) return;
+      stopCamera();
+      setErr(e.message);
     }
+  }
+  async function waitForFrame() {
+    const v = video.current;
+    for (let i = 0; i < 50 && !v?.videoWidth; i++)
+      await new Promise((r) => setTimeout(r, 100));
+    if (!v?.videoWidth) throw new Error("Camera did not start. Try again.");
+  }
+  async function requireSingleFace() {
+    if (!humanRef.current) {
+      const { default: Human } = await import("@vladmandic/human");
+      humanRef.current = new Human({
+        backend: "webgl",
+        modelBasePath: "https://vladmandic.github.io/human-models/models/",
+        face: { enabled: true, detector: { enabled: true }, mesh: { enabled: false }, description: { enabled: false }, emotion: { enabled: false }, iris: { enabled: false } },
+        body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false },
+      });
+      await humanRef.current.load();
+    }
+    const faces = (await humanRef.current.detect(video.current)).face || [];
+    if (faces.length !== 1) throw new Error(faces.length ? "Multiple faces detected. Only one student should be visible." : "No face detected. Face the camera in good lighting and try again.");
   }
   function stopCamera() {
     stream.current?.getTracks().forEach((track)=>track.stop());
@@ -71,20 +105,11 @@ export default function InternAttendancePage() {
   async function verify() {
     const imageData = capture();
     if (!imageData) return setErr("Camera is not ready.");
+    if (!baselineRef.current) return setErr("Initial face capture missing. Stop the camera and start again.");
     setPhase("VERIFYING");
+    setErr("");
     try {
-      if (!humanRef.current) {
-        const { default: Human } = await import("@vladmandic/human");
-        humanRef.current = new Human({
-          backend: "webgl",
-          modelBasePath: "https://vladmandic.github.io/human-models/models/",
-          face: { enabled: true, detector: { enabled: true }, mesh: { enabled: false }, description: { enabled: false }, emotion: { enabled: false }, iris: { enabled: false } },
-          body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false },
-        });
-        await humanRef.current.load();
-      }
-      const faces = (await humanRef.current.detect(video.current)).face || [];
-      if (faces.length !== 1) throw new Error(faces.length ? "Multiple faces detected. Only one student should be visible." : "No face detected. Face the camera in good lighting and try again.");
+      await requireSingleFace();
       const x = await api("/intern/attendance/verify", {
         method: "POST",
         body: JSON.stringify({ eventType, imageData, baselineImageData: baselineRef.current, challengeType: challenge }),
@@ -100,8 +125,16 @@ export default function InternAttendancePage() {
       setPhase("DONE");
       load();
     } catch (e) {
-      setErr(e.message === "Trusted biometric verification is not configured" ? "Face captured, but attendance cannot be recorded until the backend biometric verification service is configured." : e.message);
+      setErr(
+        e.message === "Trusted biometric verification is not configured" ||
+          e.message === "Biometric verifier unavailable"
+          ? "Face captured, but attendance cannot be recorded because the biometric verification service is not running. Contact the Admin."
+          : e.message === "Failed to fetch"
+            ? "Cannot reach the attendance server. Check your connection and try again."
+            : e.message,
+      );
       setPhase("CHALLENGE");
+      load();
     }
   }
   const instruction = {
@@ -182,7 +215,12 @@ export default function InternAttendancePage() {
                 I Completed It — Verify Face
               </button>
             )}
-            {(phase === "CHALLENGE" || phase === "VERIFYING") && <button type="button" className="btn secondary" onClick={stopCamera}>Stop Camera</button>}
+            {phase === "STARTING" && (
+              <button className="btn" disabled>
+                Detecting face…
+              </button>
+            )}
+            {(phase === "STARTING" || phase === "CHALLENGE" || phase === "VERIFYING") && <button type="button" className="btn secondary" onClick={stopCamera}>Stop Camera</button>}
             {phase === "VERIFYING" && (
               <button className="btn" disabled>
                 Verifying…

@@ -199,8 +199,24 @@ r.post("/attendance/verify", async (req, res) => {
   if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
     return res.status(400).json({ error: "Invalid camera capture" });
   if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(baselineImageData || ""))) return res.status(400).json({ error: "Initial live face capture is required" });
+  // Reject impossible events before running (and logging failures from) the biometric check.
+  const alloc = (
+    await q(
+      "SELECT * FROM batch_allocations WHERE intern_id=$1 AND current_date BETWEEN intern_start AND intern_end ORDER BY intern_start DESC LIMIT 1",
+      [p.id],
+    )
+  ).rows[0];
+  if (!alloc)
+    return res
+      .status(409)
+      .json({ error: "No active internship allocation for today" });
+  const current = (await q("SELECT check_in,check_out FROM attendance_daily WHERE intern_id=$1 AND day=current_date", [p.id])).rows[0];
+  if (eventType === "CHECK_IN" && current?.check_in) return res.status(409).json({ error: "Already checked in today" });
+  if (eventType === "CHECK_OUT" && !current?.check_in) return res.status(409).json({ error: "Check in before checking out" });
+  if (eventType === "CHECK_OUT" && current?.check_out) return res.status(409).json({ error: "Already checked out today" });
   const verified = await verifyAttendanceBiometrics({ imageData, baselineImageData, enrollment: f, challengeType });
   if (verified.unavailable) return res.status(503).json({ error: verified.reason });
+  if (verified.rejected) return res.status(422).json({ error: verified.reason });
   const { matchScore, livenessScore, challengePass } = verified;
   const dir = path.resolve("uploads/attendance-evidence");
   fs.mkdirSync(dir, { recursive: true });
@@ -228,16 +244,6 @@ r.post("/attendance/verify", async (req, res) => {
         exception: ex,
       });
   }
-  const alloc = (
-    await q(
-      "SELECT * FROM batch_allocations WHERE intern_id=$1 AND current_date BETWEEN intern_start AND intern_end ORDER BY intern_start DESC LIMIT 1",
-      [p.id],
-    )
-  ).rows[0];
-  if (!alloc)
-    return res
-      .status(409)
-      .json({ error: "No active internship allocation for today" });
   const outcome = await tx(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [p.id + ":attendance:" + new Date().toISOString().slice(0,10)]);
     const today = (await client.query(
