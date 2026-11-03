@@ -18,10 +18,20 @@ export default function AdminVerificationPage() {
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false);
+  async function removeStudent(p) {
+    if (!window.confirm(`Remove student "${p.full_name}" (${p.email}) from active records? The student will lose login access. Historical records will be retained.`)) return;
+    setBusy(true);setErr("");setMsg("");
+    try {
+      await api("/admin/interns/" + p.user_id, {method:"DELETE"});
+      setSelected(null);
+      setMsg("Student removed from active records and login disabled.");
+      await load();
+    } catch(e) {setErr(e.message);} finally {setBusy(false);}
+  }
   const load = () =>
     api("/admin/proofs")
       .then((x) => {
-        setRows(x);
+        setRows(x.filter((p)=>p.account_status!=="DELETED"));
         if (selected) {
           const n = x.find((y) => y.id === selected.id);
           if (n) setSelected(n);
@@ -167,6 +177,7 @@ export default function AdminVerificationPage() {
                     {selected.email} · {selected.mobile || "No mobile"}
                   </p>
                 </div>
+                <button type="button" className="btn danger" disabled={busy} onClick={() => removeStudent(selected)}>Delete Student</button>
                 <button
                   className="btn secondary"
                   onClick={() => view(selected.id)}
