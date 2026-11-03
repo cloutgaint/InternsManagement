@@ -3,3 +3,8 @@ const dir=path.resolve("uploads/documents");fs.mkdirSync(dir,{recursive:true});
 export const documentUpload=multer({dest:dir,limits:{fileSize:25*1024*1024},fileFilter:(req,file,cb)=>{const ok=["application/pdf","application/zip","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.presentationml.presentation","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/png","image/jpeg","text/plain"].includes(file.mimetype);cb(ok?null:new Error("Unsupported document type"),ok)}});
 export {notify,notifyGroup};
 export async function groupForUser(user){if(user.role==="INTERN")return (await q("SELECT gm.group_id FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE ip.user_id=$1 AND gm.active LIMIT 1",[user.id])).rows[0]?.group_id;if(user.role==="MENTOR")return null;return null}
+
+export function validExternalDocumentUrl(value){
+  if(typeof value!=="string"||!value.trim()||value.length>2048)return false;
+  try{const u=new URL(value);return ["https:","http:"].includes(u.protocol)&&!!u.hostname&&!u.username&&!u.password;}catch{return false;}
+}
