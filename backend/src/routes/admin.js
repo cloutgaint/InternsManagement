@@ -795,16 +795,17 @@ r.post("/domain-confirm", async (req, res) => {
     return res.status(400).json({
       error: "Confirmed domain must be one of the calculated recommendations",
     });
-  const x = (
-    await q(
-      "UPDATE domain_decisions SET confirmed_domain_id=$1,confirmed_by=$2 WHERE id=$3 RETURNING *",
+  const x = await tx(async (client) => {
+    const decision = (await client.query(
+      "UPDATE domain_decisions SET confirmed_domain_id=$1,confirmed_by=$2 WHERE id=$3 AND confirmed_domain_id IS NULL RETURNING *",
       [domainId, req.user.id, latest.id],
-    )
-  ).rows[0];
-  await q("UPDATE intern_profiles SET final_domain_id=$1 WHERE id=$2", [
-    domainId,
-    internId,
-  ]);
+    )).rows[0];
+    if (!decision) return null;
+    const profile = await client.query("UPDATE intern_profiles SET final_domain_id=$1 WHERE id=$2 RETURNING id", [domainId, internId]);
+    if (!profile.rowCount) throw new Error("Intern profile not found");
+    return decision;
+  });
+  if (!x) return res.status(409).json({ error: "Domain decision already confirmed; reload" });
   await audit(req, "DOMAIN_CONFIRMED", "domain_decision", x.id, latest, x);
   res.json(x);
 });
