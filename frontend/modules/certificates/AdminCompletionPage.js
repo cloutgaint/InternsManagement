@@ -25,6 +25,12 @@ export default function AdminCompletionPage() {
     }
   }
   async function recordExit(x,type){const reason=prompt("Reason for "+type.toLowerCase()+":");if(!reason?.trim())return;if(!confirm("Confirm "+type.toLowerCase()+" for "+x.full_name+"? This prevents completion certification."))return;try{await api("/admin/completions/"+x.intern_id+"/exit",{method:"POST",body:JSON.stringify({type,reason:reason.trim()})});setMsg("Internship marked "+type.toLowerCase()+".");setErr("");load()}catch(e){setErr(e.message)}}
+  async function removeStudent(x) {
+    if(!window.confirm(`Remove "${x.full_name}" from active student and completion records? Login will be disabled, but historical records are retained.`))return;
+    setErr("");setMsg("");
+    try{await api("/admin/interns/"+x.user_id,{method:"DELETE"});setMsg("Student removed from active records.");await load();}
+    catch(e){setErr(e.message);}
+  }
   async function cert(x) {
     try {
       await api("/admin/certificates/" + x.intern_id + "/issue", {
@@ -54,6 +60,7 @@ export default function AdminCompletionPage() {
             </div>
           </div>
           <div className="action-row">
+            <button type="button" className="btn danger" onClick={()=>removeStudent(x)}>Delete Student</button>
             {!x.exit_type && x.individual_marks != null &&
               x.completion_status !== "APPROVED" && (
                 <button className="btn" onClick={() => approve(x)}>
