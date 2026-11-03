@@ -2040,6 +2040,18 @@ r.post("/tasks", async (req, res) => {
       .status(400)
       .json({ error: "Select at least one submission type" });
   const release = new Date(b.releaseAt);
+  if (Number.isNaN(release.getTime()) || (b.dueAt && Number.isNaN(new Date(b.dueAt).getTime())))
+    return res.status(400).json({ error: "Release and due dates must be valid" });
+  if (!Number.isFinite(Number(b.marks ?? 100)) || Number(b.marks ?? 100) <= 0 || Number(b.marks ?? 100) > 1000)
+    return res.status(400).json({ error: "Task marks must be between 1 and 1000" });
+  if (b.groupId) {
+    const group = (await q("SELECT 1 FROM groups WHERE id=$1 AND batch_id=$2", [b.groupId, b.batchId])).rowCount;
+    if (!group) return res.status(400).json({ error: "Selected group does not belong to the task batch" });
+  }
+  if (b.rubricId) {
+    const rubric = (await q("SELECT 1 FROM rubrics WHERE id=$1", [b.rubricId])).rowCount;
+    if (!rubric) return res.status(400).json({ error: "Selected rubric does not exist" });
+  }
   const x = (
     await q(
       `INSERT INTO weekly_tasks(batch_id,domain_id,group_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,rubric_id,status,release_weekday,release_time,release_timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'SCHEDULED',$13,$14,'Asia/Kolkata') RETURNING *`,
