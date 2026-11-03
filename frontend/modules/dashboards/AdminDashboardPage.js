@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import Link from "next/link";
+import {useRouter} from "next/router";
 import {api} from "@/shared/api/client";
 const modules=[
 ["🏫","College Master","Add, edit and manage colleges","/admin/colleges"],
@@ -23,8 +24,9 @@ const modules=[
 ["🎓","Completion & Certificates","Final evaluation and certificates","/admin/completion"]
 ];
 export default function AdminDashboardPage(){
+const router=useRouter();
 const [data,setData]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
-useEffect(()=>{let active=true;api("/admin/dashboard").then(v=>{if(active)setData(v);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[]);
+useEffect(()=>{let active=true;api("/auth/me").then(user=>{if(!active)return;if(!["ADMIN","SUPER_ADMIN"].includes(user.role)){router.replace(user.role==="INTERN"?"/intern":user.role==="MENTOR"?"/mentor":"/login?role=admin");return;}return api("/admin/dashboard").then(v=>{if(active)setData(v);}).catch(e=>{if(active)setError(e.message);});}).catch(e=>{if(active){if(/token|authentication|unauthorized/i.test(e.message))router.replace("/login?role=admin");else setError(e.message);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[router]);
 const count=(...keys)=>keys.reduce((n,k)=>n+Number(data?.[k]||0),0);
 const verification=count("proofs_pending","approvals_pending","faces_pending");
 const pending=count("leave_pending","attendance_exceptions","groups_pending","completions_pending","task_evaluations_pending");
