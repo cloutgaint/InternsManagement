@@ -3,7 +3,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import multer from "multer";import {documentUpload} from "../services/collaborationService.js";import {notifyGroup} from "../common/notifications/notification.service.js";
-import { q } from "../common/database/index.js";
+import { q, tx } from "../common/database/index.js";
 import { sendOfferPdf } from "../services/offerLetterPdfService.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
@@ -676,64 +676,54 @@ r.get("/assessments/:id/questions", async (req, res) => {
 r.post("/assessments/:id/submit", async (req, res) => {
   const p = await me(req.user.id);
   const { attemptId, answers = [] } = req.body;
-  let at = (
-    await q(
-      `SELECT aa.*,a.duration_minutes,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.id=$1 AND aa.assessment_id=$2 AND aa.intern_id=$3 AND aa.status='IN_PROGRESS'`,
-      [attemptId, req.params.id, p.id],
-    )
-  ).rows[0];
-  if (!at)
-    return res.status(409).json({ error: "No active assessment attempt" });
-  const validIds = (
-    await q(
-      "SELECT question_ids FROM assessment_sections WHERE assessment_id=$1",
-      [req.params.id],
-    )
-  ).rows.flatMap((x) => x.question_ids || []);
   if (!Array.isArray(answers)) return res.status(400).json({ error: "Answers must be an array" });
-  const submittedIds = answers.map((x) => x?.questionId);
-  if (submittedIds.some((id) => !validIds.includes(id)))
-    return res.status(400).json({ error: "Submitted answer contains an invalid question" });
-  if (new Set(submittedIds).size !== submittedIds.length)
-    return res.status(400).json({ error: "Duplicate answers for the same question are not allowed" });
-  let total = 0,
-    manualPending = false;
-  for (const ans of answers) {
-    if (!validIds.includes(ans.questionId)) continue;
-    const qu = (
-      await q(
-        "SELECT correct_answer,marks,type FROM question_bank WHERE id=$1",
-        [ans.questionId],
-      )
-    ).rows[0];
-    let score = null,
-      status = "SUBMITTED";
-    if (["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(qu?.type)) {
-      const norm = (v) =>
-        Array.isArray(v)
-          ? [...v].map(String).sort()
-          : String(v ?? "")
-              .trim()
-              .toLowerCase();
-      score =
-        JSON.stringify(norm(qu.correct_answer)) ===
-        JSON.stringify(norm(ans.answer))
-          ? Number(qu.marks || 0)
-          : 0;
-      total += score;
-    } else manualPending = true;
-    await q(
-      "INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,$5)",
-      [at.id, ans.questionId, ans.answer ?? null, score, status],
-    );
+  const ids = answers.map((answer) => answer?.questionId);
+  if (ids.some((id) => typeof id !== "string") || new Set(ids).size !== ids.length)
+    return res.status(400).json({ error: "Each question can be answered only once" });
+  try {
+    const result = await tx(async (client) => {
+      const at = (await client.query(
+        "SELECT aa.*,a.duration_minutes,a.window_end FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.id=$1 AND aa.assessment_id=$2 AND aa.intern_id=$3 FOR UPDATE OF aa",
+        [attemptId, req.params.id, p.id],
+      )).rows[0];
+      if (!at || at.status !== "IN_PROGRESS") return { error: "No active assessment attempt", code: 409 };
+      const deadline = new Date(new Date(at.started_at).getTime() + Number(at.duration_minutes || 60) * 60000);
+      if (at.window_end && new Date(at.window_end) < deadline) deadline.setTime(new Date(at.window_end).getTime());
+      if (Date.now() > deadline.getTime()) return { error: "Assessment submission deadline has passed", code: 409 };
+      const sections = (await client.query("SELECT question_ids FROM assessment_sections WHERE assessment_id=$1", [req.params.id])).rows;
+      const validIds = new Set(sections.flatMap((section) => section.question_ids || []));
+      if (ids.some((id) => !validIds.has(id))) return { error: "Submitted answer contains an invalid question", code: 400 };
+      const questions = ids.length ? (await client.query(
+        "SELECT id,correct_answer,marks,type FROM question_bank WHERE id=ANY($1::uuid[])", [ids],
+      )).rows : [];
+      const questionMap = new Map(questions.map((question) => [question.id, question]));
+      if (questionMap.size !== ids.length) return { error: "Assessment question unavailable", code: 409 };
+      let total = 0, manualPending = false;
+      for (const answer of answers) {
+        const question = questionMap.get(answer.questionId);
+        let score = null;
+        if (["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(question.type)) {
+          const norm = (value) => Array.isArray(value) ? value.map((v) => String(v).trim().toLowerCase()).sort() : String(value ?? "").trim().toLowerCase();
+          score = JSON.stringify(norm(question.correct_answer)) === JSON.stringify(norm(answer.answer)) ? Number(question.marks || 0) : 0;
+          total += score;
+        } else manualPending = true;
+        await client.query(
+          "INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,'SUBMITTED')",
+          [at.id, answer.questionId, answer.answer ?? null, score],
+        );
+      }
+      const updated = (await client.query(
+        "UPDATE assessment_attempts SET total_score=$1,status=$2,submitted_at=now() WHERE id=$3 AND status='IN_PROGRESS' RETURNING *",
+        [total, manualPending ? "PENDING_EVALUATION" : "EVALUATED", at.id],
+      )).rows[0];
+      if (!updated) throw new Error("Assessment state changed during submission");
+      return { attempt: updated, manualPending };
+    });
+    if (result.error) return res.status(result.code).json({ error: result.error });
+    res.status(201).json({ ...result.attempt, manualEvaluationPending: result.manualPending });
+  } catch (error) {
+    res.status(500).json({ error: "Assessment submission failed; no answers were saved" });
   }
-  at = (
-    await q(
-      "UPDATE assessment_attempts SET total_score=$1,status=$2,submitted_at=now() WHERE id=$3 RETURNING *",
-      [total, manualPending ? "PENDING_EVALUATION" : "EVALUATED", at.id],
-    )
-  ).rows[0];
-  res.status(201).json({ ...at, manualEvaluationPending: manualPending });
 });
 r.get("/group", async (req, res) => {
   const p = await me(req.user.id);
