@@ -10,6 +10,7 @@ export default function LoginPage() {
     [p, setP] = useState(""),
     [show, setShow] = useState(false),
     [err, setErr] = useState(""),
+    [pending,setPending] = useState(false),
     [busy, setBusy] = useState(false),
     [mfa, setMfa] = useState(null),
     [code, setCode] = useState(""),
@@ -26,6 +27,7 @@ export default function LoginPage() {
   async function go(ev) {
     ev.preventDefault();
     setErr("");
+    setPending(false);
     const email = e.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return setErr("Enter a valid email address.");
@@ -51,7 +53,9 @@ export default function LoginPage() {
       if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
       finish(d);
     } catch (x) {
-      setErr(x.message);
+      const isPending=/pending Admin verification|pending.*approval|not approved\/active/i.test(x.message);
+      setPending(isPending);
+      setErr(isPending?"Your registration is received and awaiting Admin verification and approval. You can sign in once your account is activated.":/invalid credentials/i.test(x.message)?"Invalid email or password. If you registered recently, use the exact password you created; your account may also be awaiting Admin approval.":x.message);
     } finally {
       setBusy(false);
     }
@@ -84,7 +88,7 @@ export default function LoginPage() {
               : adminMode ? "Access the administrative workspace using your authorized account." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
-        {err && <p className="error">{err}</p>}
+        {err && <p className={pending?"success":"error"} role="alert"><strong>{pending?"Account Pending Approval":"Sign-in unsuccessful"}</strong><span style={{display:"block",marginTop:6}}>{err}</span></p>}
         {!mfa ? (
           <form onSubmit={go} noValidate>
             <div className="form-field">
