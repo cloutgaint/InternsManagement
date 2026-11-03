@@ -1,0 +1,14 @@
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS code text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS college_type text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS state text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS district text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS pin_code text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS website text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS coordinator_name text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS coordinator_email text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS coordinator_mobile text;
+CREATE UNIQUE INDEX IF NOT EXISTS colleges_code_unique_idx ON colleges (lower(code)) WHERE code IS NOT NULL;
