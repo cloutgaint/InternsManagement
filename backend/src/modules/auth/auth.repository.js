@@ -4,7 +4,7 @@ const run = (client) => client?.query.bind(client) || q;
 
 export async function findActiveColleges() {
   return (await q(
-    "SELECT id,name,university FROM colleges WHERE active=true ORDER BY name",
+    "SELECT id,name,university,city,district,state FROM colleges WHERE active=true ORDER BY name",
   )).rows;
 }
 
