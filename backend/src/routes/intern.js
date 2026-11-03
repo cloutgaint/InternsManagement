@@ -188,17 +188,18 @@ r.post("/attendance/verify", async (req, res) => {
   ).rows[0];
   if (!f)
     return res.status(409).json({ error: "Approved face enrollment required" });
-  const { eventType, imageData, challengeType } = req.body;
+  const { eventType, imageData, baselineImageData, challengeType } = req.body;
   if (!["CHECK_IN", "CHECK_OUT"].includes(eventType))
     return res.status(400).json({ error: "Invalid attendance event" });
-  if (!["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"].includes(challengeType))
+  if (!["TURN_LEFT", "TURN_RIGHT"].includes(challengeType))
     return res.status(400).json({ error: "Invalid liveness challenge" });
   if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
     return res.status(400).json({ error: "Live camera capture is required" });
   const buf = Buffer.from(String(imageData).split(",")[1] || "", "base64");
   if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
     return res.status(400).json({ error: "Invalid camera capture" });
-  const verified = await verifyAttendanceBiometrics({ imageData, enrollment: f, challengeType });
+  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(baselineImageData || ""))) return res.status(400).json({ error: "Initial live face capture is required" });
+  const verified = await verifyAttendanceBiometrics({ imageData, baselineImageData, enrollment: f, challengeType });
   if (verified.unavailable) return res.status(503).json({ error: verified.reason });
   const { matchScore, livenessScore, challengePass } = verified;
   const dir = path.resolve("uploads/attendance-evidence");
