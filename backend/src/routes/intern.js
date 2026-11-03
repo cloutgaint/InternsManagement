@@ -236,50 +236,32 @@ r.post("/attendance/verify", async (req, res) => {
     return res
       .status(409)
       .json({ error: "No active internship allocation for today" });
-  const today = (
-    await q(
-      "SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date",
-      [p.id],
-    )
-  ).rows[0];
-  if (eventType === "CHECK_IN" && today?.check_in)
-    return res.status(409).json({ error: "Already checked in today" });
-  if (eventType === "CHECK_OUT" && !today?.check_in)
-    return res.status(409).json({ error: "Check in before checking out" });
-  if (eventType === "CHECK_OUT" && today?.check_out)
-    return res.status(409).json({ error: "Already checked out today" });
-  const ev = (
-    await q(
-      `INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,$9,$8) RETURNING *`,
-      [
-        p.id,
-        alloc.batch_id,
-        eventType,
-        Number(matchScore),
-        file,
-        Number(livenessScore),
-        challengeType,
-        file,
-        challengePass,
-      ],
-    )
-  ).rows[0];
-  let daily;
-  if (eventType === "CHECK_IN")
-    daily = (
-      await q(
-        `INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status) VALUES($1,$2,current_date,now(),'PRESENT') ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status='PRESENT' RETURNING *`,
+  const outcome = await tx(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [p.id + ":attendance:" + new Date().toISOString().slice(0,10)]);
+    const today = (await client.query(
+      "SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=current_date FOR UPDATE", [p.id],
+    )).rows[0];
+    if (eventType === "CHECK_IN" && today?.check_in) return { error: "Already checked in today" };
+    if (eventType === "CHECK_OUT" && !today?.check_in) return { error: "Check in before checking out" };
+    if (eventType === "CHECK_OUT" && today?.check_out) return { error: "Already checked out today" };
+    const daily = eventType === "CHECK_IN"
+      ? (await client.query(
+        "INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status) VALUES($1,$2,current_date,now(),'PRESENT') ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status='PRESENT' RETURNING *",
         [p.id, alloc.batch_id],
-      )
-    ).rows[0];
-  else
-    daily = (
-      await q(
-        `UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int,status='PRESENT' WHERE intern_id=$1 AND day=current_date RETURNING *`,
+      )).rows[0]
+      : (await client.query(
+        "UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int,status='PRESENT' WHERE intern_id=$1 AND day=current_date AND check_in IS NOT NULL AND check_out IS NULL RETURNING *",
         [p.id],
-      )
-    ).rows[0];
-  res.status(201).json({ event: ev, daily });
+      )).rows[0];
+    if (!daily) throw new Error("Attendance daily record could not be updated");
+    const ev = (await client.query(
+      "INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,$8,$9) RETURNING *",
+      [p.id, alloc.batch_id, eventType, Number(matchScore), file, Number(livenessScore), challengeType, challengePass, file],
+    )).rows[0];
+    return { event: ev, daily };
+  });
+  if (outcome.error) return res.status(409).json({ error: outcome.error });
+  res.status(201).json(outcome);
 });
 r.get("/work-log", async (req, res) => {
   const p = await me(req.user.id);
