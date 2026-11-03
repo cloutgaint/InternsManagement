@@ -55,7 +55,7 @@ export default function LoginPage() {
     } catch (x) {
       const isPending=/pending Admin verification|pending.*approval|not approved\/active/i.test(x.message);
       setPending(isPending);
-      setErr(isPending?"Your registration is received and awaiting Admin verification and approval. You can sign in once your account is activated.":/invalid credentials/i.test(x.message)?"Invalid email or password. If you registered recently, use the exact password you created; your account may also be awaiting Admin approval.":x.message);
+      setErr(isPending?x.message:/invalid credentials/i.test(x.message)?"Invalid email or password.":x.message);
     } finally {
       setBusy(false);
     }
