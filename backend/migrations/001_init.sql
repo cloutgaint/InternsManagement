@@ -115,3 +115,7 @@ ALTER TABLE batch_allotment_orders ADD COLUMN IF NOT EXISTS verification_reason 
 
 ALTER TABLE offer_letters ADD COLUMN IF NOT EXISTS issued_snapshot jsonb;
 ALTER TABLE offer_letter_versions ADD COLUMN IF NOT EXISTS issued_snapshot jsonb;
+
+CREATE TABLE IF NOT EXISTS performance_weight_configs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),batch_id uuid NOT NULL REFERENCES batches(id) ON DELETE CASCADE,domain_id uuid REFERENCES domains(id) ON DELETE CASCADE,weights jsonb NOT NULL,updated_at timestamptz DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS performance_weight_batch_domain_uq ON performance_weight_configs(batch_id,domain_id) WHERE domain_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS performance_weight_batch_default_uq ON performance_weight_configs(batch_id) WHERE domain_id IS NULL;
