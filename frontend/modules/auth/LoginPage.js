@@ -88,6 +88,7 @@ export default function LoginPage() {
               : adminMode ? "Access the administrative workspace using your authorized account." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
+        {router.query.registered==="1"&&!adminMode&&<p className="success" role="status">Registration submitted successfully. Your college permission proof is awaiting Admin verification and approval. You can sign in after your account is activated.</p>}
         {err && <p className={pending?"success":"error"} role="alert"><strong>{pending?"Account Pending Approval":"Sign-in unsuccessful"}</strong><span style={{display:"block",marginTop:6}}>{err}</span></p>}
         {!mfa ? (
           <form onSubmit={go} noValidate>
