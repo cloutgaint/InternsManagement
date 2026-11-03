@@ -13,13 +13,7 @@ export default function InternDashboardPage() {
     [completion, setCompletion] = useState(null),
     [offers, setOffers] = useState([]),
     [offerView, setOfferView] = useState(null),
-    [tab,setTab]=useState("overview"),
-    [photoUrl,setPhotoUrl]=useState("");
-  useEffect(() => {
-    let url="";
-    apiBlob("/intern/profile-photo").then(blob=>{url=URL.createObjectURL(blob);setPhotoUrl(url);}).catch(()=>{});
-    return ()=>{if(url)URL.revokeObjectURL(url);};
-  },[]);
+    [tab,setTab]=useState("overview");
   useEffect(() => {
     Promise.all([
       api("/intern/dashboard"),
@@ -175,37 +169,6 @@ export default function InternDashboardPage() {
       </div>
       <nav className="intern-tabs" aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={tab===key?"active":""} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
       <div className="intern-sections intern-tabbed" data-tab={tab}>
-        <section className="card intern-pane intern-pane-overview">
-          <div className="intern-profile-head">{photoUrl?<img className="intern-avatar" src={photoUrl} alt="Registered student profile photo"/>:<span className="intern-avatar intern-avatar-fallback" aria-label="Profile photo unavailable">{(p.full_name||"I").slice(0,1).toUpperCase()}</span>}<div><h2>My Profile</h2><p className="muted">{p.full_name||"Intern"}</p></div></div>
-          <div className="detail-grid">
-            <div>
-              <b>Full Name</b>
-              <span>{p.full_name || "—"}</span>
-            </div>
-            <div>
-              <b>Mobile</b>
-              <span>{p.mobile || "—"}</span>
-            </div>
-            <div>
-              <b>Program / Branch</b>
-              <span>
-                {p.program || "—"} / {p.branch || "—"}
-              </span>
-            </div>
-            <div>
-              <b>Roll Number</b>
-              <span>{p.roll_number || "—"}</span>
-            </div>
-            <div>
-              <b>University</b>
-              <span>{p.university || "—"}</span>
-            </div>
-            <div>
-              <b>Year / Semester</b>
-              <span>{p.year_semester || "—"}</span>
-            </div>
-          </div>
-        </section>
         <section className="card intern-pane intern-pane-onboarding">
           <h2>Onboarding</h2>
           <div className="status-row">
