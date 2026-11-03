@@ -2,12 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 import Link from "next/link";
-const challenges = ["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"];
+const challenges = ["TURN_LEFT", "TURN_RIGHT"];
 export default function InternAttendancePage() {
   const video = useRef(null),
     canvas = useRef(null),
     stream = useRef(null),
-    humanRef = useRef(null);
+    humanRef = useRef(null),
+    baselineRef = useRef(null);
   const [st, setSt] = useState(null),
     [eventType, setEventType] = useState("CHECK_IN"),
     [challenge, setChallenge] = useState(""),
@@ -41,6 +42,7 @@ export default function InternAttendancePage() {
       });
       video.current.srcObject = stream.current;
       await video.current.play();
+      baselineRef.current = capture();
       setChallenge(challenges[Math.floor(Math.random() * challenges.length)]);
       setPhase("CHALLENGE");
       setErr("");
@@ -52,7 +54,7 @@ export default function InternAttendancePage() {
     stream.current?.getTracks().forEach((track)=>track.stop());
     stream.current=null;
     if(video.current){video.current.pause();video.current.srcObject=null;}
-    setChallenge("");setPhase("READY");setErr("");
+    baselineRef.current=null;setChallenge("");setPhase("READY");setErr("");
   }
   function capture() {
     const v = video.current,
@@ -85,7 +87,7 @@ export default function InternAttendancePage() {
       if (faces.length !== 1) throw new Error(faces.length ? "Multiple faces detected. Only one student should be visible." : "No face detected. Face the camera in good lighting and try again.");
       const x = await api("/intern/attendance/verify", {
         method: "POST",
-        body: JSON.stringify({ eventType, imageData, challengeType: challenge }),
+        body: JSON.stringify({ eventType, imageData, baselineImageData: baselineRef.current, challengeType: challenge }),
       });
       setMsg(
         eventType === "CHECK_IN"
