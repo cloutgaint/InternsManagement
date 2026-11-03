@@ -47,6 +47,12 @@ export default function InternAttendancePage() {
       setErr("Allow camera permission to continue.");
     }
   }
+  function stopCamera() {
+    stream.current?.getTracks().forEach((track)=>track.stop());
+    stream.current=null;
+    if(video.current){video.current.pause();video.current.srcObject=null;}
+    setChallenge("");setPhase("READY");setErr("");
+  }
   function capture() {
     const v = video.current,
       c = canvas.current;
@@ -90,7 +96,8 @@ export default function InternAttendancePage() {
               " minutes.",
       );
       setPhase("DONE");
-      stream.current?.getTracks().forEach((t) => t.stop());
+      stopCamera();
+      setPhase("DONE");
       load();
     } catch (e) {
       setErr(e.message);
@@ -175,6 +182,7 @@ export default function InternAttendancePage() {
                 I Completed It — Verify Face
               </button>
             )}
+            {(phase === "CHALLENGE" || phase === "VERIFYING") && <button type="button" className="btn secondary" onClick={stopCamera}>Stop Camera</button>}
             {phase === "VERIFYING" && (
               <button className="btn" disabled>
                 Verifying…
