@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }) {
   useEffect(()=>{
     if(!loggedIn){pageHistory.current=[];return;}
     const path=router.asPath;
-    if(!path.startsWith(home.split("/")[0]+"/"))return;
+    if(!(path===home||path.startsWith(home+"/")))return;
     if(["/login","/register","/"].includes(path.split("?")[0]))return;
     const history=pageHistory.current;
     if(history[history.length-1]!==path)history.push(path);
