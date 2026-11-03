@@ -29,6 +29,7 @@ export default function MentorFinalEvaluationsPage() {
     });
   }
   async function save() {
+    if (f.groupMarks === "" || f.individualMarks === "" || !Number.isFinite(Number(f.groupMarks)) || !Number.isFinite(Number(f.individualMarks)) || Number(f.groupMarks) < 0 || Number(f.groupMarks) > 100 || Number(f.individualMarks) < 0 || Number(f.individualMarks) > 100) { setErr("Enter valid group and individual marks between 0 and 100."); return; }
     try {
       await api("/mentor/final-evaluations", {
         method: "POST",
