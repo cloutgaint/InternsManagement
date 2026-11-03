@@ -1,0 +1,71 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import jwt from "jsonwebtoken";
+import { createApp } from "../src/app.js";
+import { pool, q } from "../src/common/database/index.js";
+
+const enabled = process.env.RUN_DB_E2E === "1";
+test("assessment lifecycle: submit, evaluate, recommend and confirm", { skip: !enabled }, async () => {
+  assert.ok(process.env.DATABASE_URL?.includes("intern_test"), "Use an isolated intern_test database");
+  process.env.JWT_SECRET ||= "ci-only-assessment-test-secret";
+  const app = createApp();
+  const server = app.listen(0);
+  const base = "http://127.0.0.1:" + server.address().port;
+  const suffix = Date.now().toString(36);
+  const inserted = { users: [], colleges: [], domains: [], batches: [] };
+  const row = async (sql, params = []) => (await q(sql, params)).rows[0];
+  const request = async (role, method, path, body) => {
+    const token = jwt.sign({ id: role === "ADMIN" ? inserted.admin : inserted.internUser, role }, process.env.JWT_SECRET);
+    const response = await fetch(base + path, { method, headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const college = await row("INSERT INTO colleges(name) VALUES($1) RETURNING id", ["E2E College " + suffix]);
+    inserted.colleges.push(college.id);
+    const admin = await row("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','ADMIN','ACTIVE',true) RETURNING id", ["admin+" + suffix + "@example.test"]);
+    const user = await row("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','INTERN','ACTIVE',true) RETURNING id", ["intern+" + suffix + "@example.test"]);
+    inserted.admin = admin.id; inserted.internUser = user.id; inserted.users.push(admin.id, user.id);
+    const domain = await row("INSERT INTO domains(name,code) VALUES($1,$2) RETURNING id", ["E2E Domain " + suffix, "E2E" + suffix]);
+    inserted.domains.push(domain.id);
+    const profile = await row("INSERT INTO intern_profiles(user_id,full_name,college_id,preferred_domains) VALUES($1,'E2E Intern',$2,$3) RETURNING id", [user.id, college.id, [domain.id]]);
+    const batch = await row("INSERT INTO batches(college_id,name,code,start_date,end_date) VALUES($1,$2,$3,'2026-01-01','2027-12-31') RETURNING id", [college.id, "E2E Batch", "E2E" + suffix]);
+    inserted.batches.push(batch.id);
+    await q("INSERT INTO batch_allocations(batch_id,intern_id,status) VALUES($1,$2,'ALLOTMENT_VERIFIED')", [batch.id, profile.id]);
+    const objective = await row("INSERT INTO question_bank(domain_id,type,question,correct_answer,marks,status) VALUES($1,'MCQ','E2E objective',$2,5,'ACTIVE') RETURNING id", [domain.id, "yes"]);
+    const written = await row("INSERT INTO question_bank(domain_id,type,question,marks,status) VALUES($1,'DESCRIPTIVE','E2E written',5,'ACTIVE') RETURNING id", [domain.id]);
+    const assessment = await row("INSERT INTO assessments(batch_id,name,duration_minutes,attempt_count,status) VALUES($1,'E2E Assessment',60,1,'ACTIVE') RETURNING id", [batch.id]);
+    await q("INSERT INTO assessment_sections(assessment_id,domain_id,name,pass_score,question_ids) VALUES($1,$2,'E2E Section',50,$3)", [assessment.id, domain.id, [objective.id, written.id]]);
+    const started = await request("INTERN", "POST", "/api/intern/assessments/" + assessment.id + "/start", {});
+    assert.equal(started.status, 201, JSON.stringify(started.body));
+    const attemptId = started.body.id;
+    const answers = [{ questionId: objective.id, answer: "yes" }, { questionId: written.id, answer: "Explanation" }];
+    const invalid = await request("INTERN", "POST", "/api/intern/assessments/" + assessment.id + "/submit", { attemptId, answers: [answers[0], answers[0]] });
+    assert.equal(invalid.status, 400);
+    const submitted = await request("INTERN", "POST", "/api/intern/assessments/" + assessment.id + "/submit", { attemptId, answers });
+    assert.equal(submitted.status, 201, JSON.stringify(submitted.body));
+    assert.equal(submitted.body.status, "PENDING_EVALUATION");
+    assert.equal(Number(submitted.body.total_score), 5);
+    const repeated = await request("INTERN", "POST", "/api/intern/assessments/" + assessment.id + "/submit", { attemptId, answers });
+    assert.equal(repeated.status, 409);
+    const count = await row("SELECT count(*)::int AS n FROM assessment_answers WHERE attempt_id=$1", [attemptId]);
+    assert.equal(count.n, 2);
+    const answer = await row("SELECT id FROM assessment_answers WHERE attempt_id=$1 AND question_id=$2", [attemptId, written.id]);
+    const evaluated = await request("ADMIN", "POST", "/api/admin/assessment-answers/" + answer.id + "/evaluate", { score: 4, feedback: "Good" });
+    assert.equal(evaluated.status, 200, JSON.stringify(evaluated.body));
+    const completed = await row("SELECT status,total_score FROM assessment_attempts WHERE id=$1", [attemptId]);
+    assert.equal(completed.status, "EVALUATED");
+    assert.equal(Number(completed.total_score), 9);
+    const rec = await request("ADMIN", "POST", "/api/admin/domain-recommendations/" + profile.id + "/calculate", { batchId: batch.id });
+    assert.equal(rec.status, 200, JSON.stringify(rec.body));
+    assert.equal(rec.body.recommendations[0].domainId, domain.id);
+    const confirm = await request("ADMIN", "POST", "/api/admin/domain-confirm", { internId: profile.id, batchId: batch.id, domainId: domain.id });
+    assert.equal(confirm.status, 200, JSON.stringify(confirm.body));
+    const repeatedConfirm = await request("ADMIN", "POST", "/api/admin/domain-confirm", { internId: profile.id, batchId: batch.id, domainId: domain.id });
+    assert.equal(repeatedConfirm.status, 409);
+    const saved = await row("SELECT final_domain_id FROM intern_profiles WHERE id=$1", [profile.id]);
+    assert.equal(saved.final_domain_id, domain.id);
+  } finally {
+    server.close();
+    await pool.end();
+  }
+});
