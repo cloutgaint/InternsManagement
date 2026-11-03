@@ -173,12 +173,6 @@ export default function InternDashboardPage() {
           <h3>{(data.tasks || []).length}</h3>
         </div>
       </div>
-      {!a && (
-        <p className="intern-notice">
-          Your account is active. Internship batch, dates and domain will appear
-          after Admin completes allocation.
-        </p>
-      )}
       <nav className="intern-tabs" aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={tab===key?"active":""} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
       <div className="intern-sections intern-tabbed" data-tab={tab}>
         <section className="card intern-pane intern-pane-overview">
