@@ -37,6 +37,7 @@ r.post("/chat",async(req,res)=>{const p=await me(req.user.id),g=(await q("SELECT
 r.get("/notifications",async(req,res)=>res.json((await q("SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",[req.user.id])).rows));
 r.post("/notifications/:id/read",async(req,res)=>{const x=(await q("UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING *",[req.params.id,req.user.id])).rows[0];if(!x)return res.status(404).json({error:"Notification not found"});res.json(x)});
 r.post("/notifications/read-all",async(req,res)=>{await q("UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE user_id=$1",[req.user.id]);res.json({ok:true})});
+r.get("/profile-photo",async(req,res)=>{const profile=await me(req.user.id);if(!profile?.photo_url)return res.status(404).json({error:"Profile photo not found"});const uploadRoot=path.resolve("uploads");const file=path.resolve(profile.photo_url);if(!file.startsWith(uploadRoot+path.sep)||!fs.existsSync(file))return res.status(404).json({error:"Profile photo not found"});const ext=path.extname(file).toLowerCase();if(![".jpg",".jpeg",".png"].includes(ext))return res.status(415).json({error:"Unsupported profile photo"});res.type(ext===".png"?"image/png":"image/jpeg");res.set("Cache-Control","private, max-age=300");res.sendFile(file);});
 r.get("/dashboard", async (req, res) => {
   const p = await me(req.user.id);
   const [alloc, offer, face, att, tasks, notes] = await Promise.all([
