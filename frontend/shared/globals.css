@@ -245,3 +245,23 @@
 .simple-home a:focus-visible{outline:3px solid #35a575;outline-offset:4px}
 @media(max-width:750px){.simple-home-container{padding-left:20px;padding-right:20px}.simple-home-hero-content{padding:70px 0}.simple-home-hero h1{font-size:46px;letter-spacing:-1.7px}.simple-home-steps{grid-template-columns:1fr}.simple-home-step,.simple-home-step:not(:first-child){padding:20px 0;border-left:0;border-bottom:1px solid #e5ede7}.simple-home-bottom-inner{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.simple-home *{transition:none!important}}
+
+/* Login: consistent field alignment, inline password toggle and primary CTA. */
+.auth-login-shell{min-height:calc(100vh - 76px);padding:60px 20px;background:radial-gradient(circle at 50% 0%,#e8f3ec,#f7faf8 65%);display:flex;align-items:center;justify-content:center}
+.auth-login-panel{width:min(460px,100%);padding:38px;border-radius:20px;box-shadow:0 20px 55px #163d2720}
+.auth-login-panel .auth-brand{margin-bottom:27px}
+.auth-login-panel .auth-brand h1{font-size:32px;letter-spacing:-.9px;margin:9px 0}
+.auth-login-panel .auth-brand p{font-size:14px;line-height:1.6}
+.auth-login-panel form{display:flex;flex-direction:column;gap:18px}
+.auth-login-panel .form-field{margin:0}
+.auth-login-panel .form-field label{display:block;margin:0 0 8px;font-size:13px;font-weight:700}
+.auth-login-panel .input{width:100%;height:46px;border-radius:10px;padding:0 13px;background:#fff;box-sizing:border-box}
+.auth-login-panel .input:focus{outline:2px solid #62b58a;outline-offset:1px}
+.auth-login-panel .password-wrap{position:relative}
+.auth-login-panel .password-wrap .input{padding-right:82px}
+.auth-login-panel .password-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:0;background:#eaf2ed;color:#235b3d;border-radius:7px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.auth-login-panel .password-eye:focus-visible{outline:2px solid #168353}
+.auth-login-panel .auth-submit{width:100%;min-height:46px;margin:0;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:14px}
+.auth-login-switch{margin:0;text-align:center;color:#697c70;font-size:13px}
+.auth-login-switch a{color:#076640;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:550px){.auth-login-shell{padding:28px 16px}.auth-login-panel{padding:26px 22px}}
