@@ -284,7 +284,7 @@ export default function RegisterPage() {
                 </option>
                 {colleges.map((c) => (
                   <option value={c.id} key={c.id}>
-                    {c.name}
+                    {[c.name, [c.city,c.district,c.state].filter(Boolean).join(", ")].filter(Boolean).join(" — ")}
                   </option>
                 ))}
                 <option value="OTHER">Other / College not listed</option>
