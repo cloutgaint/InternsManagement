@@ -1,41 +1,16 @@
-export default function Home() {
-  return (
-    <main className="wrap">
-      <section className="hero">
-        <span className="badge">Version 1.2 workflow</span>
-        <h1>Internships managed from verified application to completion.</h1>
-        <p className="muted">
-          College proof verification, offer letters, domain assessments, groups,
-          mentors, projects, approved face attendance, weekly tasks, reviews,
-          completion and reporting.
-        </p>
-        <p>
-          <a className="btn" href="/register">
-            Start application
-          </a>{" "}
-          &nbsp;{" "}
-          <a className="btn secondary" href="/login">
-            Sign in
-          </a>
-        </p>
-      </section>
-      <div className="grid">
-        {[
-          "Verified onboarding",
-          "Domain-agnostic programs",
-          "Mentor evaluation",
-          "Attendance & daily work",
-          "Weekly tasks & reviews",
-          "Completion & reports",
-        ].map((x) => (
-          <div className="card" key={x}>
-            <h3>{x}</h3>
-            <p className="muted">
-              Connected to the application workflow and role permissions.
-            </p>
-          </div>
-        ))}
-      </div>
-    </main>
-  );
-}
+import Link from "next/link";
+const features=[
+{icon:"✓",title:"Verified onboarding",description:"Register, submit college proof and track account verification."},
+{icon:"⌘",title:"Structured internships",description:"Follow batch allocation, domain selection and offer letter workflows."},
+{icon:"◎",title:"Mentor guidance",description:"Stay connected with assigned mentors, projects and evaluations."},
+{icon:"◷",title:"Attendance & leave",description:"Manage attendance records, leave requests and daily participation."},
+{icon:"▤",title:"Tasks & assessments",description:"Work through weekly tasks, assessments and performance reviews."},
+{icon:"★",title:"Completion & certificates",description:"Track final evaluation, internship completion and certificates."}
+];
+const steps=[["01","Create your profile","Register using your college and academic details."],["02","Get verified","Submit required proof for review and account approval."],["03","Start your internship","Access your assigned program, tasks and mentor."],["04","Track completion","Follow progress through evaluation and certification."]];
+export default function Home(){return <main className="public-home">
+<section className="public-hero"><div className="public-hero-inner"><div className="public-hero-copy"><span className="public-kicker"><span className="public-kicker-dot"/> GAINT INTERNSHIP MANAGEMENT</span><h1>Your internship journey, <span>all in one place.</span></h1><p>From student registration and college verification to mentorship, daily work and completion—manage every stage through one connected platform.</p><div className="public-hero-actions"><Link className="public-primary" href="/register">Apply for Internship <span aria-hidden="true">↗</span></Link><Link className="public-outline" href="/login">Student Login <span aria-hidden="true">→</span></Link></div><div className="public-trust"><span><b>✓</b> College verification</span><span><b>✓</b> Guided workflow</span><span><b>✓</b> Progress tracking</span></div></div><div className="public-hero-visual" aria-label="Illustration of the internship workflow"><div className="public-visual-glow"/><div className="public-visual-card"><div className="public-visual-head"><span className="public-visual-logo">G</span><div><b>Internship Journey</b><small>From application to completion</small></div><span className="public-visual-dots">•••</span></div><div className="public-visual-progress"><span>YOUR PATH</span><b>Four simple stages</b><div className="public-progress-track"><i/></div></div><div className="public-visual-steps"><div><span>01</span><b>Student registration</b><em>Get started</em></div><div><span>02</span><b>College verification</b><em>Get approved</em></div><div><span>03</span><b>Internship activities</b><em>Learn & build</em></div><div><span>04</span><b>Completion</b><em>Get evaluated</em></div></div></div><div className="public-floating-tag"><span>✦</span><div><b>One connected experience</b><small>Students · Mentors · Admins</small></div></div></div></div></section>
+<section className="public-content"><div className="public-section-heading"><span className="public-section-kicker">BUILT FOR YOUR JOURNEY</span><h2>Everything you need to move forward</h2><p>One platform to organize the important parts of your internship experience.</p></div><div className="public-feature-grid">{features.map(x=><article className="public-feature" key={x.title}><span className="public-feature-icon" aria-hidden="true">{x.icon}</span><h3>{x.title}</h3><p>{x.description}</p></article>)}</div></section>
+<section className="public-steps-section"><div className="public-content"><div className="public-section-heading"><span className="public-section-kicker">HOW IT WORKS</span><h2>A clear path from day one</h2><p>Know what comes next at each stage of your internship.</p></div><div className="public-steps-grid">{steps.map(x=><div className="public-step" key={x[0]}><span>{x[0]}</span><h3>{x[1]}</h3><p>{x[2]}</p></div>)}</div></div></section>
+<section className="public-content public-bottom"><div><span className="public-section-kicker">READY TO BEGIN?</span><h2>Take the first step toward your internship.</h2><p>Register your details and begin the verification process.</p></div><Link className="public-primary" href="/register">Start Your Application <span aria-hidden="true">↗</span></Link></section>
+</main>;}
