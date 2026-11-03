@@ -3,7 +3,7 @@ import { q, tx } from "../common/database/index.js";
 import { audit } from "../common/audit/audit.service.js";
 import fs from "fs";
 import path from "path";
-import { documentUpload } from "../services/collaborationService.js";
+import { documentUpload, validExternalDocumentUrl } from "../services/collaborationService.js";
 import { notifyGroup } from "../common/notifications/notification.service.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
@@ -50,6 +50,7 @@ r.post(
       if (req.file) fs.unlinkSync(req.file.path);
       return res.status(403).json({ error: "Group not assigned to you" });
     }
+    if (req.body.externalUrl && !validExternalDocumentUrl(req.body.externalUrl)) { if (req.file) fs.unlinkSync(req.file.path); return res.status(400).json({ error: "External document URL must be a valid HTTP(S) link" }); }
     if (!req.file && !req.body.externalUrl)
       return res
         .status(400)
