@@ -21,8 +21,8 @@ export async function register(req, res, next) {
     res.status(201).json(await service.registerIntern(input, req.files));
   } catch (error) {
     removeUploadedFiles(uploaded);
-    if (error.code === "23505")
-      return res.status(409).json({ error: "Email or proof reference already exists" });
+    if (error.code === "23505") return res.status(409).json({ error: "This email is already registered.", field: "email" });
+    if (error.status === 409) return res.status(409).json({ error: error.message, field: error.field });
     next(error);
   }
 }
