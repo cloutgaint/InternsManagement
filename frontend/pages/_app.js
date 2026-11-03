@@ -11,7 +11,7 @@ export default function App({ Component, pageProps }) {
   const [profileOpen,setProfileOpen]=useState(false),[profile,setProfile]=useState(null),[photo,setPhoto]=useState("");
   const profileRef=useRef(null);
   useEffect(()=>{
-    const sync=()=>setSession({token:localStorage.getItem("token"),role:localStorage.getItem("role")});
+    const sync=()=>setSession({token:sessionStorage.getItem("token"),role:sessionStorage.getItem("role")});
     sync();window.addEventListener("storage",sync);window.addEventListener("focus",sync);
     return ()=>{window.removeEventListener("storage",sync);window.removeEventListener("focus",sync);};
   },[router.asPath]);
@@ -40,7 +40,7 @@ export default function App({ Component, pageProps }) {
   }
   function logout(){
     pageHistory.current=[];setProfileOpen(false);setProfile(null);setPhoto("");
-    localStorage.removeItem("token");localStorage.removeItem("role");
+    sessionStorage.removeItem("token");sessionStorage.removeItem("role");
     setSession({token:null,role:null});router.replace("/login");
   }
   return <>
