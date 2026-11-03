@@ -109,6 +109,10 @@ r.post("/groups/:id/chat", async (req, res) => {
   const message = String(req.body.message || "").trim();
   if (!message && !req.body.attachmentId)
     return res.status(400).json({ error: "Message or attachment is required" });
+  if (req.body.attachmentId) {
+    const attachment = await q("SELECT 1 FROM documents WHERE id=$1 AND group_id=$2 AND active", [req.body.attachmentId, req.params.id]);
+    if (!attachment.rowCount) return res.status(403).json({ error: "Attachment is not available to this group" });
+  }
   const x = (
     await q(
       "INSERT INTO chat_messages(group_id,sender_id,message,attachment_id) VALUES($1,$2,$3,$4) RETURNING *",
