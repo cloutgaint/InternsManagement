@@ -104,8 +104,10 @@ export default function RegisterPage() {
         throw new Error("Enter a valid student email address.");
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw new Error("Enter a valid 10-digit Indian mobile number.");
-      if (!/^https:\/\/drive\.google\.com\//i.test(f.resumePortfolioUrl.trim())) {
-        setResumeError("Enter a valid Google Drive resume or portfolio link.");
+      let validResumeLink=false;
+      try{const url=new URL(f.resumePortfolioUrl.trim());validResumeLink=url.protocol==="https:"&&!!url.hostname;}catch{}
+      if (!validResumeLink) {
+        setResumeError("Enter a valid HTTPS link to your resume or portfolio.");
         resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
         resumeRef.current?.focus({preventScroll:true});
         return;
@@ -179,7 +181,7 @@ export default function RegisterPage() {
         "Application received. Your college permission proof is pending Admin verification. Login remains disabled until verification and Admin approval.",
       );
     } catch (x) {
-      if (/Google Drive resume or portfolio link/i.test(x.message)) {
+      if (/resume or portfolio link/i.test(x.message)) {
         setResumeError(x.message);
         resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
         resumeRef.current?.focus({preventScroll:true});
@@ -430,7 +432,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="form-field">
-              <label htmlFor="resume-drive-link">Resume / Portfolio Google Drive Link *</label>
+              <label htmlFor="resume-drive-link">Resume or Portfolio Link *</label>
               <input
                 className="input"
                 type="url"
@@ -439,7 +441,7 @@ export default function RegisterPage() {
                 ref={resumeRef}
                 aria-invalid={!!resumeError}
                 aria-describedby={resumeError?"resume-drive-error":undefined}
-                placeholder="https://drive.google.com/file/d/..."
+                placeholder="https://drive.google.com/... or https://yourportfolio.com"
                 value={f.resumePortfolioUrl}
                 onChange={(e) => {set("resumePortfolioUrl",e.target.value);if(resumeError)setResumeError("");}}
               />
