@@ -709,7 +709,7 @@ r.post("/assessments/:id/submit", async (req, res) => {
         } else manualPending = true;
         await client.query(
           "INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,'SUBMITTED')",
-          [at.id, answer.questionId, answer.answer ?? null, score],
+          [at.id, answer.questionId, answer.answer === undefined ? null : JSON.stringify(answer.answer), score],
         );
       }
       const updated = (await client.query(
