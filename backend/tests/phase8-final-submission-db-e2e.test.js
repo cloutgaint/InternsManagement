@@ -43,5 +43,16 @@ test("final project submission, mentor review and evaluation are enforced end-to
   assert.equal(accepted.status,200,JSON.stringify(accepted.body));
   const evaluated=await request("MENTOR",mentorUser.id,"POST","/api/mentor/final-evaluations",evalBody);
   assert.equal(evaluated.status,201,JSON.stringify(evaluated.body));
+  const adminUser=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','ADMIN','ACTIVE',true) RETURNING id",["final-admin-"+suffix+"@example.test"]);
+  const approved=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+intern.id+"/decision",{status:"APPROVED"});
+  assert.equal(approved.status,201,JSON.stringify(approved.body));
+  const report=await request("ADMIN",adminUser.id,"POST","/api/admin/reports/"+intern.id+"/completion",{});
+  assert.equal(report.status,201,JSON.stringify(report.body));
+  const certificate=await request("ADMIN",adminUser.id,"POST","/api/admin/certificates/"+intern.id+"/issue",{mode:"IN_APP"});
+  assert.equal(certificate.status,201,JSON.stringify(certificate.body));
+  const duplicate=await request("ADMIN",adminUser.id,"POST","/api/admin/certificates/"+intern.id+"/issue",{mode:"IN_APP"});
+  assert.equal(duplicate.status,409,JSON.stringify(duplicate.body));
+  const locked=await request("INTERN",internUser.id,"POST","/api/intern/final-project-submission",{repositoryUrl:"https://example.org/new"});
+  assert.equal(locked.status,409,JSON.stringify(locked.body));
  }finally{await new Promise(resolve=>server.close(resolve));await pool.end();}
 });
