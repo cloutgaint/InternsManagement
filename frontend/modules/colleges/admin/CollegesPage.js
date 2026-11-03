@@ -43,9 +43,9 @@ export default function Page() {
     catch(e){setErr(e.message);}finally{setBusy(false);}
   }
   async function remove(c) {
-    if(!window.confirm(`Delete "${c.name}"? This cannot be undone. Colleges linked to student records cannot be deleted.`))return;
+    if(!window.confirm(`Remove "${c.name}" from College Master and student registration? Existing student and internship history will be preserved.`))return;
     setErr("");setMsg("");
-    try{setBusy(true);await deleteCollege(c.id);setMsg("College deleted successfully.");await load();}
+    try{setBusy(true);await deleteCollege(c.id);setMsg("College removed from the master list. Historical records are preserved.");await load();}
     catch(e){setErr(e.message);}finally{setBusy(false);}
   }
   return <main className="wrap">
