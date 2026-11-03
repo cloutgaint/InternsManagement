@@ -1055,11 +1055,21 @@ r.get("/proofs/:id/file", async (req, res) => {
   res.sendFile(existing[0]);
 });
 
+r.delete("/interns/:userId", async (req,res,next) => {
+  try {
+    const student=(await q("SELECT u.id,u.email,u.status,ip.full_name FROM users u JOIN intern_profiles ip ON ip.user_id=u.id WHERE u.id=$1 AND u.role='INTERN'",[req.params.userId])).rows[0];
+    if(!student)return res.status(404).json({error:"Student not found"});
+    if(student.status==="DELETED")return res.status(409).json({error:"Student record already removed"});
+    await q("UPDATE users SET status='DELETED',is_active=false,updated_at=now() WHERE id=$1 AND role='INTERN'",[req.params.userId]);
+    await audit(req,"STUDENT_RECORD_REMOVED","user",student.id,student,{status:"DELETED",is_active:false});
+    res.json({message:"Student removed from active records. Historical records are retained for audit."});
+  } catch(error){next(error);}
+});
 r.get("/interns", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT ip.*,u.email,u.status account_status,u.is_active,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id ORDER BY ip.created_at DESC`,
+        `SELECT ip.*,u.email,u.status account_status,u.is_active,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE u.status<>'DELETED' ORDER BY ip.created_at DESC`,
       )
     ).rows,
   ),
