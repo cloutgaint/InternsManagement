@@ -77,3 +77,7 @@
 @media(max-width:600px){.top.glass-top{padding:9px 12px;min-height:65px}.glass-nav-shell{gap:9px}.glass-brand{gap:7px}.glass-brand-mark{width:33px;height:33px;font-size:19px;border-radius:10px}.glass-brand-copy strong{font-size:13px}.glass-brand-copy small{font-size:9px}.top .glass-nav{gap:2px;padding:3px;border-radius:12px}.top .glass-nav-link{padding:8px 9px;min-height:34px;font-size:11px;border-radius:9px}}
 @media(max-width:390px){.glass-brand-copy small{display:none}.top .glass-nav-link{padding:7px}.glass-nav-shell{gap:5px}}
 @media(prefers-reduced-motion:reduce){.top .glass-nav-link{transition:none}.top .glass-nav-cta:hover{transform:none}}
+
+/* Keep descriptive student navigation labels readable on smaller screens. */
+@media(max-width:600px){.glass-nav-shell{flex-wrap:wrap;justify-content:center}.glass-brand{margin-right:auto}.top .glass-nav{width:100%;justify-content:center}.top .glass-nav-link{flex:1;padding:9px 8px;font-size:12px}.top.glass-top{padding:9px 12px}}
+@media(max-width:390px){.top .glass-nav-link{font-size:11px;padding:8px 5px}}
