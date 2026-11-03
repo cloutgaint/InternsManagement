@@ -13,6 +13,11 @@ export default function AdminPerformancePage() {
     api("/admin/performance").then(setD).catch(e => setMessage(e.message));
     api("/admin/performance/weights").then(setConfigs).catch(e => setMessage(e.message));
   }, []);
+  useEffect(() => {
+    if (!batchId) return;
+    const config = configs.find(c => c.batch_id === batchId && (c.domain_id || "") === domainId) || configs.find(c => c.batch_id === batchId && !c.domain_id);
+    setWeights(config?.weights || { attendance: 25, tasks: 35, reviews: 25, final: 15 });
+  }, [batchId, domainId, configs]);
   if (!d) return <main className="wrap">Loading performance dashboard…</main>;
   const rows = d.interns.filter((x) =>
     (
@@ -29,11 +34,6 @@ export default function AdminPerformancePage() {
   );
   const batches = [...new Map(d.interns.filter(x => x.batch_id).map(x => [x.batch_id, x.batch_name])).entries()];
   const domains = [...new Map(d.interns.filter(x => x.domain_id).map(x => [x.domain_id, x.domain_name])).entries()];
-  useEffect(() => {
-    if (!batchId) return;
-    const config = configs.find(c => c.batch_id === batchId && (c.domain_id || "") === domainId) || configs.find(c => c.batch_id === batchId && !c.domain_id);
-    setWeights(config?.weights || { attendance: 25, tasks: 35, reviews: 25, final: 15 });
-  }, [batchId, domainId, configs]);
   async function saveWeights(e) {
     e.preventDefault();
     setMessage("");
