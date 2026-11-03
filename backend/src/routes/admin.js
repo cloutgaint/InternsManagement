@@ -763,7 +763,7 @@ r.post("/domain-recommendations/:internId/calculate", async (req, res) => {
       });
     await q(
       "INSERT INTO domain_decisions(intern_id,batch_id,preferences,recommendations) VALUES($1,$2,$3,$4)",
-      [req.params.internId, batchId, r.preferences, r.recommendations],
+      [req.params.internId, batchId, JSON.stringify(r.preferences), JSON.stringify(r.recommendations)],
     );
     await audit(
       req,
