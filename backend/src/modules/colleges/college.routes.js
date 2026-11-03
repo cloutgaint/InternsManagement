@@ -7,5 +7,6 @@ router.use(auth, permit("ADMIN", "SUPER_ADMIN"));
 router.get("/colleges", controller.list);
 router.post("/colleges", controller.create);
 router.patch("/colleges/:id", controller.update);
+router.delete("/colleges/:id", controller.remove);
 
 export default router;
