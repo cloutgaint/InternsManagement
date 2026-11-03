@@ -108,7 +108,7 @@ export async function registerIntern(input, files) {
 
 export async function login({ email, password }) {
   const normalizedEmail=String(email||"").trim().toLowerCase();
-  const user=(await q("SELECT * FROM users WHERE lower(email)= $1 AND status != $2 ORDER BY created_at DESC LIMIT 1",[normalizedEmail,"DELETED"])).rows[0];
+  const user=(await q("SELECT * FROM users WHERE lower(btrim(email))=$1 AND status<>$2 ORDER BY created_at DESC,id DESC LIMIT 1",[normalizedEmail,"DELETED"])).rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash)))
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
   if (!user.is_active)
