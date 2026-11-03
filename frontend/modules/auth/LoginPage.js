@@ -1,7 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
 import { api } from "@/shared/api/client";
 export default function LoginPage() {
+  const router=useRouter();
+  const adminMode=router.query.role==="admin";
   const [e, setE] = useState(""),
     [p, setP] = useState(""),
     [show, setShow] = useState(false),
@@ -44,6 +48,7 @@ export default function LoginPage() {
           );
         return;
       }
+      if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
       finish(d);
     } catch (x) {
       setErr(x.message);
@@ -59,6 +64,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ challenge: mfa.challenge, code }),
       });
+      if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
       finish(d);
     } catch (x) {
       setErr(x.message);
@@ -67,23 +73,24 @@ export default function LoginPage() {
     }
   }
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
+    <main className="auth-shell auth-login-shell">
+      <section className="auth-panel auth-login-panel">
         <div className="auth-brand">
-          <span className="eyebrow">GAINT INTERNS</span>
-          <h1>{mfa ? "Secure verification" : "Welcome back"}</h1>
+          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":"GAINT STUDENT PORTAL"}</span>
+          <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : "Welcome back"}</h1>
           <p>
             {mfa
               ? "Admin and Mentor accounts require multi-factor authentication."
-              : "Sign in to continue to your internship workspace."}
+              : adminMode ? "Access the administrative workspace using your authorized account." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
         {err && <p className="error">{err}</p>}
         {!mfa ? (
           <form onSubmit={go} noValidate>
             <div className="form-field">
-              <label>Email address</label>
+              <label htmlFor="login-email">Email address</label>
               <input
+                id="login-email"
                 className="input"
                 type="email"
                 autoComplete="email"
@@ -93,9 +100,10 @@ export default function LoginPage() {
               />
             </div>
             <div className="form-field">
-              <label>Password</label>
+              <label htmlFor="login-password">Password</label>
               <div className="password-wrap">
                 <input
+                  id="login-password"
                   className="input"
                   type={show ? "text" : "password"}
                   autoComplete="current-password"
@@ -116,6 +124,7 @@ export default function LoginPage() {
             <button className="btn auth-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign in"}
             </button>
+            <p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link></>}</p>
           </form>
         ) : (
           <form onSubmit={verify}>
