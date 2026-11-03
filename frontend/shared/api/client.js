@@ -11,7 +11,7 @@ function headers(options, token) {
 }
 
 function storedToken() {
-  return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  return typeof window !== "undefined" ? sessionStorage.getItem("token") : null;
 }
 
 export async function api(path, options = {}) {
