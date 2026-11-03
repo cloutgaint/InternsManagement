@@ -18,7 +18,7 @@ export default function MentorReportsPage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap mentor-reports-page">
       <div className="intern-head">
         <div>
           <h1>Fortnight Reports</h1>
