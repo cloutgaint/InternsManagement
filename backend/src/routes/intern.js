@@ -789,4 +789,33 @@ r.get("/completion", async (req, res) => {
   ).rows[0];
   res.json({ evaluation, approval, certificate });
 });
+
+r.get("/final-project-submission",async(req,res)=>{
+ const p=await me(req.user.id);
+ if(!p)return res.status(404).json({error:"Intern profile not found"});
+ const group=(await q("SELECT gm.group_id,g.name group_name,pa.project_id,pr.title project_title FROM group_members gm JOIN groups g ON g.id=gm.group_id JOIN project_assignments pa ON pa.group_id=gm.group_id AND pa.status='ASSIGNED' JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=$1 AND gm.active ORDER BY pa.id LIMIT 1",[p.id])).rows[0];
+ if(!group)return res.json({group:null,submission:null});
+ const submission=(await q("SELECT id,group_id,project_id,document_id,repository_url,demo_url,notes,status,mentor_feedback,reviewed_at,created_at,updated_at FROM final_project_submissions WHERE group_id=$1 AND project_id=$2",[group.group_id,group.project_id])).rows[0]||null;
+ res.json({group,submission});
+});
+r.post("/final-project-submission",async(req,res)=>{
+ const p=await me(req.user.id);
+ if(!p)return res.status(404).json({error:"Intern profile not found"});
+ const group=(await q("SELECT gm.group_id,pa.project_id FROM group_members gm JOIN project_assignments pa ON pa.group_id=gm.group_id AND pa.status='ASSIGNED' WHERE gm.intern_id=$1 AND gm.active ORDER BY pa.id LIMIT 1",[p.id])).rows[0];
+ if(!group)return res.status(409).json({error:"An active group with an assigned project is required"});
+ const {documentId=null,repositoryUrl=null,demoUrl=null,notes=""}=req.body||{};
+ if((repositoryUrl&&!validExternalDocumentUrl(repositoryUrl))||(demoUrl&&!validExternalDocumentUrl(demoUrl)))return res.status(400).json({error:"Repository and demo links must be valid HTTP(S) URLs"});
+ if(!documentId&&!repositoryUrl&&!demoUrl)return res.status(400).json({error:"Provide a shared document, repository URL or demo URL"});
+ if(typeof notes!=="string"||notes.length>5000)return res.status(400).json({error:"Notes must be at most 5000 characters"});
+ if(documentId){
+  const owned=(await q("SELECT 1 FROM documents WHERE id=$1 AND group_id=$2 AND active",[documentId,group.group_id])).rowCount;
+  if(!owned)return res.status(403).json({error:"Document is not shared with your group"});
+ }
+ const approved=(await q("SELECT 1 FROM completion_approvals ca JOIN group_members gm ON gm.intern_id=ca.intern_id WHERE gm.group_id=$1 AND gm.active AND ca.status='APPROVED'",[group.group_id])).rowCount;
+ if(approved)return res.status(409).json({error:"Final submission is locked after completion approval"});
+ const x=(await q(`INSERT INTO final_project_submissions(group_id,project_id,submitted_by,document_id,repository_url,demo_url,notes) VALUES($1,$2,$3,$4,$5,$6,$7)
+ ON CONFLICT(group_id,project_id) DO UPDATE SET submitted_by=EXCLUDED.submitted_by,document_id=EXCLUDED.document_id,repository_url=EXCLUDED.repository_url,demo_url=EXCLUDED.demo_url,notes=EXCLUDED.notes,status='SUBMITTED',mentor_feedback=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=now()
+ RETURNING *`,[group.group_id,group.project_id,req.user.id,documentId,repositoryUrl,demoUrl,notes])).rows[0];
+ res.status(201).json(x);
+});
 export default r;
