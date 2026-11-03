@@ -27,14 +27,14 @@ test("assessment lifecycle: submit, evaluate, recommend and confirm", { skip: !e
     inserted.admin = admin.id; inserted.internUser = user.id; inserted.users.push(admin.id, user.id);
     const domain = await row("INSERT INTO domains(name,code) VALUES($1,$2) RETURNING id", ["E2E Domain " + suffix, "E2E" + suffix]);
     inserted.domains.push(domain.id);
-    const profile = await row("INSERT INTO intern_profiles(user_id,full_name,college_id,preferred_domains) VALUES($1,'E2E Intern',$2,$3) RETURNING id", [user.id, college.id, [domain.id]]);
+    const profile = await row("INSERT INTO intern_profiles(user_id,full_name,college_id,preferred_domains) VALUES($1,'E2E Intern',$2,$3) RETURNING id", [user.id, college.id, JSON.stringify([domain.id])]);
     const batch = await row("INSERT INTO batches(college_id,name,code,start_date,end_date) VALUES($1,$2,$3,'2026-01-01','2027-12-31') RETURNING id", [college.id, "E2E Batch", "E2E" + suffix]);
     inserted.batches.push(batch.id);
     await q("INSERT INTO batch_allocations(batch_id,intern_id,status) VALUES($1,$2,'ALLOTMENT_VERIFIED')", [batch.id, profile.id]);
     const objective = await row("INSERT INTO question_bank(domain_id,type,question,correct_answer,marks,status) VALUES($1,'MCQ','E2E objective',$2,5,'ACTIVE') RETURNING id", [domain.id, "yes"]);
     const written = await row("INSERT INTO question_bank(domain_id,type,question,marks,status) VALUES($1,'DESCRIPTIVE','E2E written',5,'ACTIVE') RETURNING id", [domain.id]);
     const assessment = await row("INSERT INTO assessments(batch_id,name,duration_minutes,attempt_count,status) VALUES($1,'E2E Assessment',60,1,'ACTIVE') RETURNING id", [batch.id]);
-    await q("INSERT INTO assessment_sections(assessment_id,domain_id,name,pass_score,question_ids) VALUES($1,$2,'E2E Section',50,$3)", [assessment.id, domain.id, [objective.id, written.id]]);
+    await q("INSERT INTO assessment_sections(assessment_id,domain_id,name,pass_score,question_ids) VALUES($1,$2,'E2E Section',50,$3)", [assessment.id, domain.id, JSON.stringify([objective.id, written.id])]);
     const started = await request("INTERN", "POST", "/api/intern/assessments/" + assessment.id + "/start", {});
     assert.equal(started.status, 201, JSON.stringify(started.body));
     const attemptId = started.body.id;
