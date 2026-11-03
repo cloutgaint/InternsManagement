@@ -22,3 +22,7 @@ export async function updateCollege(id, input) {
     [...values,id],
   )).rows[0];
 }
+
+export async function deleteCollege(id) {
+  return (await q("DELETE FROM colleges WHERE id=$1 RETURNING *",[id])).rows[0];
+}
