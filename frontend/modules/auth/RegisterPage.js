@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
+import { useRouter } from "next/router";
 const PROGRAMS = [
   "B.Tech",
   "B.E.",
@@ -36,6 +37,7 @@ const PROOFS = [
   "Other",
 ];
 export default function RegisterPage() {
+  const router=useRouter();
   const [f, setF] = useState({
       email: "",
       password: "",
@@ -177,9 +179,10 @@ export default function RegisterPage() {
       files.forEach((x) => body.append("proofFiles", x));
       if (photo) body.append("photo", photo);
       await api("/auth/register", { method: "POST", body });
-      setMsg(
-        "Application received. Your college permission proof is pending Admin verification. Login remains disabled until verification and Admin approval.",
-      );
+      e.currentTarget.reset();
+      setF(x=>Object.fromEntries(Object.entries(x).map(([key,value])=>[key,typeof value==="boolean"?false:""])));
+      setFiles([]);setPhoto(null);setCollegeChoice("");setShowPassword(false);
+      await router.replace("/login?registered=1");
     } catch (x) {
       if (/resume or portfolio link/i.test(x.message)) {
         setResumeError(x.message);
