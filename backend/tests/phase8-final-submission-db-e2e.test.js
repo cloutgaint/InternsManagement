@@ -1,0 +1,47 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import jwt from "jsonwebtoken";
+import {createApp} from "../src/app.js";
+import {q,pool} from "../src/common/database/index.js";
+test("final project submission, mentor review and evaluation are enforced end-to-end",{skip:process.env.RUN_DB_E2E!=="1"},async()=>{
+ assert.ok(process.env.DATABASE_URL?.includes("intern_test"),"Use isolated intern_test database");
+ process.env.JWT_SECRET ||= "ci-only-phase8-secret";
+ const suffix=Date.now().toString(36);
+ const one=async(sql,args=[]) => (await q(sql,args)).rows[0];
+ const app=createApp(),server=app.listen(0),base="http://127.0.0.1:"+server.address().port;
+ const request=async(role,id,method,path,body)=>{
+  const token=jwt.sign({id,role},process.env.JWT_SECRET);
+  const res=await fetch(base+path,{method,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+  return {status:res.status,body:await res.json()};
+ };
+ try{
+  const college=await one("INSERT INTO colleges(name) VALUES($1) RETURNING id",["Final College "+suffix]);
+  const mentorUser=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','MENTOR','ACTIVE',true) RETURNING id",["final-mentor-"+suffix+"@example.test"]);
+  const internUser=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','INTERN','ACTIVE',true) RETURNING id",["final-intern-"+suffix+"@example.test"]);
+  const outsiderUser=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','INTERN','ACTIVE',true) RETURNING id",["final-outsider-"+suffix+"@example.test"]);
+  const mentor=await one("INSERT INTO mentors(user_id,full_name) VALUES($1,'Final Mentor') RETURNING id",[mentorUser.id]);
+  const intern=await one("INSERT INTO intern_profiles(user_id,full_name,college_id) VALUES($1,'Final Intern',$2) RETURNING id",[internUser.id,college.id]);
+  await q("INSERT INTO intern_profiles(user_id,full_name,college_id) VALUES($1,'Outsider',$2)",[outsiderUser.id,college.id]);
+  const batch=await one("INSERT INTO batches(college_id,name,code,start_date,end_date) VALUES($1,'Final Batch',$2,'2026-01-01','2027-12-31') RETURNING id",[college.id,"F8"+suffix]);
+  const group=await one("INSERT INTO groups(batch_id,name) VALUES($1,'Final Group') RETURNING id",[batch.id]);
+  const project=await one("INSERT INTO projects(title) VALUES($1) RETURNING id",["Final Project "+suffix]);
+  await q("INSERT INTO project_assignments(project_id,group_id) VALUES($1,$2)",[project.id,group.id]);
+  await q("INSERT INTO group_members(group_id,intern_id) VALUES($1,$2)",[group.id,intern.id]);
+  await q("INSERT INTO mentor_assignments(mentor_id,group_id) VALUES($1,$2)",[mentor.id,group.id]);
+  const evalBody={groupId:group.id,internId:intern.id,groupMarks:85,individualMarks:90,mentorFeedback:"Excellent",recommendation:"COMPLETED"};
+  const early=await request("MENTOR",mentorUser.id,"POST","/api/mentor/final-evaluations",evalBody);
+  assert.equal(early.status,409,JSON.stringify(early.body));
+  const outsider=await request("INTERN",outsiderUser.id,"POST","/api/intern/final-project-submission",{repositoryUrl:"https://example.org/repo"});
+  assert.equal(outsider.status,409,JSON.stringify(outsider.body));
+  const submitted=await request("INTERN",internUser.id,"POST","/api/intern/final-project-submission",{repositoryUrl:"https://example.org/repo",notes:"Final project"});
+  assert.equal(submitted.status,201,JSON.stringify(submitted.body));
+  const visible=await request("MENTOR",mentorUser.id,"GET","/api/mentor/final-project-submissions");
+  assert.equal(visible.status,200);assert.ok(visible.body.some(x=>x.id===submitted.body.id));
+  const invalid=await request("MENTOR",mentorUser.id,"POST","/api/mentor/final-project-submissions/"+submitted.body.id+"/review",{status:"ACCEPTED",feedback:""});
+  assert.equal(invalid.status,400);
+  const accepted=await request("MENTOR",mentorUser.id,"POST","/api/mentor/final-project-submissions/"+submitted.body.id+"/review",{status:"ACCEPTED",feedback:"Ready"});
+  assert.equal(accepted.status,200,JSON.stringify(accepted.body));
+  const evaluated=await request("MENTOR",mentorUser.id,"POST","/api/mentor/final-evaluations",evalBody);
+  assert.equal(evaluated.status,201,JSON.stringify(evaluated.body));
+ }finally{await new Promise(resolve=>server.close(resolve));await pool.end();}
+});
