@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function MentorReportsPage() {
   const [reviews, setReviews] = useState([]),
@@ -106,12 +106,12 @@ export default function MentorReportsPage() {
             <b>Marks</b>
             <b>Contribution Note</b>
             {report.members.map((m) => (
-              <>
+              <Fragment key={m.roll_number || m.full_name}>
                 <span>{m.full_name}</span>
                 <span>{m.roll_number || "—"}</span>
                 <span>{m.marks}</span>
                 <span>{m.contribution_note || "—"}</span>
-              </>
+              </Fragment>
             ))}
           </div>
           <small className="muted">
