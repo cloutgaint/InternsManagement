@@ -52,6 +52,14 @@ test("final project submission, mentor review and evaluation are enforced end-to
   assert.equal(certificate.status,201,JSON.stringify(certificate.body));
   const duplicate=await request("ADMIN",adminUser.id,"POST","/api/admin/certificates/"+intern.id+"/issue",{mode:"IN_APP"});
   assert.equal(duplicate.status,409,JSON.stringify(duplicate.body));
+  const cannotExitIssued=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+intern.id+"/exit",{type:"WITHDRAWN",reason:"Leaving early"});assert.equal(cannotExitIssued.status,409,JSON.stringify(cannotExitIssued.body));
+  const exiting=await one("INSERT INTO intern_profiles(user_id,full_name,college_id) VALUES($1,'Exiting Intern',$2) RETURNING id",[outsiderUser.id,college.id]);
+  const missingReason=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+exiting.id+"/exit",{type:"WITHDRAWN"});assert.equal(missingReason.status,400,JSON.stringify(missingReason.body));
+  const forbidden=await request("INTERN",outsiderUser.id,"POST","/api/admin/completions/"+exiting.id+"/exit",{type:"WITHDRAWN",reason:"Leaving"});assert.equal(forbidden.status,403,JSON.stringify(forbidden.body));
+  const exited=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+exiting.id+"/exit",{type:"WITHDRAWN",reason:"Leaving early"});assert.equal(exited.status,201,JSON.stringify(exited.body));
+  const repeatExit=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+exiting.id+"/exit",{type:"TERMINATED",reason:"Repeated"});assert.equal(repeatExit.status,409,JSON.stringify(repeatExit.body));
+  const cannotApprove=await request("ADMIN",adminUser.id,"POST","/api/admin/completions/"+exiting.id+"/decision",{status:"APPROVED"});assert.equal(cannotApprove.status,409,JSON.stringify(cannotApprove.body));
+  const cannotCert=await request("ADMIN",adminUser.id,"POST","/api/admin/certificates/"+exiting.id+"/issue",{});assert.equal(cannotCert.status,409,JSON.stringify(cannotCert.body));
   const locked=await request("INTERN",internUser.id,"POST","/api/intern/final-project-submission",{repositoryUrl:"https://example.org/new"});
   assert.equal(locked.status,409,JSON.stringify(locked.body));
  }finally{await new Promise(resolve=>server.close(resolve));await pool.end();}
