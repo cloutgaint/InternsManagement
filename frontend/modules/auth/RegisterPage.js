@@ -101,6 +101,7 @@ export default function RegisterPage() {
         throw new Error("Enter a valid student email address.");
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw new Error("Enter a valid 10-digit Indian mobile number.");
+      if (!f.resumePortfolioUrl.trim() || !/^https:\/\/drive\.google\.com\//i.test(f.resumePortfolioUrl.trim())) throw new Error("A valid Google Drive resume or portfolio link is required.");
       if (!f.dob) throw new Error("Date of birth is required.");
       const dob = new Date(f.dob),
         today = new Date();
@@ -417,10 +418,12 @@ export default function RegisterPage() {
               />
             </div>
             <div className="form-field">
-              <label>Resume / Portfolio Link (optional)</label>
+              <label>Resume / Portfolio Google Drive Link *</label>
               <input
                 className="input"
                 type="url"
+                required
+                placeholder="https://drive.google.com/file/d/..."
                 value={f.resumePortfolioUrl}
                 onChange={(e) => set("resumePortfolioUrl", e.target.value)}
               />
