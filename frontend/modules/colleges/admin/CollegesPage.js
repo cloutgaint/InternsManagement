@@ -4,8 +4,8 @@ import { createCollege, getColleges, updateCollege } from "../api/colleges.api";
 const blank = { name:"",code:"",university:"",college_type:"",state:"",district:"",city:"",address:"",pin_code:"",email:"",phone:"",website:"",coordinator_name:"",coordinator_email:"",coordinator_mobile:"",active:true };
 const groups = [
   { title:"Basic Information", fields:[["name","Official College Name",true],["code","College Code",true],["university","University / Affiliation",true],["college_type","College Type",true]] },
-  { title:"Location Details", fields:[["state","State",true],["district","District",true],["city","City / Town",true],["address","Full College Address",true],["pin_code","PIN Code",true]] },
-  { title:"Contact & Coordinator Details", fields:[["email","Official College Email"],["phone","College Contact Number"],["website","College Website"],["coordinator_name","Coordinator Name"],["coordinator_email","Coordinator Email"],["coordinator_mobile","Coordinator Mobile"]] },
+  { title:"Location Details", fields:[["state","State",true],["city","City / Town",true],["address","Full College Address",true],] },
+  { title:"Contact & Coordinator Details", fields:[["email","Official College Email"],["phone","College Contact Number"],["website","College Website"],["coordinator_name","Coordinator Name"],["coordinator_mobile","Coordinator Mobile"]] },
 ];
 const types = ["Engineering College","Degree College","Polytechnic","University","Other"];
 function CollegeFields({ value, onChange, required }) {
