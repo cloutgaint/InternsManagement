@@ -1,3 +1,4 @@
+import { DEFAULT_WEIGHTS, validateWeights, calculatePerformance } from "../services/performanceScoreService.js";
 import { Router } from "express";
 import batchAllotmentOrders from "./batchAllotmentOrders.js";
 import { offerSnapshot } from "../services/offerLetterSnapshot.js";
@@ -13,7 +14,20 @@ r.use(batchAllotmentOrders);
 r.get("/dashboard", async (req, res) => {
   const sql = `SELECT (SELECT count(*) FROM users WHERE role='INTERN') interns,(SELECT count(*) FROM users WHERE role='INTERN' AND is_active) active_interns,(SELECT count(*) FROM college_proofs WHERE status IN ('UPLOADED','UNDER_REVIEW')) proofs_pending,(SELECT count(*) FROM users WHERE role='INTERN' AND status='PENDING_APPROVAL') approvals_pending,(SELECT count(*) FROM face_enrollments WHERE status='PENDING_ADMIN_APPROVAL') faces_pending,(SELECT count(*) FROM task_submissions WHERE status IN ('SUBMITTED','RESUBMITTED')) task_evaluations_pending,(SELECT count(*) FROM attendance_exceptions WHERE status NOT IN ('CLOSED','REJECTED')) attendance_exceptions,(SELECT count(*) FROM leave_requests WHERE status='PENDING') leave_pending,(SELECT count(*) FROM groups WHERE status IN ('SYSTEM_DRAFT','DRAFT')) groups_pending,(SELECT count(*) FROM batch_allocations WHERE current_date BETWEEN intern_start AND intern_end) active_allocations,(SELECT count(*) FROM fortnight_reviews WHERE status='PUBLISHED') published_reviews,(SELECT count(*) FROM completion_approvals WHERE status='PENDING') completions_pending,(SELECT count(*) FROM certificates WHERE status='ISSUED') certificates_issued`;res.json((await q(sql)).rows[0]);
 });
-r.get("/performance",async(req,res)=>{const rows=(await q(`SELECT ip.id,ip.full_name,ip.roll_number,c.name college_name,b.name batch_name,d.name domain_name,g.name group_name,p.title project_title,
+r.get("/performance/weights",async(req,res)=>res.json((await q("SELECT batch_id,domain_id,weights,updated_at FROM performance_weight_configs ORDER BY updated_at DESC")).rows));
+r.put("/performance/weights",async(req,res)=>{
+ const {batchId,domainId=null,weights}=req.body;
+ if(!batchId || !validateWeights(weights))return res.status(400).json({error:"Batch and four nonnegative weights totaling 100 are required"});
+ const batch=(await q("SELECT id FROM batches WHERE id=$1",[batchId])).rows[0];
+ if(!batch)return res.status(404).json({error:"Batch not found"});
+ if(domainId && !(await q("SELECT id FROM domains WHERE id=$1",[domainId])).rowCount)return res.status(404).json({error:"Domain not found"});
+ const x=(await q(`INSERT INTO performance_weight_configs(batch_id,domain_id,weights) VALUES($1,$2,$3)
+ ON CONFLICT DO NOTHING RETURNING *`,[batchId,domainId,JSON.stringify(weights)])).rows[0];
+ const result=x || (await q("UPDATE performance_weight_configs SET weights=$3,updated_at=now() WHERE batch_id=$1 AND domain_id IS NOT DISTINCT FROM $2 RETURNING *",[batchId,domainId,JSON.stringify(weights)])).rows[0];
+ await audit(req,"PERFORMANCE_WEIGHTS_UPDATED","batch",batchId,null,result);
+ res.json(result);
+});
+r.get("/performance",async(req,res)=>{const rows=(await q(`SELECT ip.id,ip.full_name,ip.roll_number,c.name college_name,b.name batch_name,ba.batch_id,ip.final_domain_id domain_id,d.name domain_name,g.name group_name,p.title project_title,
 COALESCE(att.present_days,0)::int present_days,COALESCE(att.total_days,0)::int attendance_days,CASE WHEN COALESCE(att.total_days,0)=0 THEN 0 ELSE round(att.present_days*100.0/att.total_days,1) END attendance_pct,
 COALESCE(ts.task_count,0)::int task_count,COALESCE(ts.approved_tasks,0)::int approved_tasks,COALESCE(ts.avg_task_marks,0)::numeric(10,1) avg_task_marks,
 COALESCE(rv.review_count,0)::int review_count,COALESCE(rv.avg_individual_marks,0)::numeric(10,1) avg_individual_marks,
@@ -23,7 +37,18 @@ LEFT JOIN LATERAL(SELECT count(*) total_days,count(*) FILTER(WHERE status='PRESE
 LEFT JOIN LATERAL(SELECT count(*) task_count,count(*) FILTER(WHERE x.status='APPROVED') approved_tasks,avg(te.marks) avg_task_marks FROM task_submissions x LEFT JOIN LATERAL(SELECT marks FROM task_evaluations e WHERE e.submission_id=x.id ORDER BY e.created_at DESC LIMIT 1)te ON true WHERE x.intern_id=ip.id)ts ON true
 LEFT JOIN LATERAL(SELECT count(*) review_count,avg(rim.marks) avg_individual_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true
 LEFT JOIN LATERAL(SELECT individual_marks,recommendation FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true ORDER BY ip.full_name`)).rows;
-const summary={interns:rows.length,avgAttendance:rows.length?Number((rows.reduce((n,x)=>n+Number(x.attendance_pct||0),0)/rows.length).toFixed(1)):0,avgTaskMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_task_marks||0),0)/rows.length).toFixed(1)):0,avgIndividualMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_individual_marks||0),0)/rows.length).toFixed(1)):0};res.json({summary,interns:rows})});
+const configs=(await q("SELECT batch_id,domain_id,weights FROM performance_weight_configs")).rows;
+const configured=rows.map(x=>{
+  const config=configs.find(c=>c.batch_id===x.batch_id && c.domain_id===x.domain_id) || configs.find(c=>c.batch_id===x.batch_id && !c.domain_id);
+  const weights=config?.weights || DEFAULT_WEIGHTS;
+  return {...x,performance_score:calculatePerformance({
+    attendance_pct:Number(x.attendance_days)>0?x.attendance_pct:null,
+    avg_task_marks:Number(x.approved_tasks)>0?x.avg_task_marks:null,
+    avg_individual_marks:Number(x.review_count)>0?x.avg_individual_marks:null,
+    final_individual_marks:x.recommendation?x.final_individual_marks:null,
+  },weights),performance_weights:weights};
+});
+const summary={interns:rows.length,avgAttendance:rows.length?Number((rows.reduce((n,x)=>n+Number(x.attendance_pct||0),0)/rows.length).toFixed(1)):0,avgTaskMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_task_marks||0),0)/rows.length).toFixed(1)):0,avgIndividualMarks:rows.length?Number((rows.reduce((n,x)=>n+Number(x.avg_individual_marks||0),0)/rows.length).toFixed(1)):0};res.json({summary,interns:configured})});
 r.get("/proofs", async (req, res) =>
   res.json(
     (
