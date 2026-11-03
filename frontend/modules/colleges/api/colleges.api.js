@@ -9,3 +9,5 @@ export const updateCollege = (id, input) => api("/admin/colleges/" + id, {
   method: "PATCH",
   body: JSON.stringify(input),
 });
+
+export const deleteCollege = (id) => api("/admin/colleges/" + id, {method:"DELETE"});
