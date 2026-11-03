@@ -42,11 +42,11 @@ export default function App({ Component, pageProps }) {
     <header className="top glass-top"><div className="glass-nav-shell">
       <Link href="/" className="glass-brand" aria-label="GAINT Intern Management home"><span className="glass-brand-mark" aria-hidden="true">G</span><span className="glass-brand-copy"><strong>GAINT</strong><small>Intern Management</small></span></Link>
       <nav className="nav glass-nav" aria-label="Main navigation">
-        {router.pathname!=="/"&&(!loggedIn||router.asPath!==home)&&<button type="button" className="glass-nav-link glass-back" onClick={goBack} aria-label="Go back to previous page"><span aria-hidden="true">←</span> Back</button>}
         {links.map(({href,label})=><Link key={href} href={href} aria-current={router.pathname===href?"page":undefined} className={"glass-nav-link"+(router.pathname===href?" is-active":"")+(!loggedIn&&href==="/register"?" glass-nav-cta":"")}>{label}</Link>)}
         {loggedIn&&<button type="button" className="glass-nav-link glass-logout" onClick={logout} aria-label="Log out of your account">Log Out</button>}
       </nav>
     </div></header>
+    {router.pathname!=="/"&&(!loggedIn||router.asPath!==home)&&<div className="page-back-bar"><div className="page-back-inner"><button type="button" className="page-back-button" onClick={goBack} aria-label="Go back to previous page"><span aria-hidden="true">←</span> Back</button></div></div>}
     <Component {...pageProps}/>
   </>;
 }
