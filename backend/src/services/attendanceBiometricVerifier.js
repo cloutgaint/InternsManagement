@@ -1,19 +1,23 @@
-import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 export async function verifyAttendanceBiometrics({ imageData, enrollment, challengeType }) {
   const endpoint = process.env.BIOMETRIC_VERIFY_URL;
   const token = process.env.BIOMETRIC_VERIFY_TOKEN;
   if (!endpoint || !token) return { ok: false, unavailable: true, reason: "Trusted biometric verification is not configured" };
   let url;
   try { url = new URL(endpoint); } catch { return { ok: false, unavailable: true, reason: "Invalid biometric verifier URL" }; }
-  if (url.protocol !== "https:" && !(process.env.NODE_ENV === "test" && url.hostname === "127.0.0.1"))
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))
     return { ok: false, unavailable: true, reason: "Biometric verifier must use HTTPS" };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
+    const enrollmentPath = path.resolve(enrollment.raw_image_path || "");
+    if (!enrollment.raw_image_path || !fs.existsSync(enrollmentPath)) return { ok: false, unavailable: true, reason: "Approved enrollment image is unavailable" };
+    const enrollmentImageData = "data:image/" + (enrollmentPath.toLowerCase().endsWith(".png") ? "png" : "jpeg") + ";base64," + fs.readFileSync(enrollmentPath).toString("base64");
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ imageData, enrollmentReference: enrollment.template_ref, challengeType }),
+      body: JSON.stringify({ imageData, enrollmentImageData, challengeType }),
       signal: controller.signal,
     });
     if (!response.ok) return { ok: false, unavailable: true, reason: "Biometric verifier rejected the request" };
