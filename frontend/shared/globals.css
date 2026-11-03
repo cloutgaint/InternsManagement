@@ -282,7 +282,7 @@
 .intern-tabs button.active{background:#075e3e;color:#fff;box-shadow:0 3px 10px #0b573b24}
 .intern-tabs button:focus-visible{outline:3px solid #4ca77a;outline-offset:2px}
 .intern-tabbed .intern-pane{display:none}
-.intern-tabbed[data-tab="overview"] .intern-pane-overview,.intern-tabbed[data-tab="onboarding"] .intern-pane-onboarding,.intern-tabbed[data-tab="work"] .intern-pane-work,.intern-tabbed[data-tab="learning"] .intern-pane-learning,.intern-tabbed[data-tab="team"] .intern-pane-team,.intern-tabbed[data-tab="completion"] .intern-pane-completion{display:block}
+.intern-tabbed[data-tab="overview"] .intern-pane-overview,.intern-tabbed[data-tab="onboarding"] .intern-pane-onboarding,.intern-tabbed[data-tab="work"] .intern-pane-work,.intern-tabbed[data-tab="learning"] .intern-pane-learning,.intern-tabbed[data-tab="team"] .intern-pane-team,.intern-tabbed[data-tab="reviews"] .intern-pane-reviews,.intern-tabbed[data-tab="completion"] .intern-pane-completion{display:block}
 .intern-profile-head{display:flex;align-items:center;gap:15px;margin-bottom:16px}
 .intern-profile-head h2{margin:0 0 4px}
 .intern-profile-head p{margin:0}
