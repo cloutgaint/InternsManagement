@@ -92,3 +92,14 @@
 .top .glass-back{font-family:inherit;border:1px solid rgba(12,103,66,.13);background:rgba(255,255,255,.7);color:#234d38;cursor:pointer;gap:6px}
 .top .glass-back:hover{background:rgba(12,103,66,.1);color:#075b3b}
 .top .glass-back:focus-visible{outline:3px solid #2c8e65;outline-offset:3px}
+
+/* Scoped admin alignment fixes: responsive completion actions and audit pagination. */
+.admin-completion-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 20px}
+.admin-completion-info{flex:1 1 320px;min-width:0;line-height:1.5}
+.admin-completion-info .muted{overflow-wrap:anywhere}
+.admin-completion-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:0}
+.admin-completion-actions .btn{white-space:nowrap}
+.admin-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 4px;color:#53675c}
+.admin-pagination .action-row{display:flex;align-items:center;gap:10px;margin:0}
+.admin-pagination button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:700px){.admin-completion-row{align-items:stretch}.admin-completion-actions{justify-content:flex-start;width:100%}.admin-pagination{justify-content:center}}
