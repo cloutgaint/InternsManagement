@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function AdminAuditPage() {
   const [rows, setRows] = useState([]),
-    [q, setQ] = useState("");
+    [q, setQ] = useState(""),
+    [page,setPage] = useState(1);
+  const pageSize=10;
   useEffect(() => {
     api("/admin/audit").then(setRows);
   }, []);
@@ -12,6 +14,9 @@ export default function AdminAuditPage() {
       .toLowerCase()
       .includes(q.toLowerCase()),
   );
+  const totalPages=Math.max(1,Math.ceil(r.length/pageSize));
+  const currentPage=Math.min(page,totalPages);
+  const visible=r.slice((currentPage-1)*pageSize,currentPage*pageSize);
   return (
     <main className="wrap">
       <div className="intern-head">
@@ -27,10 +32,10 @@ export default function AdminAuditPage() {
         className="input"
         placeholder="Search action, entity type or ID"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => {setQ(e.target.value);setPage(1);}}
       />
       <section className="card audit-list">
-        {r.map((x) => (
+        {visible.map((x) => (
           <article className="audit-row" key={x.id}>
             <div>
               <b>{x.action}</b>
@@ -55,6 +60,7 @@ export default function AdminAuditPage() {
           </article>
         ))}
       </section>
+      <div className="admin-pagination"><span>{r.length ? `${(currentPage-1)*pageSize+1}–${Math.min(currentPage*pageSize,r.length)} of ${r.length}` : "No audit entries"}</span><div className="action-row"><button className="btn secondary" type="button" disabled={currentPage===1} onClick={()=>setPage(currentPage-1)}>Previous</button><span>Page {currentPage} of {totalPages}</span><button className="btn secondary" type="button" disabled={currentPage===totalPages} onClick={()=>setPage(currentPage+1)}>Next</button></div></div>
     </main>
   );
 }
