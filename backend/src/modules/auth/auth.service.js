@@ -55,8 +55,6 @@ export async function registerIntern(input, files) {
     throw badRequest("Select a college or enter the college name under Other");
 
   return tx(async (client) => {
-    const passwordHash = await bcrypt.hash(input.password, 12);
-    const user = await repository.createInternUser(client, input.email, passwordHash);
     let college;
     if (input.collegeId) {
       college = await repository.findActiveCollegeById(client, input.collegeId);
@@ -67,11 +65,22 @@ export async function registerIntern(input, files) {
       if (!college)
         college = await repository.createInactiveCollege(client, name, input.university);
     }
+    const email=String(input.email).trim().toLowerCase();
+    const rollNumber=String(input.rollNumber).trim();
+    // Serialize registrations for this college and roll number to avoid racing duplicates.
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",[`student-roll:${college.id}:${rollNumber.toLowerCase()}`]);
+    const existingRoll=await client.query(
+      "SELECT 1 FROM intern_profiles ip JOIN users u ON u.id=ip.user_id WHERE ip.college_id=$1 AND lower(btrim(ip.roll_number))=lower($2) AND u.status<>'DELETED' LIMIT 1",
+      [college.id,rollNumber],
+    );
+    if(existingRoll.rowCount)throw Object.assign(new Error("This roll number is already registered for the selected college."),{status:409,field:"rollNumber"});
+    const passwordHash=await bcrypt.hash(input.password,12);
+    const user=await repository.createInternUser(client,email,passwordHash);
     const profile = await repository.createInternProfile(client, {
       userId: user.id, fullName: input.fullName, mobile: input.mobile,
       dob: input.dob, address: input.address, photo: photoFile.path || null,
       collegeId: college.id, university: input.university, program, branch,
-      yearSemester: input.yearSemester, rollNumber: input.rollNumber,
+      yearSemester: input.yearSemester, rollNumber,
       preferredDomains: JSON.stringify(preferredDomains),
       preferredBatch: input.preferredBatch || null,
       modePreference: input.modePreference || null,
