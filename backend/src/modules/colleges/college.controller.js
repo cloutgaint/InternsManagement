@@ -32,3 +32,14 @@ export async function update(req, res, next) {
     next(error);
   }
 }
+
+export async function remove(req,res,next) {
+  try {
+    const before=await service.deleteCollege(req.params.id);
+    await audit(req,"COLLEGE_DELETE","college",before.id,before,null);
+    res.json({message:"College deleted successfully"});
+  } catch(error) {
+    if(error.code==="23503")return res.status(409).json({error:"This college is linked to existing student or internship records. Deactivate it instead to preserve those records."});
+    next(error);
+  }
+}
