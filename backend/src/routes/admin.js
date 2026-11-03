@@ -1361,6 +1361,8 @@ r.post("/questions/:id/review", async (req, res) => {
     return res.status(409).json({
       error: "Review workflow is only required for AI-generated questions",
     });
+  if (before.status !== "DRAFT")
+    return res.status(409).json({ error: "Only draft AI questions can be reviewed" });
   if (decision === "REJECT" && !String(reason || "").trim())
     return res.status(400).json({ error: "Rejection reason is required" });
   let x;
@@ -1464,6 +1466,8 @@ r.patch("/questions/:id", async (req, res) => {
   ).rows[0];
   if (!before) return res.status(404).json({ error: "Question not found" });
   const b = { ...before, ...req.body };
+  if (before.source === "AI" && before.status === "DRAFT" && String(b.status).toUpperCase() === "ACTIVE")
+    return res.status(409).json({ error: "AI questions require explicit Admin review before activation" });
   const x = (
     await q(
       `UPDATE question_bank SET domain_id=$1,topic=$2,difficulty=$3,type=$4,question=$5,options=$6,correct_answer=$7,marking_guide=$8,marks=$9,explanation=$10,status=$11 WHERE id=$12 RETURNING *`,
@@ -1494,6 +1498,8 @@ r.post("/questions/:id/status", async (req, res) => {
     await q("SELECT * FROM question_bank WHERE id=$1", [req.params.id])
   ).rows[0];
   if (!before) return res.status(404).json({ error: "Question not found" });
+  if (before.source === "AI" && before.status === "DRAFT" && status === "ACTIVE")
+    return res.status(409).json({ error: "AI questions require explicit Admin review before activation" });
   const x = (
     await q("UPDATE question_bank SET status=$1 WHERE id=$2 RETURNING *", [
       status,
