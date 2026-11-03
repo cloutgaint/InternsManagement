@@ -4,7 +4,7 @@ import fs from "fs";
 import jwt from "jsonwebtoken";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
-import { tx } from "../../common/database/index.js";
+import { tx, q } from "../../common/database/index.js";
 import * as repository from "./auth.repository.js";
 
 const privileged = (role) => ["ADMIN", "SUPER_ADMIN", "MENTOR"].includes(role);
@@ -107,11 +107,12 @@ export async function registerIntern(input, files) {
 }
 
 export async function login({ email, password }) {
-  const user = await repository.findUserByEmail(String(email || "").trim().toLowerCase());
+  const normalizedEmail=String(email||"").trim().toLowerCase();
+  const user=(await q("SELECT * FROM users WHERE lower(email)= $1 AND status != $2 ORDER BY created_at DESC LIMIT 1",[normalizedEmail,"DELETED"])).rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash)))
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
   if (!user.is_active)
-    throw Object.assign(new Error("Account not approved/active"), { status: 403 });
+    throw Object.assign(new Error("Your application is pending Admin verification and approval. You can sign in after your account is activated."), { status: 403 });
   if (privileged(user.role)) {
     const challenge = jwt.sign(
       { id: user.id, purpose: "MFA_CHALLENGE" },
