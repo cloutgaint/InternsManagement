@@ -577,4 +577,20 @@ r.post("/final-evaluations", async (req, res) => {
   );
   res.status(201).json(x);
 });
+
+r.get("/final-project-submissions",async(req,res)=>{
+ const m=await mid(req.user.id);
+ const rows=(await q(`SELECT fps.id,fps.group_id,fps.project_id,fps.document_id,fps.repository_url,fps.demo_url,fps.notes,fps.status,fps.mentor_feedback,fps.reviewed_at,fps.created_at,g.name group_name,p.title project_title,d.title document_title
+ FROM final_project_submissions fps JOIN mentor_assignments ma ON ma.group_id=fps.group_id AND ma.mentor_id=$1 AND ma.active JOIN groups g ON g.id=fps.group_id JOIN projects p ON p.id=fps.project_id LEFT JOIN documents d ON d.id=fps.document_id ORDER BY fps.updated_at DESC`,[m])).rows;
+ res.json(rows);
+});
+r.post("/final-project-submissions/:id/review",async(req,res)=>{
+ const m=await mid(req.user.id);
+ const {status,feedback}=req.body||{};
+ if(!["ACCEPTED","REVISION_REQUESTED"].includes(status)||typeof feedback!=="string"||!feedback.trim()||feedback.length>5000)return res.status(400).json({error:"Review decision and feedback are required"});
+ const x=(await q(`UPDATE final_project_submissions fps SET status=$3,mentor_feedback=$4,reviewed_by=$5,reviewed_at=now(),updated_at=now()
+ FROM mentor_assignments ma WHERE fps.id=$1 AND ma.group_id=fps.group_id AND ma.mentor_id=$2 AND ma.active RETURNING fps.*`,[req.params.id,m,status,feedback.trim(),req.user.id])).rows[0];
+ if(!x)return res.status(404).json({error:"Submission not found in your assigned groups"});
+ res.json(x);
+});
 export default r;
