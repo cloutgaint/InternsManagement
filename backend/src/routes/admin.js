@@ -1593,11 +1593,21 @@ r.post("/assessments", async (req, res) => {
     return res
       .status(400)
       .json({ error: "Assessment end must be after start" });
+  if (!Number.isInteger(Number(b.attemptCount ?? 1)) || Number(b.attemptCount ?? 1) < 1)
+    return res.status(400).json({ error: "Attempt count must be a positive integer" });
+  if (b.windowStart && Number.isNaN(Date.parse(b.windowStart)) || b.windowEnd && Number.isNaN(Date.parse(b.windowEnd)))
+    return res.status(400).json({ error: "Invalid assessment window date" });
+  if (!["DRAFT","PUBLISHED","ACTIVE","CLOSED"].includes(String(b.status || "DRAFT").toUpperCase()))
+    return res.status(400).json({ error: "Invalid assessment status" });
   const sections = Array.isArray(b.sections) ? b.sections : [];
   if (!sections.length)
     return res
       .status(400)
       .json({ error: "Add at least one assessment section" });
+  if (sections.some((section) => !Array.isArray(section.questionIds) || !section.questionIds.length || !Number.isFinite(Number(section.passScore ?? 50)) || Number(section.passScore ?? 50) < 0 || Number(section.passScore ?? 50) > 100))
+    return res.status(400).json({ error: "Each section requires questions and a pass score from 0 to 100" });
+  if (sections.some((section) => new Set(section.questionIds).size !== section.questionIds.length))
+    return res.status(400).json({ error: "Duplicate questions within a section are not allowed" });
   const allIds = sections.flatMap((s) => s.questionIds || []);
   if (!allIds.length)
     return res.status(400).json({ error: "Select at least one question" });
