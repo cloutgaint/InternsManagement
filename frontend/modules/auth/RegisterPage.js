@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 const PROGRAMS = [
   "B.Tech",
@@ -73,6 +73,8 @@ export default function RegisterPage() {
     [photo, setPhoto] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [resumeError,setResumeError] = useState(""),
+    resumeRef=useRef(null),
     [showPassword, setShowPassword] = useState(false),
     [busy, setBusy] = useState(false),
     [colleges, setColleges] = useState([]),
@@ -88,6 +90,7 @@ export default function RegisterPage() {
   async function submit(e) {
     e.preventDefault();
     setErr("");
+    setResumeError("");
     setMsg("");
     try {
       const email = f.email.trim().toLowerCase(),
@@ -101,7 +104,12 @@ export default function RegisterPage() {
         throw new Error("Enter a valid student email address.");
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw new Error("Enter a valid 10-digit Indian mobile number.");
-      if (!f.resumePortfolioUrl.trim() || !/^https:\/\/drive\.google\.com\//i.test(f.resumePortfolioUrl.trim())) throw new Error("A valid Google Drive resume or portfolio link is required.");
+      if (!/^https:\/\/drive\.google\.com\//i.test(f.resumePortfolioUrl.trim())) {
+        setResumeError("Enter a valid Google Drive resume or portfolio link.");
+        resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
+        resumeRef.current?.focus({preventScroll:true});
+        return;
+      }
       if (!f.dob) throw new Error("Date of birth is required.");
       const dob = new Date(f.dob),
         today = new Date();
@@ -171,7 +179,11 @@ export default function RegisterPage() {
         "Application received. Your college permission proof is pending Admin verification. Login remains disabled until verification and Admin approval.",
       );
     } catch (x) {
-      setErr(x.message);
+      if (/Google Drive resume or portfolio link/i.test(x.message)) {
+        setResumeError(x.message);
+        resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
+        resumeRef.current?.focus({preventScroll:true});
+      } else setErr(x.message);
     } finally {
       setBusy(false);
     }
@@ -418,15 +430,20 @@ export default function RegisterPage() {
               />
             </div>
             <div className="form-field">
-              <label>Resume / Portfolio Google Drive Link *</label>
+              <label htmlFor="resume-drive-link">Resume / Portfolio Google Drive Link *</label>
               <input
                 className="input"
                 type="url"
                 required
+                id="resume-drive-link"
+                ref={resumeRef}
+                aria-invalid={!!resumeError}
+                aria-describedby={resumeError?"resume-drive-error":undefined}
                 placeholder="https://drive.google.com/file/d/..."
                 value={f.resumePortfolioUrl}
-                onChange={(e) => set("resumePortfolioUrl", e.target.value)}
+                onChange={(e) => {set("resumePortfolioUrl",e.target.value);if(resumeError)setResumeError("");}}
               />
+              {resumeError&&<span id="resume-drive-error" className="error" role="alert">{resumeError}</span>}
             </div>
           </div>
           <h3 className="form-section-title">College Permission Proof</h3>
