@@ -167,7 +167,7 @@ export default function InternDashboardPage() {
           <h3>{(data.tasks || []).length}</h3>
         </div>
       </div>
-      <nav className="intern-tabs" aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={tab===key?"active":""} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
+      <nav className="intern-tabs" aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["reviews","Fortnight Reviews"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={tab===key?"active":""} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
       <div className="intern-sections intern-tabbed" data-tab={tab}>
         <section className="card intern-pane intern-pane-onboarding">
           <h2>Onboarding</h2>
@@ -308,7 +308,7 @@ export default function InternDashboardPage() {
             <p className="muted">Group not assigned yet.</p>
           )}
         </section>
-        <section className="card intern-pane intern-pane-completion">
+        <section className="card intern-pane intern-pane-reviews">
           <h2>Fortnight Reviews</h2>
           {reviews.length ? (
             reviews.map((x) => (
