@@ -5,7 +5,7 @@ import "@/shared/globals.css";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
-  const links = [{href:"/",label:"Home"},{href:"/login",label:"Login"},{href:"/register",label:"Apply"}];
+  const links = [{href:"/",label:"Home"},{href:"/login",label:"Student Login"},{href:"/register",label:"Student Registration"}];
   return (
     <>
       <Head>
