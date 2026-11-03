@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-export async function verifyAttendanceBiometrics({ imageData, enrollment, challengeType }) {
+export async function verifyAttendanceBiometrics({ imageData, baselineImageData, enrollment, challengeType }) {
   const endpoint = process.env.BIOMETRIC_VERIFY_URL;
   const token = process.env.BIOMETRIC_VERIFY_TOKEN;
   if (!endpoint || !token) return { ok: false, unavailable: true, reason: "Trusted biometric verification is not configured" };
@@ -17,7 +17,7 @@ export async function verifyAttendanceBiometrics({ imageData, enrollment, challe
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ imageData, enrollmentImageData, challengeType }),
+      body: JSON.stringify({ imageData, baselineImageData, enrollmentImageData, challengeType }),
       signal: controller.signal,
     });
     if (!response.ok) return { ok: false, unavailable: true, reason: "Biometric verifier rejected the request" };
