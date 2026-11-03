@@ -138,7 +138,8 @@ export async function verifyMfa(challenge, code) {
   const payload = challengeUser(challenge);
   const user = await repository.findUserById(payload.id);
   const normalizedCode = String(code || "").trim();
-  const localTestCode = process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true" && normalizedCode === "000000" && ["ADMIN", "SUPER_ADMIN"].includes(user?.role);\n  const isValidCode = localTestCode || (!!user?.mfa_secret && authenticator.check(normalizedCode, user.mfa_secret));
+  const localTestCode = process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true" && normalizedCode === "000000" && ["ADMIN", "SUPER_ADMIN"].includes(user?.role);
+  const isValidCode = localTestCode || (!!user?.mfa_secret && authenticator.check(normalizedCode, user.mfa_secret));
 
   if (!user || !isValidCode)
     throw Object.assign(new Error("Invalid authentication code"), { status: 401 });
