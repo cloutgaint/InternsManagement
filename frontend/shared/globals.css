@@ -273,3 +273,19 @@
 .page-back-button:hover{background:#eef7f1;border-color:#b7d6c3}
 .page-back-button:focus-visible{outline:3px solid #2c8e65;outline-offset:3px}
 @media(max-width:640px){.page-back-bar{padding:10px 16px 0}}
+
+
+/* Intern workspace: focused navigation and authenticated registration photo. */
+.intern-tabs{display:flex;gap:7px;flex-wrap:wrap;padding:6px;background:#eaf1ed;border:1px solid #dce7e0;border-radius:13px;margin:18px 0 15px}
+.intern-tabs button{border:0;border-radius:9px;background:transparent;color:#50665a;font:inherit;font-size:13px;font-weight:700;padding:11px 15px;cursor:pointer;transition:background .15s,color .15s}
+.intern-tabs button:hover{background:#dcebe1;color:#155b3a}
+.intern-tabs button.active{background:#075e3e;color:#fff;box-shadow:0 3px 10px #0b573b24}
+.intern-tabs button:focus-visible{outline:3px solid #4ca77a;outline-offset:2px}
+.intern-tabbed .intern-pane{display:none}
+.intern-tabbed[data-tab="overview"] .intern-pane-overview,.intern-tabbed[data-tab="onboarding"] .intern-pane-onboarding,.intern-tabbed[data-tab="work"] .intern-pane-work,.intern-tabbed[data-tab="learning"] .intern-pane-learning,.intern-tabbed[data-tab="team"] .intern-pane-team,.intern-tabbed[data-tab="completion"] .intern-pane-completion{display:block}
+.intern-profile-head{display:flex;align-items:center;gap:15px;margin-bottom:16px}
+.intern-profile-head h2{margin:0 0 4px}
+.intern-profile-head p{margin:0}
+.intern-avatar{height:72px;width:72px;flex:none;object-fit:cover;object-position:center;border-radius:18px;border:2px solid #dcebe2;background:#e9f4ec}
+.intern-avatar-fallback{display:grid;place-items:center;color:#0d6543;font-size:27px;font-weight:800}
+@media(max-width:680px){.intern-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.intern-tabs button{white-space:nowrap;flex:none;padding:10px 12px}.intern-avatar{width:58px;height:58px}}
