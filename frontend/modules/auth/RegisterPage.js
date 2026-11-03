@@ -77,7 +77,8 @@ export default function RegisterPage() {
     [showPassword, setShowPassword] = useState(false),
     [busy, setBusy] = useState(false),
     [colleges, setColleges] = useState([]),
-    [collegeLoad, setCollegeLoad] = useState(true);
+    [collegeLoad, setCollegeLoad] = useState(true),
+    [collegeChoice, setCollegeChoice] = useState("");
   useEffect(() => {
     api("/auth/colleges")
       .then(setColleges)
@@ -115,7 +116,7 @@ export default function RegisterPage() {
         throw new Error(
           "Password must be 10+ characters and include uppercase, lowercase, number and special character.",
         );
-      if (!f.collegeId && !f.collegeOther.trim())
+      if (!collegeChoice || (!f.collegeId && !f.collegeOther.trim()))
         throw new Error(
           "Select your college or choose Other and enter the college name.",
         );
@@ -259,11 +260,13 @@ export default function RegisterPage() {
           <h3 className="form-section-title">Academic Details</h3>
           <div className="form-grid">
             <div className="form-field">
-              <label>College</label>
+              <label htmlFor="student-college">Select Your College</label>
               <select
+                id="student-college"
                 className="input"
-                value={f.collegeId || "OTHER"}
+                value={collegeChoice}
                 onChange={(e) => {
+                  setCollegeChoice(e.target.value);
                   const id = e.target.value === "OTHER" ? "" : e.target.value;
                   const c = colleges.find((x) => x.id === id);
                   setF((x) => ({
@@ -287,10 +290,10 @@ export default function RegisterPage() {
                 <option value="OTHER">Other / College not listed</option>
               </select>
               <span className="field-help">
-                College list is maintained by GAINT Admin.
+                Select a college added by GAINT Admin. If yours is missing, choose Other.
               </span>
             </div>
-            {!f.collegeId && (
+            {collegeChoice === "OTHER" && (
               <div className="form-field">
                 <label>College Name (Other)</label>
                 <input
