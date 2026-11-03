@@ -24,7 +24,7 @@ export default function App({ Component, pageProps }) {
     if(history[history.length-1]!==path)history.push(path);
     if(history.length>30)history.shift();
   },[loggedIn,router.asPath,home]);
-  const links=loggedIn?[{href:home,label:role.includes("ADMIN")?"Admin Dashboard":role==="MENTOR"?"Mentor Dashboard":"Student Dashboard"}]:[{href:"/",label:"Home"},{href:"/login",label:"Student Login"},{href:"/register",label:"Student Registration"}];
+  const links=loggedIn?[{href:home,label:role.includes("ADMIN")?"Admin Dashboard":role==="MENTOR"?"Mentor Dashboard":"Student Dashboard"}]:[{href:"/",label:"Home"},{href:"/login",label:"Student Login"},{href:"/login?role=admin",label:"Admin Login"},{href:"/register",label:"Student Registration"}];
   function goBack(){
     if(!loggedIn){router.push("/");return;}
     const history=pageHistory.current;
