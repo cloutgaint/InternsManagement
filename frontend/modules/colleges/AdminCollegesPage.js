@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { api } from "../../lib/api";
 export default function Page() {
   const [rows, setRows] = useState([]),
     [form, setForm] = useState({ name: "", university: "" }),
