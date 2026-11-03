@@ -119,3 +119,23 @@ ALTER TABLE offer_letter_versions ADD COLUMN IF NOT EXISTS issued_snapshot jsonb
 CREATE TABLE IF NOT EXISTS performance_weight_configs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),batch_id uuid NOT NULL REFERENCES batches(id) ON DELETE CASCADE,domain_id uuid REFERENCES domains(id) ON DELETE CASCADE,weights jsonb NOT NULL,updated_at timestamptz DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS performance_weight_batch_domain_uq ON performance_weight_configs(batch_id,domain_id) WHERE domain_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS performance_weight_batch_default_uq ON performance_weight_configs(batch_id) WHERE domain_id IS NULL;
+
+-- Phase 8: one current final submission per project group; evidence remains in the protected documents table.
+CREATE TABLE IF NOT EXISTS final_project_submissions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ group_id uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+ project_id uuid NOT NULL REFERENCES projects(id),
+ submitted_by uuid NOT NULL REFERENCES users(id),
+ document_id uuid REFERENCES documents(id),
+ repository_url text,
+ demo_url text,
+ notes text,
+ status text NOT NULL DEFAULT 'SUBMITTED' CHECK(status IN ('SUBMITTED','REVISION_REQUESTED','ACCEPTED')),
+ mentor_feedback text,
+ reviewed_by uuid REFERENCES users(id),
+ reviewed_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT final_project_submission_evidence CHECK(document_id IS NOT NULL OR repository_url IS NOT NULL OR demo_url IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS final_project_submissions_group_project_uq ON final_project_submissions(group_id,project_id);
