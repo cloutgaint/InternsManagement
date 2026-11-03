@@ -5,6 +5,7 @@ import path from "path";
 import multer from "multer";import {documentUpload} from "../services/collaborationService.js";import {notifyGroup} from "../common/notifications/notification.service.js";
 import { q, tx } from "../common/database/index.js";
 import { sendOfferPdf } from "../services/offerLetterPdfService.js";
+import { verifyAttendanceBiometrics } from "../services/attendanceBiometricVerifier.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
 const submissionDir = path.resolve("uploads/task-submissions");
@@ -186,45 +187,24 @@ r.post("/attendance/verify", async (req, res) => {
   ).rows[0];
   if (!f)
     return res.status(409).json({ error: "Approved face enrollment required" });
-  const {
-    eventType,
-    imageData,
-    challengeType,
-    challengePass,
-    livenessScore,
-    matchScore,
-  } = req.body;
+  const { eventType, imageData, challengeType } = req.body;
   if (!["CHECK_IN", "CHECK_OUT"].includes(eventType))
     return res.status(400).json({ error: "Invalid attendance event" });
-  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
+  if (!["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"].includes(challengeType))
+    return res.status(400).json({ error: "Invalid liveness challenge" });
+  if (!/^data:image\\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
     return res.status(400).json({ error: "Live camera capture is required" });
-  if (
-    !["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"].includes(challengeType) ||
-    challengePass !== true ||
-    Number(livenessScore) < 0.75
-  )
-    return res
-      .status(422)
-      .json({
-        error:
-          "Liveness challenge failed. Please retry with a live camera capture.",
-      });
-  if (
-    !Number.isFinite(Number(matchScore)) ||
-    Number(matchScore) < 0 ||
-    Number(matchScore) > 1
-  )
-    return res
-      .status(400)
-      .json({ error: "A biometric matcher score between 0 and 1 is required" });
   const buf = Buffer.from(String(imageData).split(",")[1] || "", "base64");
   if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
     return res.status(400).json({ error: "Invalid camera capture" });
+  const verified = await verifyAttendanceBiometrics({ imageData, enrollment: f, challengeType });
+  if (verified.unavailable) return res.status(503).json({ error: verified.reason });
+  const { matchScore, livenessScore, challengePass } = verified;
   const dir = path.resolve("uploads/attendance-evidence");
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, p.id + "-" + Date.now() + ".jpg");
   fs.writeFileSync(file, buf);
-  if (Number(matchScore) < 0.75) {
+  if (!verified.ok) {
     const ex = (
       await q(
         "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold','DETECTED',$2) RETURNING *",
@@ -234,6 +214,7 @@ r.post("/attendance/verify", async (req, res) => {
             matchScore: Number(matchScore),
             livenessScore: Number(livenessScore),
             challengeType,
+            challengePass,
           },
         ],
       )
@@ -269,7 +250,7 @@ r.post("/attendance/verify", async (req, res) => {
     return res.status(409).json({ error: "Already checked out today" });
   const ev = (
     await q(
-      `INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,true,$8) RETURNING *`,
+      `INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,evidence_ref,liveness_score,challenge_type,challenge_pass,capture_path) VALUES($1,$2,$3,$4,true,$5,$6,$7,$9,$8) RETURNING *`,
       [
         p.id,
         alloc.batch_id,
@@ -279,6 +260,7 @@ r.post("/attendance/verify", async (req, res) => {
         Number(livenessScore),
         challengeType,
         file,
+        challengePass,
       ],
     )
   ).rows[0];
