@@ -425,29 +425,28 @@ r.post("/reviews", async (req, res) => {
     )
   ).rowCount;
   if (!allowed) return res.status(403).json({ error: "Not assigned" });
-  const x = (
-    await q(
+  if (!Number.isInteger(Number(b.periodNo)) || Number(b.periodNo) < 1 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(b.reviewDate || "")))
+    return res.status(400).json({ error: "Valid review period and date are required" });
+  if (!["SCHEDULED", "CONDUCTED", "PUBLISHED"].includes(b.status || "CONDUCTED"))
+    return res.status(400).json({ error: "Invalid review status" });
+  if (b.groupMarks != null && (!Number.isFinite(Number(b.groupMarks)) || Number(b.groupMarks) < 0 || Number(b.groupMarks) > 100))
+    return res.status(400).json({ error: "Group marks must be between 0 and 100" });
+  const individuals = b.individualMarks || [];
+  if (!Array.isArray(individuals) || individuals.some(im => !im.internId || !Number.isFinite(Number(im.marks)) || Number(im.marks) < 0 || Number(im.marks) > 100) || new Set(individuals.map(im => im.internId)).size !== individuals.length)
+    return res.status(400).json({ error: "Individual marks must be unique and between 0 and 100" });
+  const members = (await q("SELECT intern_id FROM group_members WHERE group_id=$1 AND active", [b.groupId])).rows;
+  const memberIds = new Set(members.map(x => x.intern_id));
+  if (individuals.some(im => !memberIds.has(im.internId)))
+    return res.status(400).json({ error: "Individual review contains an intern outside this group" });
+  const x = await tx(async client => {
+    const review = (await client.query(
       "INSERT INTO fortnight_reviews(group_id,period_no,review_date,status,progress,domain_review,presentation_review,group_marks,feedback,action_items,next_expectations,published_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,CASE WHEN $4='PUBLISHED' THEN now() END) RETURNING *",
-      [
-        b.groupId,
-        b.periodNo,
-        b.reviewDate,
-        b.status || "CONDUCTED",
-        b.progress,
-        b.domainReview,
-        b.presentationReview,
-        b.groupMarks,
-        b.feedback,
-        b.actionItems,
-        b.nextExpectations,
-      ],
-    )
-  ).rows[0];
-  for (const im of b.individualMarks || [])
-    await q(
-      "INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)",
-      [x.id, im.internId, im.marks, im.note || null],
-    );
+      [b.groupId,b.periodNo,b.reviewDate,b.status || "CONDUCTED",b.progress,b.domainReview,b.presentationReview,b.groupMarks,b.feedback,b.actionItems,b.nextExpectations],
+    )).rows[0];
+    for (const im of individuals)
+      await client.query("INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)",[review.id,im.internId,im.marks,im.note || null]);
+    return review;
+  });
   res.status(201).json(x);
 });
 r.get("/reviews/:id/report", async (req, res) => {
