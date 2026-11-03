@@ -1369,7 +1369,7 @@ r.post("/questions/:id/review", async (req, res) => {
   if (decision === "APPROVE") {
     x = (
       await q(
-        `UPDATE question_bank SET domain_id=COALESCE($1,domain_id),topic=COALESCE($2,topic),difficulty=COALESCE($3,difficulty),type=COALESCE($4,type),question=COALESCE($5,question),options=COALESCE($6,options),correct_answer=COALESCE($7,correct_answer),marking_guide=COALESCE($8,marking_guide),marks=COALESCE($9,marks),explanation=COALESCE($10,explanation),status='ACTIVE' WHERE id=$11 RETURNING *`,
+        `UPDATE question_bank SET domain_id=COALESCE($1,domain_id),topic=COALESCE($2,topic),difficulty=COALESCE($3,difficulty),type=COALESCE($4,type),question=COALESCE($5,question),options=COALESCE($6,options),correct_answer=COALESCE($7,correct_answer),marking_guide=COALESCE($8,marking_guide),marks=COALESCE($9,marks),explanation=COALESCE($10,explanation),status='ACTIVE' WHERE id=$11 AND source='AI' AND status='DRAFT' RETURNING *`,
         [
           changes.domainId || null,
           changes.topic || null,
@@ -1388,11 +1388,12 @@ r.post("/questions/:id/review", async (req, res) => {
   } else {
     x = (
       await q(
-        "UPDATE question_bank SET status='INACTIVE',explanation=CASE WHEN $2<>'' THEN COALESCE(explanation,'')||E'\\nAI review rejection: '||$2 ELSE explanation END WHERE id=$1 RETURNING *",
+        "UPDATE question_bank SET status='INACTIVE',explanation=CASE WHEN $2<>'' THEN COALESCE(explanation,'')||E'\\nAI review rejection: '||$2 ELSE explanation END WHERE id=$1 AND source='AI' AND status='DRAFT' RETURNING *",
         [req.params.id, String(reason || "").trim()],
       )
     ).rows[0];
   }
+  if (!x) return res.status(409).json({ error: "Question review state changed; reload and retry" });
   await audit(req, "AI_QUESTION_" + decision, "question_bank", x.id, before, {
     ...x,
     reviewReason: reason || null,
