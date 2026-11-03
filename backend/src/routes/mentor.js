@@ -525,6 +525,8 @@ r.post("/final-evaluations", async (req, res) => {
     return res
       .status(403)
       .json({ error: "Intern is not in your assigned group" });
+  const acceptedSubmission=(await q("SELECT 1 FROM final_project_submissions WHERE group_id=$1 AND status='ACCEPTED'",[b.groupId])).rowCount;
+  if(!acceptedSubmission)return res.status(409).json({error:"An accepted final project submission is required before final evaluation"});
   if (b.groupMarks === "" || b.groupMarks == null || b.individualMarks === "" || b.individualMarks == null)
     return res.status(400).json({ error: "Group and individual marks are required" });
   const groupMarks = Number(b.groupMarks),
