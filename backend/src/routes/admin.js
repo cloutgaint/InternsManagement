@@ -988,20 +988,20 @@ r.get("/attendance-records", async (req, res) =>
 );
 r.post("/attendance-exceptions/:id/decision", async (req, res) => {
   const { status, reason } = req.body;
-  const x = (
-    await q(
-      "UPDATE attendance_exceptions SET status=$1,reason=COALESCE($2,reason),decided_by=$3,decided_at=now() WHERE id=$4 RETURNING *",
-      [status, reason, req.user.id, req.params.id],
-    )
-  ).rows[0];
-  await audit(
-    req,
-    "ATTENDANCE_EXCEPTION_" + status,
-    "attendance_exception",
-    x.id,
-    null,
-    x,
-  );
+  if (!["APPROVED", "REJECTED"].includes(status))
+    return res.status(400).json({ error: "Decision must be APPROVED or REJECTED" });
+  if (!String(reason || "").trim())
+    return res.status(400).json({ error: "An attendance exception decision reason is required" });
+  const before = (await q("SELECT * FROM attendance_exceptions WHERE id=$1", [req.params.id])).rows[0];
+  if (!before) return res.status(404).json({ error: "Attendance exception not found" });
+  if (!["DETECTED", "REQUESTED"].includes(before.status))
+    return res.status(409).json({ error: "Attendance exception already decided" });
+  const x = (await q(
+    "UPDATE attendance_exceptions SET status=$1,reason=$2,decided_by=$3,decided_at=now() WHERE id=$4 AND status IN ('DETECTED','REQUESTED') RETURNING *",
+    [status, String(reason).trim(), req.user.id, req.params.id],
+  )).rows[0];
+  if (!x) return res.status(409).json({ error: "Attendance exception decision changed; reload" });
+  await audit(req, "ATTENDANCE_EXCEPTION_" + status, "attendance_exception", x.id, before, x);
   res.json(x);
 });
 r.get("/proofs/:id/file", async (req, res) => {
