@@ -6,7 +6,8 @@ const challenges = ["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"];
 export default function InternAttendancePage() {
   const video = useRef(null),
     canvas = useRef(null),
-    stream = useRef(null);
+    stream = useRef(null),
+    humanRef = useRef(null);
   const [st, setSt] = useState(null),
     [eventType, setEventType] = useState("CHECK_IN"),
     [challenge, setChallenge] = useState(""),
@@ -70,6 +71,18 @@ export default function InternAttendancePage() {
     if (!imageData) return setErr("Camera is not ready.");
     setPhase("VERIFYING");
     try {
+      if (!humanRef.current) {
+        const { default: Human } = await import("@vladmandic/human");
+        humanRef.current = new Human({
+          backend: "webgl",
+          modelBasePath: "https://vladmandic.github.io/human-models/models/",
+          face: { enabled: true, detector: { enabled: true }, mesh: { enabled: false }, description: { enabled: false }, emotion: { enabled: false }, iris: { enabled: false } },
+          body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false },
+        });
+        await humanRef.current.load();
+      }
+      const faces = (await humanRef.current.detect(video.current)).face || [];
+      if (faces.length !== 1) throw new Error(faces.length ? "Multiple faces detected. Only one student should be visible." : "No face detected. Face the camera in good lighting and try again.");
       const x = await api("/intern/attendance/verify", {
         method: "POST",
         body: JSON.stringify({ eventType, imageData, challengeType: challenge }),
