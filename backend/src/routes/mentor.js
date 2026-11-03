@@ -425,7 +425,7 @@ r.post("/reviews", async (req, res) => {
     )
   ).rowCount;
   if (!allowed) return res.status(403).json({ error: "Not assigned" });
-  if (!Number.isInteger(Number(b.periodNo)) || Number(b.periodNo) < 1 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(b.reviewDate || "")))
+  if (!Number.isInteger(Number(b.periodNo)) || Number(b.periodNo) < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(String(b.reviewDate || "")))
     return res.status(400).json({ error: "Valid review period and date are required" });
   if (!["SCHEDULED", "CONDUCTED", "PUBLISHED"].includes(b.status || "CONDUCTED"))
     return res.status(400).json({ error: "Invalid review status" });
