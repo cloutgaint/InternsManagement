@@ -16,8 +16,8 @@ export default function LoginPage() {
     [code, setCode] = useState(""),
     [setup, setSetup] = useState(null);
   function finish(d) {
-    localStorage.setItem("token", d.token);
-    localStorage.setItem("role", d.user.role);
+    sessionStorage.setItem("token", d.token);
+    sessionStorage.setItem("role", d.user.role);
     location.href = d.user.role.includes("ADMIN")
       ? "/admin"
       : d.user.role === "MENTOR"
