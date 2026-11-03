@@ -265,3 +265,11 @@
 .auth-login-switch{margin:0;text-align:center;color:#697c70;font-size:13px}
 .auth-login-switch a{color:#076640;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:550px){.auth-login-shell{padding:28px 16px}.auth-login-panel{padding:26px 22px}}
+
+/* Page-level back action, separate from account navigation. */
+.page-back-bar{background:transparent;padding:12px 24px 0}
+.page-back-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:flex-start}
+.page-back-button{display:inline-flex;align-items:center;gap:8px;border:1px solid #d7e5dc;background:#fff;color:#24513a;border-radius:10px;padding:9px 15px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px #173c2810}
+.page-back-button:hover{background:#eef7f1;border-color:#b7d6c3}
+.page-back-button:focus-visible{outline:3px solid #2c8e65;outline-offset:3px}
+@media(max-width:640px){.page-back-bar{padding:10px 16px 0}}
