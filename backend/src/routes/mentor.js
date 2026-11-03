@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { q } from "../common/database/index.js";
+import { q, tx } from "../common/database/index.js";
 import { audit } from "../common/audit/audit.service.js";
 import fs from "fs";
 import path from "path";
@@ -302,32 +302,22 @@ r.post("/submissions/:id/evaluate", async (req, res) => {
     return res
       .status(400)
       .json({ error: "Rework instructions and due date are required" });
-  const x = (
-    await q(
+  const outcome = await tx(async (client) => {
+    const locked = (await client.query("SELECT status FROM task_submissions WHERE id=$1 FOR UPDATE", [row.id])).rows[0];
+    if (!locked || !["SUBMITTED", "RESUBMITTED"].includes(locked.status))
+      return { conflict: true };
+    const x = (await client.query(
       "INSERT INTO task_evaluations(submission_id,mentor_id,marks,feedback,status,rubric_scores,decision,rework_instructions,rework_due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
-      [
-        row.id,
-        m,
-        marks,
-        req.body.feedback,
-        decision,
-        rubricScores,
-        decision,
-        req.body.reworkInstructions || null,
-        req.body.reworkDueAt || null,
-      ],
-    )
-  ).rows[0];
-  await q(
-    "UPDATE task_submissions SET status=$1,rework_due_at=$2,mentor_feedback=$3 WHERE id=$4",
-    [
-      decision,
-      decision === "REWORK_REQUIRED" ? req.body.reworkDueAt : null,
-      req.body.feedback,
-      row.id,
-    ],
-  );
-  res.status(201).json(x);
+      [row.id, m, marks, req.body.feedback, decision, JSON.stringify(rubricScores), decision, req.body.reworkInstructions || null, req.body.reworkDueAt || null],
+    )).rows[0];
+    await client.query(
+      "UPDATE task_submissions SET status=$1,rework_due_at=$2,mentor_feedback=$3 WHERE id=$4",
+      [decision, decision === "REWORK_REQUIRED" ? req.body.reworkDueAt : null, req.body.feedback, row.id],
+    );
+    return { evaluation: x };
+  });
+  if (outcome.conflict) return res.status(409).json({ error: "Submission has already been evaluated" });
+  res.status(201).json(outcome.evaluation);
 });
 r.get("/assessment-evaluations", async (req, res) => {
   const m = await mid(req.user.id);
