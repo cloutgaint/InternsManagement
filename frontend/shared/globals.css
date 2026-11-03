@@ -87,3 +87,8 @@
 .top .glass-logout:hover{background:#fee8e8;color:#842020}
 .top .glass-logout:focus-visible{outline:3px solid #b84b4b;outline-offset:3px}
 @media(max-width:600px){.top .glass-nav{flex-wrap:wrap}.top .glass-logout{flex:1}}
+
+/* Shared back navigation across student, mentor and admin pages. */
+.top .glass-back{font-family:inherit;border:1px solid rgba(12,103,66,.13);background:rgba(255,255,255,.7);color:#234d38;cursor:pointer;gap:6px}
+.top .glass-back:hover{background:rgba(12,103,66,.1);color:#075b3b}
+.top .glass-back:focus-visible{outline:3px solid #2c8e65;outline-offset:3px}
