@@ -192,7 +192,7 @@ r.post("/attendance/verify", async (req, res) => {
     return res.status(400).json({ error: "Invalid attendance event" });
   if (!["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"].includes(challengeType))
     return res.status(400).json({ error: "Invalid liveness challenge" });
-  if (!/^data:image\\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
+  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
     return res.status(400).json({ error: "Live camera capture is required" });
   const buf = Buffer.from(String(imageData).split(",")[1] || "", "base64");
   if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
