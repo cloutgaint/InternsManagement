@@ -112,7 +112,7 @@ export async function login({ email, password }) {
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash)))
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
   if (!user.is_active)
-    throw Object.assign(new Error("Your application is pending Admin verification and approval. You can sign in after your account is activated."), { status: 403 });
+    throw Object.assign(new Error(user.status === "PENDING_APPROVAL" ? "Your college permission proof is verified. Your account is awaiting Admin approval." : user.status === "PROOF_UNDER_REVIEW" ? "Your college permission proof is awaiting Admin verification." : user.status === "PROOF_REUPLOAD_REQUIRED" ? "Admin requested a new college permission proof. Please contact Admin." : user.status === "PROOF_REJECTED" ? "Your college permission proof was rejected. Please contact Admin." : "Your account is not active. Please contact Admin."), { status: 403 });
   if (privileged(user.role)) {
     const challenge = jwt.sign(
       { id: user.id, purpose: "MFA_CHALLENGE" },
