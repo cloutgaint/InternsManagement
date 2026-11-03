@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import "@/shared/globals.css";
 export default function App({ Component, pageProps }) {
   const router=useRouter();
+  const internalNavigation=useRef(false);
+  useEffect(()=>{
+    const mark=()=>{internalNavigation.current=true;};
+    router.events.on("routeChangeStart",mark);
+    return ()=>router.events.off("routeChangeStart",mark);
+  },[router.events]);
   const [session,setSession]=useState({token:null,role:null});
   useEffect(()=>{
     const sync=()=>setSession({token:localStorage.getItem("token"),role:localStorage.getItem("role")});
@@ -18,6 +24,7 @@ export default function App({ Component, pageProps }) {
   function goBack(){
     const fallback=loggedIn?home:"/";
     const previous=document.referrer;
+    if(window.history.length>1&&internalNavigation.current){router.back();return;}
     if(window.history.length>1&&previous){
       try{if(new URL(previous).origin===window.location.origin){router.back();return;}}catch{}
     }
