@@ -81,3 +81,9 @@
 /* Keep descriptive student navigation labels readable on smaller screens. */
 @media(max-width:600px){.glass-nav-shell{flex-wrap:wrap;justify-content:center}.glass-brand{margin-right:auto}.top .glass-nav{width:100%;justify-content:center}.top .glass-nav-link{flex:1;padding:9px 8px;font-size:12px}.top.glass-top{padding:9px 12px}}
 @media(max-width:390px){.top .glass-nav-link{font-size:11px;padding:8px 5px}}
+
+/* Shared logout action for Admin, Mentor and Student navigation. */
+.top .glass-logout{font-family:inherit;border:1px solid rgba(159,48,48,.17);background:rgba(255,245,245,.82);color:#9a3030;cursor:pointer}
+.top .glass-logout:hover{background:#fee8e8;color:#842020}
+.top .glass-logout:focus-visible{outline:3px solid #b84b4b;outline-offset:3px}
+@media(max-width:600px){.top .glass-nav{flex-wrap:wrap}.top .glass-logout{flex:1}}
