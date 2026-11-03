@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createCollege, getColleges, updateCollege } from "../api/colleges.api";
+import { createCollege, getColleges, updateCollege, deleteCollege } from "../api/colleges.api";
 const blank = { name:"",code:"",university:"",college_type:"",state:"",district:"",city:"",address:"",pin_code:"",email:"",phone:"",website:"",coordinator_name:"",coordinator_email:"",coordinator_mobile:"",active:true };
 const groups = [
   { title:"Basic Information", fields:[["name","Official College Name",true],["code","College Code",true],["university","University / Affiliation",true],["college_type","College Type",true]] },
@@ -42,6 +42,12 @@ export default function Page() {
     try {setBusy(true);await updateCollege(edit.id,edit);setEdit(null);setMsg("College updated successfully.");await load();}
     catch(e){setErr(e.message);}finally{setBusy(false);}
   }
+  async function remove(c) {
+    if(!window.confirm(`Delete "${c.name}"? This cannot be undone. Colleges linked to student records cannot be deleted.`))return;
+    setErr("");setMsg("");
+    try{setBusy(true);await deleteCollege(c.id);setMsg("College deleted successfully.");await load();}
+    catch(e){setErr(e.message);}finally{setBusy(false);}
+  }
   return <main className="wrap">
     <div className="intern-head"><div><h1>College Master</h1><p className="muted">Manage college profiles available to students during registration. Inactive colleges are hidden from new applications.</p></div><span className="badge">{rows.filter((x)=>x.active).length} active</span></div>
     {msg && <p className="success">{msg}</p>}{err && <p className="error">{err}</p>}
@@ -49,7 +55,7 @@ export default function Page() {
     <section className="card workflow-section"><h2>Managed Colleges</h2>
       {!rows.length?<p className="muted">No colleges have been added yet.</p>:rows.map((c)=><div className="workflow-row" key={c.id}>
         {edit?.id===c.id?<form onSubmit={save} style={{width:"100%"}}><div className="form-grid"><CollegeFields value={edit} onChange={setEdit}/></div><div className="action-row"><button className="btn" disabled={busy}>Save Changes</button><button className="btn secondary" type="button" onClick={()=>setEdit(null)}>Cancel</button></div></form>:
-        <><div><b>{c.name}</b><p className="muted">{[c.code,c.university,c.city,c.district,c.state].filter(Boolean).join(" · ") || "College profile incomplete"}</p></div><div className="action-row"><span className={"status-pill "+(c.active?"status-verified":"")}>{c.active?"ACTIVE":"INACTIVE"}</span><button className="btn secondary" type="button" onClick={()=>setEdit({...blank,...c})}>Edit</button></div></>}
+        <><div><b>{c.name}</b><p className="muted">{[c.code,c.university,c.city,c.district,c.state].filter(Boolean).join(" · ") || "College profile incomplete"}</p></div><div className="action-row"><span className={"status-pill "+(c.active?"status-verified":"")}>{c.active?"ACTIVE":"INACTIVE"}</span><button className="btn secondary" type="button" onClick={()=>setEdit({...blank,...c})}>Edit</button><button className="btn secondary" type="button" disabled={busy} onClick={()=>remove(c)} style={{color:"#a32626"}}>Delete</button></div></>}
       </div>)}
     </section>
   </main>;
