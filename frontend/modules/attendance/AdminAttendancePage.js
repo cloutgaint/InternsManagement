@@ -9,7 +9,8 @@ export default function AdminAttendancePage() {
     [reason, setReason] = useState({}),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [images,setImages] = useState({});
+    [images,setImages] = useState({}),
+    [preview,setPreview] = useState(null);
   const load = () =>
     Promise.all([
       api("/admin/face-enrollments"),
@@ -94,7 +95,7 @@ export default function AdminAttendancePage() {
         <section className="card workflow-section">
           {faces.map((x) => (
             <div className="face-admin-row" key={x.id}>
-              {images[x.id]?<img src={images[x.id]} alt={"Face enrollment of "+x.full_name}/>:<div className="face-admin-photo-fallback" role="img" aria-label="Enrollment image unavailable">Photo unavailable</div>}
+              <div className="face-admin-image">{images[x.id]?<img src={images[x.id]} alt={"Face enrollment of "+x.full_name}/>:<div className="face-admin-photo-fallback" role="img" aria-label="Enrollment image unavailable">Photo unavailable</div>}<button type="button" className="btn secondary" disabled={!images[x.id]} onClick={()=>setPreview({name:x.full_name,url:images[x.id]})}>View Image</button></div>
               <div>
                 <b>{x.full_name}</b>
                 <p className="muted">
@@ -136,6 +137,7 @@ export default function AdminAttendancePage() {
           ))}
         </section>
       )}
+      {preview&&<div className="face-preview-backdrop" role="presentation" onClick={()=>setPreview(null)}><section className="face-preview-modal" role="dialog" aria-modal="true" aria-label={"Face enrollment image for "+preview.name} onClick={e=>e.stopPropagation()}><div className="face-preview-header"><h2>{preview.name} — Face Registration</h2><button type="button" className="btn secondary" onClick={()=>setPreview(null)}>Close</button></div><img src={preview.url} alt={"Face enrollment capture for "+preview.name}/></section></div>}
       {tab === "attendance" && (
         <section className="card">
           <div className="attendance-table">
