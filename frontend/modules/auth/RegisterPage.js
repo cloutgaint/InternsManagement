@@ -202,8 +202,6 @@ export default function RegisterPage() {
           </div>
           <span className="badge">Student Registration</span>
         </div>
-        {msg && <p className="success">{msg}</p>}
-        {err && <p className="error">{err}</p>}
         <form onSubmit={submit} className="registration-form">
           <h3 className="form-section-title">Personal Details</h3>
           <div className="form-grid">
@@ -634,6 +632,8 @@ export default function RegisterPage() {
               {busy ? "Submitting…" : "Submit Application"}
             </button>
           </div>
+          {msg&&<p className="success" role="status" aria-live="polite">{msg}</p>}
+          {err&&<p className="error" role="alert">{err}</p>}
         </form>
       </div>
     </main>
