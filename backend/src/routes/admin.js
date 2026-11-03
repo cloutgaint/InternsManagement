@@ -952,12 +952,14 @@ r.post("/face-enrollments/:id/decision", async (req, res) => {
   ).rows[0];
   if (!before)
     return res.status(404).json({ error: "Face enrollment not found" });
+  if (before.status !== "PENDING_ADMIN_APPROVAL") return res.status(409).json({ error: "Only pending face enrollments can be reviewed" });
   const x = (
     await q(
-      `UPDATE face_enrollments SET status=$1,decision_reason=$2,approved_by=$3,approved_at=CASE WHEN $1='APPROVED' THEN now() ELSE NULL END WHERE id=$4 RETURNING *`,
+      `UPDATE face_enrollments SET status=$1,decision_reason=$2,approved_by=$3,approved_at=CASE WHEN $1='APPROVED' THEN now() ELSE NULL END WHERE id=$4 AND status='PENDING_ADMIN_APPROVAL' RETURNING *`,
       [status, reason || null, req.user.id, before.id],
     )
   ).rows[0];
+  if (!x) return res.status(409).json({ error: "Enrollment decision changed; reload" });
   await audit(
     req,
     "FACE_ENROLLMENT_" + status,
