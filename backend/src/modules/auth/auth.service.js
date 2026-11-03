@@ -24,7 +24,10 @@ function challengeUser(token) {
 export const getColleges = () => repository.findActiveColleges();
 
 export async function registerIntern(input, files) {
-  if (!/^https:\/\/drive\.google\.com\//i.test((input.resumePortfolioUrl || "").trim())) throw badRequest("A valid Google Drive resume or portfolio link is required");
+  const submittedLink=String(input.resumePortfolioUrl||"").trim();
+  let validLink=false;
+  try{const url=new URL(submittedLink);validLink=url.protocol==="https:"&&!!url.hostname;}catch{}
+  if(!validLink)throw badRequest("A valid HTTPS resume or portfolio link is required");
   const proofs = files?.proofFiles || [];
   const photoFile = files?.photo?.[0];
   if (new Date(input.issueDate) > new Date()) throw badRequest("Issue date cannot be future");
