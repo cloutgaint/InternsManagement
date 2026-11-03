@@ -70,23 +70,9 @@ export default function InternAttendancePage() {
     if (!imageData) return setErr("Camera is not ready.");
     setPhase("VERIFYING");
     try {
-      /* Browser challenge confirms user interaction; production biometric matcher must supply the actual face similarity score. */ const matcher =
-        window.GAINT_FACE_MATCHER;
-      if (typeof matcher !== "function")
-        throw new Error(
-          "Face matching service is not configured. Connect GAINT_FACE_MATCHER before enabling attendance in production.",
-        );
-      const result = await matcher({ imageData, challengeType: challenge });
       const x = await api("/intern/attendance/verify", {
         method: "POST",
-        body: JSON.stringify({
-          eventType,
-          imageData,
-          challengeType: challenge,
-          challengePass: result.challengePass === true,
-          livenessScore: Number(result.livenessScore),
-          matchScore: Number(result.matchScore),
-        }),
+        body: JSON.stringify({ eventType, imageData, challengeType: challenge }),
       });
       setMsg(
         eventType === "CHECK_IN"
@@ -95,12 +81,11 @@ export default function InternAttendancePage() {
               (x.daily?.working_minutes || 0) +
               " minutes.",
       );
-      setPhase("DONE");
       stopCamera();
       setPhase("DONE");
       load();
     } catch (e) {
-      setErr(e.message);
+      setErr(e.message === "Trusted biometric verification is not configured" ? "Face captured, but attendance cannot be recorded until the backend biometric verification service is configured." : e.message);
       setPhase("CHALLENGE");
     }
   }
