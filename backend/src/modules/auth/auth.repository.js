@@ -4,7 +4,7 @@ const run = (client) => client?.query.bind(client) || q;
 
 export async function findActiveColleges() {
   return (await q(
-    "SELECT id,name,university,city,district,state FROM colleges WHERE active=true ORDER BY name",
+    "SELECT id,name,university,city,district,state FROM colleges WHERE active=true AND archived_at IS NULL ORDER BY name",
   )).rows;
 }
 
@@ -17,14 +17,14 @@ export async function createInternUser(client, email, passwordHash) {
 
 export async function findActiveCollegeById(client, collegeId) {
   return (await run(client)(
-    "SELECT id,name,university FROM colleges WHERE id=$1 AND active=true",
+    "SELECT id,name,university FROM colleges WHERE id=$1 AND active=true AND archived_at IS NULL",
     [collegeId],
   )).rows[0];
 }
 
 export async function findCollegeByName(client, name) {
   return (await run(client)(
-    "SELECT id,name,university FROM colleges WHERE lower(name)=lower($1) LIMIT 1",
+    "SELECT id,name,university FROM colleges WHERE lower(name)=lower($1) AND archived_at IS NULL LIMIT 1",
     [name],
   )).rows[0];
 }
