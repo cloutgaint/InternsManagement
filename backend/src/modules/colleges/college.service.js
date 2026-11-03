@@ -9,3 +9,10 @@ export async function updateCollege(id, input) {
   const college = await repository.updateCollege(id, { ...before, ...input });
   return { before, college };
 }
+
+export async function deleteCollege(id) {
+  const before=await repository.findCollege(id);
+  if(!before)throw Object.assign(new Error("College not found"),{status:404});
+  await repository.deleteCollege(id);
+  return before;
+}
