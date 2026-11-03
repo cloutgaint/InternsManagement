@@ -690,6 +690,12 @@ r.post("/assessments/:id/submit", async (req, res) => {
       [req.params.id],
     )
   ).rows.flatMap((x) => x.question_ids || []);
+  if (!Array.isArray(answers)) return res.status(400).json({ error: "Answers must be an array" });
+  const submittedIds = answers.map((x) => x?.questionId);
+  if (submittedIds.some((id) => !validIds.includes(id)))
+    return res.status(400).json({ error: "Submitted answer contains an invalid question" });
+  if (new Set(submittedIds).size !== submittedIds.length)
+    return res.status(400).json({ error: "Duplicate answers for the same question are not allowed" });
   let total = 0,
     manualPending = false;
   for (const ans of answers) {
