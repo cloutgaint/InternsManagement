@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
+import Link from "next/link";
 const challenges = ["TURN_LEFT", "TURN_RIGHT", "BLINK", "SMILE"];
 export default function InternAttendancePage() {
   const video = useRef(null),
@@ -116,6 +117,7 @@ export default function InternAttendancePage() {
           {st?.face?.status || "NO FACE ENROLLMENT"}
         </span>
       </div>
+      {st?.face?.status !== "APPROVED" && <section className="card" style={{marginBottom:16}}><h2>Face Registration Required</h2><p className="muted">{st?.face?.status==="PENDING_ADMIN_APPROVAL"?"Your face registration is awaiting Admin approval. Attendance will be available after approval.":"Register your face before using camera attendance. Admin approval is required."}</p><Link href="/intern/face-enrollment" className="btn secondary">{st?.face?.status==="PENDING_ADMIN_APPROVAL"?"View Face Registration":"Register Face"}</Link></section>}
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
       <section className="card attendance-camera">
