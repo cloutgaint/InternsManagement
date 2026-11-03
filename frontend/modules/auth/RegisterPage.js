@@ -54,7 +54,6 @@ export default function RegisterPage() {
       rollNumber: "",
       preferredDomains: "",
       preferredBatch: "",
-      modePreference: "",
       skillsTools: "",
       resumePortfolioUrl: "",
       proofType: "",
@@ -408,18 +407,6 @@ export default function RegisterPage() {
                 value={f.preferredBatch}
                 onChange={(e) => set("preferredBatch", e.target.value)}
               />
-            </div>
-            <div className="form-field">
-              <label>Mode Preference</label>
-              <select
-                className="input"
-                value={f.modePreference}
-                onChange={(e) => set("modePreference", e.target.value)}
-              >
-                <option value="">Select if offered</option>
-                <option value="ONSITE">On-site</option>
-                <option value="REMOTE">Remote</option>
-              </select>
             </div>
             <div className="form-field">
               <label>Skills & Tools Known</label>
