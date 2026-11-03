@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/shared/api/client";
+import { api, apiBlob } from "@/shared/api/client";
 export default function AdminAttendancePage() {
   const [faces, setFaces] = useState([]),
     [exceptions, setExceptions] = useState([]),
@@ -8,7 +8,8 @@ export default function AdminAttendancePage() {
     [tab, setTab] = useState("faces"),
     [reason, setReason] = useState({}),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [images,setImages] = useState({});
   const load = () =>
     Promise.all([
       api("/admin/face-enrollments"),
@@ -24,6 +25,7 @@ export default function AdminAttendancePage() {
   useEffect(() => {
     load();
   }, []);
+  useEffect(()=>{let cancelled=false;const urls=[];Promise.all(faces.map(async x=>{try{const blob=await apiBlob("/admin/face-enrollments/"+x.id+"/image");const url=URL.createObjectURL(blob);urls.push(url);if(!cancelled)setImages(prev=>({...prev,[x.id]:url}));}catch{}}));return()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};},[faces]);
   async function face(x, status) {
     try {
       await api("/admin/face-enrollments/" + x.id + "/decision", {
@@ -92,14 +94,7 @@ export default function AdminAttendancePage() {
         <section className="card workflow-section">
           {faces.map((x) => (
             <div className="face-admin-row" key={x.id}>
-              <img
-                src={
-                  api.baseUrl
-                    ? api.baseUrl + "/admin/face-enrollments/" + x.id + "/image"
-                    : "/api/admin/face-enrollments/" + x.id + "/image"
-                }
-                alt="Enrollment"
-              />
+              {images[x.id]?<img src={images[x.id]} alt={"Face enrollment of "+x.full_name}/>:<div className="face-admin-photo-fallback" role="img" aria-label="Enrollment image unavailable">Photo unavailable</div>}
               <div>
                 <b>{x.full_name}</b>
                 <p className="muted">
