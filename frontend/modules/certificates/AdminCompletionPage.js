@@ -50,8 +50,8 @@ export default function AdminCompletionPage() {
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
       {rows.map((x) => (
-        <section className="card workflow-row" key={x.intern_id}>
-          <div>
+        <section className="card admin-completion-row" key={x.intern_id}>
+          <div className="admin-completion-info">
             <b>{x.full_name}</b>
             <div className="muted">
               Evaluation: {x.individual_marks ?? "Pending"} · Completion:{" "}
@@ -59,7 +59,7 @@ export default function AdminCompletionPage() {
               {x.certificate_status || "Not issued"} {x.exit_type ? "· Exit: "+x.exit_type : ""} {x.certificate_id ? "· "+x.certificate_id : ""}
             </div>
           </div>
-          <div className="action-row">
+          <div className="action-row admin-completion-actions">
             <button type="button" className="btn danger" onClick={()=>removeStudent(x)}>Delete Student</button>
             {!x.exit_type && x.individual_marks != null &&
               x.completion_status !== "APPROVED" && (
