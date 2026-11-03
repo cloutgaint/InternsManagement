@@ -24,6 +24,7 @@ export default function AdminCompletionPage() {
       setErr(e.message);
     }
   }
+  async function recordExit(x,type){const reason=prompt("Reason for "+type.toLowerCase()+":");if(!reason?.trim())return;if(!confirm("Confirm "+type.toLowerCase()+" for "+x.full_name+"? This prevents completion certification."))return;try{await api("/admin/completions/"+x.intern_id+"/exit",{method:"POST",body:JSON.stringify({type,reason:reason.trim()})});setMsg("Internship marked "+type.toLowerCase()+".");setErr("");load()}catch(e){setErr(e.message)}}
   async function cert(x) {
     try {
       await api("/admin/certificates/" + x.intern_id + "/issue", {
@@ -49,22 +50,23 @@ export default function AdminCompletionPage() {
             <div className="muted">
               Evaluation: {x.individual_marks ?? "Pending"} · Completion:{" "}
               {x.completion_status || "Pending"} · Certificate:{" "}
-              {x.certificate_status || "Not issued"} {x.certificate_id ? "· "+x.certificate_id : ""}
+              {x.certificate_status || "Not issued"} {x.exit_type ? "· Exit: "+x.exit_type : ""} {x.certificate_id ? "· "+x.certificate_id : ""}
             </div>
           </div>
           <div className="action-row">
-            {x.individual_marks != null &&
+            {!x.exit_type && x.individual_marks != null &&
               x.completion_status !== "APPROVED" && (
                 <button className="btn" onClick={() => approve(x)}>
                   Approve Completion
                 </button>
               )}
-            {x.certificate_status === "ISSUED" && <button className="btn secondary" onClick={()=>download(x)}>Download Certificate</button>}{x.completion_status === "APPROVED" &&
+            {x.certificate_status === "ISSUED" && <button className="btn secondary" onClick={()=>download(x)}>Download Certificate</button>}{!x.exit_type && x.completion_status === "APPROVED" &&
               x.certificate_status !== "ISSUED" && (
                 <button className="btn" onClick={() => cert(x)}>
                   Issue Certificate
                 </button>
               )}
+            {!x.exit_type && x.certificate_status !== "ISSUED" && <><button className="btn secondary" onClick={()=>recordExit(x,"WITHDRAWN")}>Withdraw</button><button className="btn secondary" onClick={()=>recordExit(x,"TERMINATED")}>Terminate</button></>}
           </div>
         </section>
       ))}
