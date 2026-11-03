@@ -326,7 +326,7 @@ export default function InternDashboardPage() {
           </div>
         </section>
         <section className="card">
-          <div className="verification-title"><h2>Team & Project</h2><a className="btn secondary" href="/intern/collaboration">Group Workspace</a></div>
+          <div className="verification-title"><h2>Team & Project</h2><div className="action-row"><a className="btn secondary" href="/intern/collaboration">Group Workspace</a><a className="btn secondary" href="/intern/final-submission">Final Project Submission</a></div></div>
           {group ? (
             <>
               <p>
