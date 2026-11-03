@@ -12,7 +12,14 @@ export default function InternDashboardPage() {
     [reviews, setReviews] = useState([]),
     [completion, setCompletion] = useState(null),
     [offers, setOffers] = useState([]),
-    [offerView, setOfferView] = useState(null);
+    [offerView, setOfferView] = useState(null),
+    [tab,setTab]=useState("overview"),
+    [photoUrl,setPhotoUrl]=useState("");
+  useEffect(() => {
+    let url="";
+    apiBlob("/intern/profile-photo").then(blob=>{url=URL.createObjectURL(blob);setPhotoUrl(url);}).catch(()=>{});
+    return ()=>{if(url)URL.revokeObjectURL(url);};
+  },[]);
   useEffect(() => {
     Promise.all([
       api("/intern/dashboard"),
@@ -172,9 +179,10 @@ export default function InternDashboardPage() {
           after Admin completes allocation.
         </p>
       )}
-      <div className="intern-sections">
-        <section className="card">
-          <h2>My Profile</h2>
+      <nav className="intern-tabs" aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={tab===key?"active":""} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
+      <div className="intern-sections intern-tabbed" data-tab={tab}>
+        <section className="card intern-pane intern-pane-overview">
+          <div className="intern-profile-head">{photoUrl?<img className="intern-avatar" src={photoUrl} alt="Registered student profile photo"/>:<span className="intern-avatar intern-avatar-fallback" aria-label="Profile photo unavailable">{(p.full_name||"I").slice(0,1).toUpperCase()}</span>}<div><h2>My Profile</h2><p className="muted">{p.full_name||"Intern"}</p></div></div>
           <div className="detail-grid">
             <div>
               <b>Full Name</b>
@@ -204,7 +212,7 @@ export default function InternDashboardPage() {
             </div>
           </div>
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-onboarding">
           <h2>Onboarding</h2>
           <div className="status-row">
             <span>Batch allocation</span>
@@ -228,7 +236,7 @@ export default function InternDashboardPage() {
             <b>{a?.domain_name || "Pending"}</b>
           </div>
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-onboarding">
           <h2>Offer Letter</h2>
           {offers.length ? (
             offers.map((x) => (
@@ -262,7 +270,7 @@ export default function InternDashboardPage() {
             </p>
           )}
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-work">
           <h2>Attendance</h2>
           <div className="form-actions">
             <a className="btn" href="/intern/attendance">
@@ -282,7 +290,7 @@ export default function InternDashboardPage() {
             <p className="muted">No attendance records yet.</p>
           )}
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-work">
           <h2>Daily Work, Reports & Leave</h2>
           <p className="muted">
             Morning plans, evening reports, blockers, evidence and leave
@@ -294,7 +302,7 @@ export default function InternDashboardPage() {
             </a>
           </div>
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-learning">
           <h2>Weekly Tasks</h2>
           {(data.tasks || []).length ? (
             <p>{data.tasks.length} released task(s) are available.</p>
@@ -307,7 +315,7 @@ export default function InternDashboardPage() {
             </a>
           </div>
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-learning">
           <h2>Assessment</h2>
           {assessments.length ? (
             assessments.map((x) => (
@@ -325,7 +333,7 @@ export default function InternDashboardPage() {
             </a>
           </div>
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-team">
           <div className="verification-title"><h2>Team & Project</h2><div className="action-row"><a className="btn secondary" href="/intern/collaboration">Group Workspace</a><a className="btn secondary" href="/intern/final-submission">Final Project Submission</a></div></div>
           {group ? (
             <>
@@ -343,7 +351,7 @@ export default function InternDashboardPage() {
             <p className="muted">Group not assigned yet.</p>
           )}
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-completion">
           <h2>Fortnight Reviews</h2>
           {reviews.length ? (
             reviews.map((x) => (
@@ -358,7 +366,7 @@ export default function InternDashboardPage() {
             <p className="muted">No reviews published yet.</p>
           )}
         </section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-completion">
           <div className="verification-title"><h2>Completion & Certificate</h2><a className="btn secondary" href="/intern/certificate">Open Certificate</a></div>
           <div className="status-row">
             <span>Final evaluation</span>
@@ -373,8 +381,8 @@ export default function InternDashboardPage() {
             <b>{completion?.certificate?.status || "Not issued"}</b>
           </div>
         </section>
-        <section className="card"><h2>Group Workspace</h2><p className="muted">Documents, shared resources and group chat with your mentor.</p><div className="form-actions"><a className="btn" href="/intern/collaboration">Open Group Workspace</a></div></section>
-        <section className="card">
+        <section className="card intern-pane intern-pane-team"><h2>Group Workspace</h2><p className="muted">Documents, shared resources and group chat with your mentor.</p><div className="form-actions"><a className="btn" href="/intern/collaboration">Open Group Workspace</a></div></section>
+        <section className="card intern-pane intern-pane-overview">
           <div className="verification-title"><h2>Notifications</h2><a className="btn secondary" href="/intern/notifications">View All</a></div>
           {(data.notifications || []).length ? (
             <div className="mini-list">
