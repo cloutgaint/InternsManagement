@@ -20,6 +20,7 @@ export default function LoginPage() {
     sessionStorage.setItem("role", d.user.role);
     location.href = d.user.role.includes("ADMIN")
       ? "/admin"
+      : d.user.role === "COLLEGE_COORDINATOR" ? "/college-coordinator"
       : d.user.role === "MENTOR"
         ? "/mentor"
         : "/intern";
