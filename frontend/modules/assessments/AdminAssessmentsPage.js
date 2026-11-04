@@ -20,6 +20,15 @@ const fresh = () => ({
     },
   ],
 });
+function formatTimeTaken(startedAt, submittedAt) {
+  if (!startedAt || !submittedAt) return null;
+  const start = new Date(startedAt).getTime();
+  const end = new Date(submittedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  const seconds = Math.floor((end - start) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes} min ${seconds % 60} sec` : `${seconds} sec`;
+}
 export default function AdminAssessmentsPage() {
   const [batches, setBatches] = useState([]),
     [questions, setQuestions] = useState([]),
@@ -373,7 +382,7 @@ export default function AdminAssessmentsPage() {
               <div>
                 <b>{x.full_name}</b>
                 <div className="muted">
-                  {x.assessment_name} · Score {x.total_score || 0} · {x.status}
+                  {x.assessment_name} · Score {x.total_score ?? 0} · {x.status}{formatTimeTaken(x.started_at, x.submitted_at) && <> · Time taken: {formatTimeTaken(x.started_at, x.submitted_at)}</>}
                 </div>
               </div>
               <div className="action-row">
