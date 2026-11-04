@@ -87,7 +87,11 @@ export default function AdminAssessmentsPage() {
     );
   }
   async function create(e) {setFeedbackArea("create");
-    e.preventDefault();
+    e.preventDefault();setErr("");setMsg("");
+    if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
+    if(form.sections.some(x=>!x.questionIds.length))return setErr("Add at least one question to every assessment section.");
+    const selected=form.sections.flatMap(x=>x.questionIds);
+    if(new Set(selected).size!==selected.length)return setErr("A question cannot be selected in more than one section.");
     try {
       setBusy(true);
       await api("/admin/assessments", {
@@ -107,7 +111,7 @@ export default function AdminAssessmentsPage() {
       setBusy(false);
     }
   }
-  async function status(a, status) {setFeedbackArea("status");
+  async function status(a, status) {setFeedbackArea("status");setErr("");setMsg("");
     try {
       await api("/admin/assessments/" + a.id + "/status", {
         method: "PATCH",
@@ -126,7 +130,7 @@ export default function AdminAssessmentsPage() {
       setErr(e.message);
     }
   }
-  async function score(ans) {setFeedbackArea("score");
+  async function score(ans) {setFeedbackArea("score");setErr("");setMsg("");
     const val = window.prompt(
       "Score out of " + ans.marks + ":",
       ans.manual_score ?? "",
@@ -158,7 +162,7 @@ export default function AdminAssessmentsPage() {
         <span className="badge">{assessments.length} assessments</span>
       </div>
       <section className="card workflow-section">
-        <h2>Scoring Rubrics</h2>
+        <h2>Scoring Rubrics</h2>{feedbackArea==="rubric"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <p className="muted">
           Create reusable weighted criteria for descriptive assessment answers.
           Criterion weights must total 100%.
@@ -261,6 +265,7 @@ export default function AdminAssessmentsPage() {
             className="btn"
             onClick={async () => {
               try {
+                setFeedbackArea("rubric");setErr("");setMsg("");
                 await api("/admin/rubrics", {
                   method: "POST",
                   body: JSON.stringify(rubric),
