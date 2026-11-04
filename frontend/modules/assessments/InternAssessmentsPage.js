@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function InternAssessmentsPage() {
+  const submittingRef=useRef(false);
   const [list, setList] = useState([]),
     [exam, setExam] = useState(null),
     [answers, setAnswers] = useState({}),
@@ -25,13 +26,14 @@ export default function InternAssessmentsPage() {
         Math.floor((new Date(exam.deadline) - Date.now()) / 1000),
       );
       setLeft(n);
-      if (n === 0) submit(true);
+      if (n === 0 && !submittingRef.current) submit(true);
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [exam]);
   async function start(a) {
+    setErr("");setMsg("");
     try {
       setBusy(true);
       await api("/intern/assessments/" + a.id + "/start", {
@@ -61,7 +63,7 @@ export default function InternAssessmentsPage() {
     setAnswers((x) => ({ ...x, [q.id]: v }));
   }
   async function submit(auto = false) {
-    if (!exam || busy) return;
+    if (!exam || submittingRef.current) return;
     if (
       !auto &&
       !window.confirm(
@@ -70,6 +72,7 @@ export default function InternAssessmentsPage() {
     )
       return;
     try {
+      submittingRef.current=true;
       setBusy(true);
       const out = await api(
         "/intern/assessments/" + exam.assessment.id + "/submit",
@@ -94,6 +97,7 @@ export default function InternAssessmentsPage() {
     } catch (e) {
       setErr(e.message);
     } finally {
+      submittingRef.current=false;
       setBusy(false);
     }
   }
@@ -145,6 +149,7 @@ export default function InternAssessmentsPage() {
             </small>
           </aside>
           <section className="card exam-question">
+            {err&&<p className="error" role="alert">{err}</p>}
             <div className="question-tags">
               <span>{q.type}</span>
               <span>{q.marks} marks</span>
@@ -250,9 +255,8 @@ export default function InternAssessmentsPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card workflow-section">
+        {msg&&<p className="success" role="status">{msg}</p>}{err&&<p className="error" role="alert">{err}</p>}
         {list.length ? (
           list.map((a) => (
             <div className="workflow-row" key={a.id}>
@@ -271,7 +275,7 @@ export default function InternAssessmentsPage() {
                 </span>
                 {!["PENDING_EVALUATION", "EVALUATED"].includes(
                   a.attempt_status,
-                ) && (
+                ) && (!a.window_start||new Date(a.window_start)<=new Date())&&(!a.window_end||new Date(a.window_end)>new Date()) && (
                   <button
                     className="btn"
                     disabled={busy}
