@@ -771,6 +771,8 @@ r.post("/allocate", async (req, res) => {
       error:
         "Selected duration is outside the college-approved period. Provide an Admin override reason or correct the dates.",
     });
+  const existing=(await q("SELECT ba.id,b.name batch_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 LIMIT 1",[internId])).rows[0];
+  if(existing)return res.status(409).json({error:"Already allocated to "+existing.batch_name+". Use Edit Batch to transfer this intern."});
   const before =
     (
       await q(
@@ -814,6 +816,38 @@ r.post("/allocate", async (req, res) => {
     proofApprovedFrom: info.approved_from,
     proofApprovedTo: info.approved_to,
   });
+});
+r.patch("/allocations/:id/batch",async(req,res)=>{
+  const {batchId}=req.body||{};
+  if(!batchId)return res.status(400).json({error:"Select the new batch"});
+  const result=await tx(async c=>{
+    const original=(await c.query("SELECT ba.* FROM batch_allocations ba WHERE ba.id=$1",[req.params.id])).rows[0];
+    if(!original)return {code:404,error:"Allocation not found"};
+    await c.query("SELECT id FROM intern_profiles WHERE id=$1 FOR UPDATE",[original.intern_id]);
+    const rows=(await c.query("SELECT ba.*,b.name batch_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 FOR UPDATE OF ba",[original.intern_id])).rows;
+    if(rows.length!==1)return {code:409,error:"Multiple allocations already exist for this intern. Resolve them before transferring."};
+    const current=rows[0];
+    if(current.batch_id===batchId)return {code:409,error:"Already allocated to this batch. Select a different batch."};
+    const linked=(await c.query("SELECT 1 FROM offer_letters WHERE allocation_id=$1 AND status<>'REVOKED' LIMIT 1",[current.id])).rowCount;
+    if(linked)return {code:409,error:"An offer letter already exists. Revoke it before transferring the intern to another batch."};
+    const target=(await c.query(`SELECT b.*,ip.college_id intern_college,cp.status proof_status,cp.approved_from,cp.approved_to FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL(SELECT status,approved_from,approved_to FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN' AND u.is_active=true AND u.status='ACTIVE'`,[batchId,current.intern_id])).rows[0];
+    if(!target)return {code:404,error:"Target batch or active intern not found"};
+    if(target.college_id&&target.intern_college&&target.college_id!==target.intern_college)return {code:409,error:"Selected batch belongs to another college"};
+    if(!["VERIFIED","OVERRIDE"].includes(target.proof_status))return {code:409,error:"Verified college permission proof is required"};
+    const start=String(target.start_date).slice(0,10),end=String(target.end_date).slice(0,10);
+    const mismatch=String(target.approved_from).slice(0,10)>start||String(target.approved_to).slice(0,10)<end;
+    const reason=String(req.body?.overrideReason||"").trim();
+    if(mismatch&&(!reason||req.user.role!=="SUPER_ADMIN"))return {code:403,error:"Target batch is outside college-approved dates. Super Admin must enter an override reason."};
+    if(!mismatch&&reason)return {code:400,error:"Override reason is not needed for this batch"};
+    const duplicate=(await c.query("SELECT 1 FROM batch_allocations WHERE intern_id=$1 AND batch_id=$2 AND id<>$3",[current.intern_id,batchId,current.id])).rowCount;
+    if(duplicate)return {code:409,error:"Already allocated to the selected batch"};
+    const updated=(await c.query("UPDATE batch_allocations SET batch_id=$2,intern_start=$3,intern_end=$4,date_mismatch=$5,override_reason=$6,status=$7 WHERE id=$1 RETURNING *",[current.id,batchId,start,end,mismatch,reason||null,mismatch?"ALLOTTED_WITH_OVERRIDE":"ALLOTMENT_VERIFIED"])).rows[0];
+    await c.query("INSERT INTO allotment_verifications(allocation_id,actor_id,status,reason) VALUES($1,$2,$3,$4)",[updated.id,req.user.id,mismatch?"OVERRIDDEN":"VERIFIED",reason||null]);
+    return {updated,before:current};
+  });
+  if(result.error)return res.status(result.code).json({error:result.error});
+  await audit(req,"ALLOCATION_BATCH_TRANSFER","batch_allocation",result.updated.id,result.before,{...result.updated,transferReason:String(req.body?.reason||"").trim()||null});
+  res.json(result.updated);
 });
 r.post("/allocations/:id/early-end",async(req,res)=>{
   const endDate=String(req.body?.endDate||""),reason=String(req.body?.reason||"").trim();
