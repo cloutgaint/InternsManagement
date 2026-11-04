@@ -806,6 +806,18 @@ r.post("/allocate", async (req, res) => {
     proofApprovedTo: info.approved_to,
   });
 });
+r.post("/allocations/:id/early-end",async(req,res)=>{
+  const endDate=String(req.body?.endDate||""),reason=String(req.body?.reason||"").trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||Number.isNaN(Date.parse(endDate))||new Date(endDate).toISOString().slice(0,10)!==endDate||reason.length<10||reason.length>1000)return res.status(400).json({error:"Valid revised end date and a reason of 10–1000 characters are required"});
+  const before=(await q("SELECT ba.*,b.end_date batch_end FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.id=$1",[req.params.id])).rows[0];
+  if(!before)return res.status(404).json({error:"Allocation not found"});
+  const start=String(before.intern_start).slice(0,10),oldEnd=String(before.intern_end).slice(0,10);
+  if(endDate<start||endDate>=oldEnd||endDate>String(before.batch_end).slice(0,10))return res.status(400).json({error:"Early end must be within the internship period and before the current end date"});
+  const x=(await q("UPDATE batch_allocations SET intern_end=$2 WHERE id=$1 AND intern_end=$3 RETURNING *",[before.id,endDate,before.intern_end])).rows[0];
+  if(!x)return res.status(409).json({error:"Allotment changed; refresh and retry"});
+  await audit(req,"ALLOCATION_EARLY_END","batch_allocation",x.id,before,{...x,earlyEndReason:reason});
+  res.json({allocation:x,completionApproved:false,message:"Early end saved. Final completion requires separate evaluation and approval."});
+});
 r.get("/allocations", async (req, res) =>
   res.json(
     (
