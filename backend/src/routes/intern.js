@@ -725,7 +725,7 @@ r.post("/assessments/:id/submit", async (req, res) => {
       if (!at || at.status !== "IN_PROGRESS") return { error: "No active assessment attempt", code: 409 };
       const deadline = new Date(new Date(at.started_at).getTime() + Number(at.duration_minutes || 60) * 60000);
       if (at.window_end && new Date(at.window_end) < deadline) deadline.setTime(new Date(at.window_end).getTime());
-      if (Date.now() > deadline.getTime()) return { error: "Assessment submission deadline has passed", code: 409 };
+      if (Date.now() > deadline.getTime()+5000) return { error: "Assessment submission deadline has passed", code: 409 };
       const sections = await sectionsForIntern(req.params.id, p);
       const validIds = new Set(sections.flatMap((section) => section.question_ids || []));
       if (ids.some((id) => !validIds.has(id))) return { error: "Submitted answer contains an invalid question", code: 400 };
@@ -734,7 +734,9 @@ r.post("/assessments/:id/submit", async (req, res) => {
       )).rows : [];
       const questionMap = new Map(questions.map((question) => [question.id, question]));
       if (questionMap.size !== ids.length) return { error: "Assessment question unavailable", code: 409 };
-      let total = 0, manualPending = false;
+      const allQuestions=validIds.size?(await client.query("SELECT id,type FROM question_bank WHERE id=ANY($1::uuid[])",[[...validIds]])).rows:[];
+      const submittedIds=new Set(ids);
+      let total=0,manualPending=allQuestions.some(question=>["SHORT_TEXT","DESCRIPTIVE"].includes(question.type)&&!submittedIds.has(question.id));
       for (const answer of answers) {
         const question = questionMap.get(answer.questionId);
         let score = null;
