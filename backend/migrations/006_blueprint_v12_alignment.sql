@@ -94,7 +94,11 @@ ALTER TABLE certificates ADD COLUMN IF NOT EXISTS issued_by uuid REFERENCES user
 ALTER TABLE college_completion_reports ADD COLUMN IF NOT EXISTS emailed_to text;
 ALTER TABLE college_completion_reports ADD COLUMN IF NOT EXISTS emailed_at timestamptz;
 
--- Scheduled reminders are de-duplicated by event key.
+-- Scheduled reminders are de-duplicated by event key. Without this index a running scheduler
+-- repeats reminders, so keep the earliest copy of each before creating it.
+DELETE FROM notifications a USING notifications b
+WHERE a.event_key IS NOT NULL AND a.user_id=b.user_id AND a.event_key=b.event_key
+  AND (a.created_at,a.id)>(b.created_at,b.id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_event ON notifications(user_id,event_key) WHERE event_key IS NOT NULL;
 
 ALTER TABLE domain_decisions ADD COLUMN IF NOT EXISTS reason text;
