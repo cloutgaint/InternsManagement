@@ -1,5 +1,6 @@
 import { DEFAULT_WEIGHTS, validateWeights, calculatePerformance } from "../services/performanceScoreService.js";
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import batchAllotmentOrders from "./batchAllotmentOrders.js";
 import { offerSnapshot } from "../services/offerLetterSnapshot.js";
 import fs from "fs";
@@ -1084,6 +1085,22 @@ r.get("/interns", async (req, res) =>
     ).rows,
   ),
 );
+r.post("/mentors", async (req, res) => {
+  const b=req.body||{},fullName=String(b.fullName||"").trim(),email=String(b.email||"").trim().toLowerCase(),password=String(b.password||"");
+  const expertise=Array.isArray(b.expertise)?b.expertise.map(x=>String(x).trim()).filter(Boolean):[];
+  const maxGroups=Number(b.maxGroups),maxInterns=Number(b.maxInterns);
+  if(fullName.length<2||fullName.length>150||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||password.length<12||!/[A-Z]/.test(password)||!/[a-z]/.test(password)||!/[0-9]/.test(password)||!(/[^A-Za-z0-9]/.test(password))||!Number.isInteger(maxGroups)||maxGroups<1||maxGroups>100||!Number.isInteger(maxInterns)||maxInterns<1||maxInterns>1000||expertise.length>20||expertise.some(x=>x.length>100))return res.status(400).json({error:"Provide name, valid email, strong password (12+ characters, upper/lowercase, number, symbol), valid capacities and expertise"});
+  if((await q("SELECT 1 FROM users WHERE lower(email)=$1",[email])).rowCount)return res.status(409).json({error:"Email is already registered"});
+  const passwordHash=await bcrypt.hash(password,12);
+  let created;
+  try{created=await tx(async c=>{
+    const u=(await c.query("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,$2,'MENTOR','ACTIVE',true) RETURNING id,email",[email,passwordHash])).rows[0];
+    const m=(await c.query("INSERT INTO mentors(user_id,full_name,expertise,max_groups,max_interns,active) VALUES($1,$2,$3::jsonb,$4,$5,true) RETURNING id,full_name,expertise,max_groups,max_interns",[u.id,fullName,JSON.stringify(expertise),maxGroups,maxInterns])).rows[0];
+    return {...m,user_id:u.id,email:u.email};
+  });}catch(e){if(e.code==="23505")return res.status(409).json({error:"Email is already registered"});throw e;}
+  await audit(req,"MENTOR_CREATED","mentor",created.id,null,{user_id:created.user_id,email:created.email,full_name:created.full_name,max_groups:created.max_groups,max_interns:created.max_interns});
+  res.status(201).json(created);
+});
 r.get("/mentors", async (req, res) =>
   res.json(
     (
