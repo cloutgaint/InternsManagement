@@ -16,8 +16,14 @@ const blankQuestion = (domainId = "") => ({
   options: ["", "", "", ""], correctAnswer: "", marks: 1,
   explanation: "", status: "ACTIVE",
 });
-const blankAi = (domainId = "") => ({ domainId, topic: "", difficulty: "MEDIUM", count: 3, marks: 1 });
+const blankAi = (domainId = "") => ({ instructions: "", domainId, subject: "", topic: "", difficulty: "BEGINNER", count: 10, marks: 1 });
 const blankFilters = { q: "", domain: "", topic: "", difficulty: "" };
+const generatedMcqError = (question) => {
+  const options = Array.isArray(question.options) ? question.options.map((option) => String(option || "").trim()) : [];
+  if (!String(question.question || "").trim() || options.length !== 4 || options.some((option) => !option) || new Set(options.map((option) => option.toLowerCase())).size !== 4 || !options.includes(String(question.correctAnswer || "").trim()) || !String(question.explanation || "").trim())
+    return "Provide a question, four unique options, one correct answer, and an explanation.";
+  return "";
+};
 const isEligibleMcq = (question) =>
   question.type === "MCQ" && question.status === "ACTIVE" &&
   Array.isArray(question.options) && question.options.length === 4 &&
@@ -63,19 +69,20 @@ function QuestionPreview({ question, domainName }) {
 export default function AssessmentQuestionWorkspace({ section, questions, domains, usedQuestionIds, onChange, onReload, error, setError }) {
   const [modal, setModal] = useState(null);
   const [modalError, setModalError] = useState("");
+  const [modalMessage, setModalMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [questionForm, setQuestionForm] = useState(blankQuestion(section.domainId));
   const [editId, setEditId] = useState(null);
   const [editingAiDraft, setEditingAiDraft] = useState(false);
   const [ai, setAi] = useState(blankAi(section.domainId));
-  const [generatedIds, setGeneratedIds] = useState([]);
+  const [generated, setGenerated] = useState([]);
+  const [editingGeneratedId, setEditingGeneratedId] = useState(null);
   const [filters, setFilters] = useState({ ...blankFilters, domain: section.domainId || "" });
   const [bankSelection, setBankSelection] = useState([]);
   const [preview, setPreview] = useState(null);
   const selected = section.questionIds.map((id) => questions.find((question) => question.id === id)).filter(Boolean);
   const domainName = (id) => domains.find((domain) => domain.id === id)?.name || "Common";
   const totalMarks = selected.reduce((sum, question) => sum + Number(question.marks || 0), 0);
-  const generated = generatedIds.map((id) => questions.find((question) => question.id === id)).filter(Boolean);
   const bankRows = useMemo(() => questions.filter((question) =>
     isEligibleMcq(question) &&
     (!filters.q || question.question.toLowerCase().includes(filters.q.toLowerCase())) &&
@@ -117,31 +124,44 @@ export default function AssessmentQuestionWorkspace({ section, questions, domain
   }
 
   async function generate(event) {
-    event.preventDefault(); setModalError(""); setBusy(true);
+    event.preventDefault();
+    if (generated.length && !window.confirm("Replace the current unsaved generated MCQs?")) return;
+    setModalError(""); setModalMessage(""); setBusy(true);
     try {
-      const rows = await api("/admin/questions/ai-generate", { method: "POST", body: JSON.stringify({ ...ai, types: ["MCQ"] }) });
-      setGeneratedIds((ids) => [...rows.map((question) => question.id), ...ids]);
-      await onReload();
+      const out = await api("/admin/questions/ai-generate", { method: "POST", body: JSON.stringify({ ...ai, types: ["MCQ"] }) });
+      const drafts = (out.questions || []).map((question, index) => ({ ...question, clientId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}` }));
+      if (!drafts.length) throw new Error("No valid MCQs were generated. Refine the prompt and retry.");
+      setGenerated(drafts);
+      setModalMessage(`${out.validCount} MCQ${out.validCount === 1 ? "" : "s"} generated. Review before saving.`);
     } catch (requestError) { setModalError(requestError.message); } finally { setBusy(false); }
   }
-
-  async function review(question, decision, reason = "") {
-    setModalError("");
-    try {
-      await api(`/admin/questions/${question.id}/review`, { method: "POST", body: JSON.stringify({ decision, reason }) });
-      await onReload();
-      if (decision === "APPROVE" && !section.questionIds.includes(question.id) && !usedQuestionIds.has(question.id)) onChange([...section.questionIds, question.id]);
-    } catch (requestError) { setModalError(requestError.message); }
-  }
-
   async function regenerate(question) {
     setModalError(""); setBusy(true);
     try {
-      await api(`/admin/questions/${question.id}/review`, { method: "POST", body: JSON.stringify({ decision: "REJECT", reason: "Replaced by regenerated MCQ" }) });
-      const rows = await api("/admin/questions/ai-generate", { method: "POST", body: JSON.stringify({ ...ai, domainId: question.domain_id || ai.domainId, topic: question.topic || ai.topic, difficulty: question.difficulty, types: ["MCQ"], count: 1, marks: question.marks }) });
-      setGeneratedIds((ids) => [...rows.map((row) => row.id), ...ids.filter((id) => id !== question.id)]);
-      await onReload();
+      const out = await api("/admin/questions/ai-generate", { method: "POST", body: JSON.stringify({ ...ai, domainId: question.domainId || ai.domainId, topic: question.topic || ai.topic, difficulty: question.difficulty, types: ["MCQ"], count: 1, marks: question.marks }) });
+      const replacement = (out.questions || [])[0];
+      if (!replacement) throw new Error("No valid replacement MCQ was generated.");
+      setGenerated((drafts) => drafts.map((draft) => draft.clientId === question.clientId ? { ...replacement, clientId: globalThis.crypto?.randomUUID?.() || `${Date.now()}` } : draft));
     } catch (requestError) { setModalError(requestError.message); } finally { setBusy(false); }
+  }
+  async function saveGenerated() {
+    if (!generated.length || busy) return;
+    const invalidIndex = generated.findIndex((question) => generatedMcqError(question));
+    if (invalidIndex >= 0) return setModalError(`Question ${invalidIndex + 1}: ${generatedMcqError(generated[invalidIndex])}`);
+    setModalError(""); setModalMessage(""); setBusy(true);
+    try {
+      const saved = await api("/admin/questions/ai-save", { method: "POST", body: JSON.stringify({ questions: generated }) });
+      await onReload();
+      onChange([...section.questionIds, ...saved.map((question) => question.id).filter((id) => !section.questionIds.includes(id) && !usedQuestionIds.has(id))]);
+      setGenerated([]); setEditingGeneratedId(null);
+      setModalMessage(`${saved.length} MCQ${saved.length === 1 ? "" : "s"} saved to the Question Bank and added to this section.`);
+    } catch (requestError) {
+      const detail = String(requestError.message || "Please try again.").replace(/^Unable to save questions\.\s*/i, "");
+      setModalError(`Unable to save questions. ${detail} Your draft has been preserved.`);
+    } finally { setBusy(false); }
+  }
+  function updateGenerated(clientId, changes) {
+    setGenerated((drafts) => drafts.map((draft) => draft.clientId === clientId ? { ...draft, ...changes } : draft));
   }
 
   function move(index, direction) {
@@ -154,12 +174,12 @@ export default function AssessmentQuestionWorkspace({ section, questions, domain
     onChange([...section.questionIds, ...bankSelection.filter((id) => !section.questionIds.includes(id))]);
     setBankSelection([]); setError(""); setModal(null);
   }
-  function closeModal() { setModal(null); setModalError(""); setPreview(null); }
+  function closeModal() { setModal(null); setModalError(""); setModalMessage(""); setPreview(null); }
 
   return <>
     <div className="section-question-toolbar"><div><b>{selected.length} MCQ{selected.length === 1 ? "" : "s"}</b><span>{totalMarks} total marks</span></div><div className="action-row">
       <button type="button" className="btn secondary" onClick={() => openManual()}>+ Create MCQ</button>
-      <button type="button" className="btn secondary" onClick={() => { setAi((current) => generatedIds.length ? current : blankAi(section.domainId)); setModalError(""); setModal("ai"); }}>Generate with AI</button>
+      <button type="button" className="btn secondary" onClick={() => { setAi((current) => generated.length ? current : blankAi(section.domainId)); setModalError(""); setModal("ai"); }}>Generate with AI</button>
       <button type="button" className="btn" onClick={() => { setFilters({ ...blankFilters, domain: section.domainId || "" }); setBankSelection([]); setModalError(""); setModal("bank"); }}>Select from Question Bank</button>
     </div></div>
     {error && <p className="error section-error" role="alert">{error}</p>}
@@ -169,17 +189,18 @@ export default function AssessmentQuestionWorkspace({ section, questions, domain
     </div>)}</div>}
 
     {modal && <div className="modal-backdrop" onMouseDown={closeModal}><section className="modal-card assessment-question-modal" onMouseDown={(event) => event.stopPropagation()}>
-      <div className="verification-title"><div><h2>{modal === "manual" ? (editId ? "Edit MCQ" : "Create MCQ") : modal === "ai" ? "Generate MCQs with AI" : modal === "bank" ? "Select MCQs from Question Bank" : "MCQ Preview"}</h2>{modal === "ai" && <p className="muted">Generated MCQs stay DRAFT until explicitly approved by an Admin.</p>}</div><button type="button" className="icon-close" onClick={closeModal}>×</button></div>
+      <div className="verification-title"><div><h2>{modal === "manual" ? (editId ? "Edit MCQ" : "Create MCQ") : modal === "ai" ? "Generate MCQs with Groq AI" : modal === "bank" ? "Select MCQs from Question Bank" : "MCQ Preview"}</h2>{modal === "ai" && <p className="muted">Generated MCQs remain unsaved until you review and save them.</p>}</div><button type="button" className="icon-close" onClick={closeModal}>×</button></div>
       {modalError && <p className="error" role="alert">{modalError}</p>}
+      {modalMessage && <p className="success" role="status">{modalMessage}</p>}
       {modal === "manual" && <form onSubmit={saveQuestion}><McqFields value={questionForm} setValue={setQuestionForm} domains={domains} editingAiDraft={editingAiDraft} /><div className="form-actions"><button type="button" className="btn secondary" onClick={closeModal}>Cancel</button><button className="btn" disabled={busy}>{busy ? "Saving…" : editId ? "Save Changes" : "Create & Add"}</button></div></form>}
-      {modal === "ai" && <><form onSubmit={generate}><div className="form-grid compact-grid">
+      {modal === "ai" && <><form onSubmit={generate}><div className="form-field"><label>Topic / Prompt</label><textarea className="input ai-prompt-input" value={ai.instructions} onChange={(e) => setAi((current) => ({ ...current, instructions: e.target.value }))} placeholder="Generate Python MCQs covering variables, loops, functions, lists, and dictionaries. Include practical beginner-level questions." required /></div><div className="form-grid compact-grid">
         <div className="form-field"><label>Domain</label><select className="input" value={ai.domainId} onChange={(e) => setAi((current) => ({ ...current, domainId: e.target.value }))}><option value="">Common / All</option>{domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}</select></div>
-        <div className="form-field"><label>Topic</label><input className="input" value={ai.topic} onChange={(e) => setAi((current) => ({ ...current, topic: e.target.value }))} required /></div>
-        <div className="form-field"><label>Difficulty</label><select className="input" value={ai.difficulty} onChange={(e) => setAi((current) => ({ ...current, difficulty: e.target.value }))}><option>EASY</option><option>MEDIUM</option><option>HARD</option></select></div>
-        <div className="form-field"><label>Question Count</label><input className="input" type="number" min="1" max="20" value={ai.count} onChange={(e) => setAi((current) => ({ ...current, count: Number(e.target.value) }))} /></div>
+        <div className="form-field"><label>Subject</label><input className="input" value={ai.subject} onChange={(e) => setAi((current) => ({ ...current, subject: e.target.value }))} placeholder="Python, Java, SQL…" /></div>
+        <div className="form-field"><label>Difficulty</label><select className="input" value={ai.difficulty} onChange={(e) => setAi((current) => ({ ...current, difficulty: e.target.value }))}><option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="ADVANCED">Advanced</option><option value="MIXED">Mixed</option></select></div>
+        <div className="form-field"><label>Question Count</label><select className="input" value={ai.count} onChange={(e) => setAi((current) => ({ ...current, count: Number(e.target.value) }))}>{[5,10,15,20,25,30].map((count) => <option key={count}>{count}</option>)}</select></div>
         <div className="form-field"><label>Marks per MCQ</label><input className="input" type="number" min="0.5" step="0.5" value={ai.marks} onChange={(e) => setAi((current) => ({ ...current, marks: Number(e.target.value) }))} /></div>
-      </div><div className="form-actions"><button className="btn" disabled={busy}>{busy ? "Generating…" : generated.length ? "Generate More Drafts" : "Generate Draft MCQs"}</button></div></form>
-      {!!generated.length && <div className="ai-review-list">{generated.map((question) => <div className="question-row" key={question.id}><div className="question-main"><div className="question-tags"><span>MCQ</span><span>{question.difficulty}</span><span>{question.marks} marks</span><span>{question.status}</span></div><b>{question.question}</b></div><div className="action-row"><button type="button" className="btn secondary" onClick={() => { setPreview(question); setModal("preview"); }}>Preview</button>{question.status === "DRAFT" && <><button type="button" className="btn secondary" onClick={() => openManual(question)}>Edit</button><button type="button" className="btn secondary" disabled={busy} onClick={() => regenerate(question)}>Regenerate</button><button type="button" className="btn danger" onClick={() => review(question, "REJECT", "Rejected during assessment creation")}>Reject</button><button type="button" className="btn" onClick={() => review(question, "APPROVE")}>Approve & Add</button></>}</div></div>)}</div>}</>}
+      </div><div className="form-actions"><button className="btn" disabled={busy || !ai.instructions.trim()}>{busy ? "Generating MCQs…" : generated.length ? "Regenerate Questions" : "Generate MCQs with AI"}</button></div></form>
+      {!!generated.length && <div className="ai-review-list"><div className="verification-title"><div><h3>Generated MCQs — Review Before Saving</h3><p className="muted">{generated.length} unsaved MCQs</p></div><div className="action-row"><button type="button" className="btn secondary" onClick={() => { setGenerated([]); setEditingGeneratedId(null); setModalMessage("Generated draft discarded."); }}>Discard Draft</button><button type="button" className="btn" disabled={busy} onClick={saveGenerated}>{busy ? "Saving questions…" : "Save All Valid Questions"}</button></div></div>{generated.map((question, index) => <div className="question-row" key={question.clientId}><div className="question-main"><div className="question-tags"><span>Question {index + 1}</span><span>{question.topic}</span><span>{question.difficulty}</span><span>{question.marks} marks</span><span>UNSAVED</span></div>{editingGeneratedId === question.clientId ? <><textarea className="input" value={question.question} onChange={(e) => updateGenerated(question.clientId, { question: e.target.value })} />{question.options.map((option, optionIndex) => <div className="form-field" key={optionIndex}><label>Option {String.fromCharCode(65 + optionIndex)} <input type="radio" name={`correct-${question.clientId}`} checked={question.correctAnswer === option} onChange={() => updateGenerated(question.clientId, { correctAnswer: option })} /> Correct</label><input className="input" value={option} onChange={(e) => { const options = question.options.map((item, itemIndex) => itemIndex === optionIndex ? e.target.value : item); updateGenerated(question.clientId, { options, correctAnswer: question.correctAnswer === option ? e.target.value : question.correctAnswer }); }} /></div>)}<textarea className="input" value={question.explanation} onChange={(e) => updateGenerated(question.clientId, { explanation: e.target.value })} />{generatedMcqError(question) && <p className="error" role="alert">{generatedMcqError(question)}</p>}</> : <><b>{question.question}</b><ol>{question.options.map((option) => <li key={option}>{option}</li>)}</ol><small><b>Correct:</b> {question.correctAnswer}</small><small><b>Explanation:</b> {question.explanation}</small></>}</div><div className="action-row"><button type="button" className="btn secondary" onClick={() => setEditingGeneratedId((id) => id === question.clientId ? null : question.clientId)}>{editingGeneratedId === question.clientId ? "Done" : "Edit"}</button><button type="button" className="btn secondary" disabled={busy} onClick={() => regenerate(question)}>Regenerate</button><button type="button" className="btn danger" onClick={() => setGenerated((drafts) => drafts.filter((draft) => draft.clientId !== question.clientId))}>Delete</button></div></div>)}</div>}</>}
       {modal === "bank" && <><div className="question-bank-filters mcq-bank-filters"><input className="input" placeholder="Search MCQs" value={filters.q} onChange={(e) => setFilters((current) => ({ ...current, q: e.target.value }))} /><select className="input" value={filters.domain} onChange={(e) => setFilters((current) => ({ ...current, domain: e.target.value }))}><option value="">All domains</option>{domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}</select><input className="input" placeholder="Topic" value={filters.topic} onChange={(e) => setFilters((current) => ({ ...current, topic: e.target.value }))} /><select className="input" value={filters.difficulty} onChange={(e) => setFilters((current) => ({ ...current, difficulty: e.target.value }))}><option value="">All difficulties</option><option>EASY</option><option>MEDIUM</option><option>HARD</option></select></div>
         <div className="bank-question-list">{bankRows.map((question) => { const inSection = section.questionIds.includes(question.id); const elsewhere = usedQuestionIds.has(question.id); return <label className={(inSection || elsewhere) ? "already-selected" : ""} key={question.id}><input type="checkbox" disabled={inSection || elsewhere} checked={inSection || bankSelection.includes(question.id)} onChange={(event) => setBankSelection((ids) => event.target.checked ? [...ids, question.id] : ids.filter((id) => id !== question.id))} /><span><b>{question.question}</b><small>MCQ · {domainName(question.domain_id)} · {question.topic || "General"} · {question.difficulty} · {question.marks} marks · ACTIVE {inSection ? "· Already in this section" : elsewhere ? "· Used in another section" : ""}</small></span></label>; })}{!bankRows.length && <p className="muted">No eligible active MCQs match these filters.</p>}</div>
         <div className="form-actions"><span className="muted">{bankSelection.length} selected</span><button type="button" className="btn secondary" onClick={closeModal}>Cancel</button><button type="button" className="btn" disabled={!bankSelection.length} onClick={addFromBank}>Add Selected</button></div></>}

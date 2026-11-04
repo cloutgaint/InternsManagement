@@ -11,6 +11,9 @@ import { sendMail } from "../../common/notifications/mail.service.js";
 import { detectFileType } from "../../common/storage/secureFiles.js";
 import { findCoveringOrder, linkInternToOrder, storeProofFiles, validateProofDetails, latestProof } from "../../services/proofService.js";
 
+// Accept the adjacent 30-second steps so typing delay or phone clock drift does not reject a valid code.
+authenticator.options = { window: 1 };
+
 const privileged = (role) => ["ADMIN", "SUPER_ADMIN", "MENTOR", "COLLEGE_COORDINATOR"].includes(role);
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
 const sign = (user) => jwt.sign(
