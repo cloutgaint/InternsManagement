@@ -21,6 +21,7 @@ export default function AdminBatchesPage() {
     [early, setEarly] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("batch"),
     [busy, setBusy] = useState(false);
   const load = () =>
     Promise.all([
@@ -40,7 +41,7 @@ export default function AdminBatchesPage() {
     load();
   }, []);
   async function createBatch(e) {
-    e.preventDefault();
+    e.preventDefault();setFeedbackArea("batch");setMsg("");
     setErr("");
     if (new Date(form.endDate) < new Date(form.startDate))
       return setErr("Batch end date cannot be before start date.");
@@ -67,7 +68,7 @@ export default function AdminBatchesPage() {
       setBusy(false);
     }
   }
-  function startAllocation(i) {
+  function startAllocation(i) {setErr("");setMsg("");setFeedbackArea("allotment");
     const available = batches.filter(
       (b) => !b.college_id || b.college_id === i.college_id,
     );
@@ -90,7 +91,7 @@ export default function AdminBatchesPage() {
     }));
   }
   async function submitEarlyEnd(e) {
-    e.preventDefault();setErr("");setMsg("");
+    e.preventDefault();setFeedbackArea("early");setErr("");setMsg("");
     try{
       setBusy(true);
       await api("/admin/allocations/"+early.id+"/early-end",{method:"POST",body:JSON.stringify({endDate:early.endDate,reason:early.reason})});
@@ -99,7 +100,7 @@ export default function AdminBatchesPage() {
     }catch(e){setErr(e.message);}finally{setBusy(false);}
   }
   async function allocate(e) {
-    e.preventDefault();
+    e.preventDefault();setFeedbackArea("allotment");
     setErr("");
     const b = batches.find((x) => x.id === pick.batchId);
     if (!b) return setErr("Select a batch.");
@@ -136,11 +137,11 @@ export default function AdminBatchesPage() {
         </div>
         <span className="badge">{allocations.length} allocations</span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
+
       <BatchAllotmentOrders batches={batches} />
       <section className="card">
         <h2>Create Batch</h2>
+        {feedbackArea==="batch"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form className="form-grid" onSubmit={createBatch}>
           <div className="form-field">
             <label>College</label>
@@ -229,6 +230,8 @@ export default function AdminBatchesPage() {
       <section className="card workflow-section"><h2>Existing Semester Batches</h2>{batches.map(b=><div className="workflow-row" key={b.id}><div><b>{b.name}</b><p className="muted">{b.code} · {b.semester||"Semester not set"} · {String(b.start_date).slice(0,10)} to {String(b.end_date).slice(0,10)} · {b.status} · {b.mode}</p></div><BatchSettings batch={b} onSaved={load}/></div>)}</section>
       <section className="card workflow-section">
         <h2>Intern Allotment</h2>
+        {feedbackArea==="allotment"&&!pick&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        {feedbackArea==="early"&&!early&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <p className="muted">
           GAINT Admin controls internship dates. Batch dates are applied automatically. College-approved periods are checked by the backend.
         </p>
@@ -263,7 +266,7 @@ export default function AdminBatchesPage() {
           );
         })}
       </section>
-      {early&&<div className="modal-backdrop" onMouseDown={()=>setEarly(null)}><section className="modal-card" onMouseDown={e=>e.stopPropagation()}><h2>End Internship Early</h2><p className="muted">{early.name} · Current end: {early.currentEnd}</p><p className="muted">This changes the scheduled end date only. It does not bypass final assessment, completion approval or certificate requirements.</p><form onSubmit={submitEarlyEnd}><div className="form-field"><label>Revised End Date</label><input className="input" type="date" required min={early.startDate} max={early.currentEnd} value={early.endDate} onChange={e=>setEarly(x=>({...x,endDate:e.target.value}))}/></div><div className="form-field"><label>Reason for Early End</label><textarea className="input" required minLength={10} value={early.reason} onChange={e=>setEarly(x=>({...x,reason:e.target.value}))}/></div><div className="form-actions action-row"><button type="button" className="btn secondary" onClick={()=>setEarly(null)}>Cancel</button><button className="btn" disabled={busy}>Save Early End</button></div></form></section></div>}
+      {early&&<div className="modal-backdrop" onMouseDown={()=>setEarly(null)}><section className="modal-card" onMouseDown={e=>e.stopPropagation()}><h2>End Internship Early</h2>{feedbackArea==="early"&&err&&<p className="error" role="alert">{err}</p>}<p className="muted">{early.name} · Current end: {early.currentEnd}</p><p className="muted">This changes the scheduled end date only. It does not bypass final assessment, completion approval or certificate requirements.</p><form onSubmit={submitEarlyEnd}><div className="form-field"><label>Revised End Date</label><input className="input" type="date" required min={early.startDate} max={early.currentEnd} value={early.endDate} onChange={e=>setEarly(x=>({...x,endDate:e.target.value}))}/></div><div className="form-field"><label>Reason for Early End</label><textarea className="input" required minLength={10} value={early.reason} onChange={e=>setEarly(x=>({...x,reason:e.target.value}))}/></div><div className="form-actions action-row"><button type="button" className="btn secondary" onClick={()=>setEarly(null)}>Cancel</button><button className="btn" disabled={busy}>Save Early End</button></div></form></section></div>}
       {pick && (
         <div className="modal-backdrop" onMouseDown={() => setPick(null)}>
           <section
@@ -273,6 +276,7 @@ export default function AdminBatchesPage() {
             <div className="verification-title">
               <div>
                 <h2>Internship Allotment</h2>
+                {feedbackArea==="allotment"&&err&&<p className="error" role="alert">{err}</p>}
                 <p className="muted">
                   {pick.intern.full_name} · {pick.intern.college_name}
                 </p>
