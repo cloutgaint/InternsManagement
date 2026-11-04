@@ -362,11 +362,12 @@ r.post("/batches", async (req, res) => {
     return res.status(400).json({ error: "College, batch name, code and valid start/end dates are required" });
   if (b.endDate < b.startDate)
     return res.status(400).json({ error: "Batch end date cannot be before start date" });
+  if (b.semester && !/^SEM(?:ESTER)?[ -]?[1-8]$/i.test(String(b.semester).trim())) return res.status(400).json({error:"Semester must be SEM1 through SEM8"});
   if (!["ONSITE", "REMOTE", "HYBRID"].includes(b.mode || "ONSITE"))
     return res.status(400).json({ error: "Invalid internship mode" });
   const x = (
     await q(
-      "INSERT INTO batches(college_id,name,code,start_date,end_date,mode,task_release_rule,review_rule,min_attendance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
+      "INSERT INTO batches(college_id,name,code,start_date,end_date,mode,task_release_rule,review_rule,min_attendance,semester) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *",
       [
         b.collegeId,
         b.name,
@@ -377,6 +378,7 @@ r.post("/batches", async (req, res) => {
         b.taskReleaseRule || {},
         b.reviewRule || {},
         b.minAttendance || 75,
+        b.semester || null,
       ],
     )
   ).rows[0];
