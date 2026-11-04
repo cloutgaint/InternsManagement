@@ -8,6 +8,7 @@ export default function AdminMentorsPage() {
     [domains, setDomains] = useState([]),
     [selected, setSelected] = useState({}),
     [reason, setReason] = useState({}),
+    [feedbackArea,setFeedbackArea]=useState("create"),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState("");
@@ -27,7 +28,7 @@ export default function AdminMentorsPage() {
     load();
   }, []);
   async function createMentor(e) {
-    e.preventDefault();setErr("");setMsg("");
+    e.preventDefault();setFeedbackArea("create");setErr("");setMsg("");
     try {
       setBusy("create");
       const body={...newMentor,expertise:newMentor.expertise.split(",").map(x=>x.trim()).filter(Boolean),maxGroups:Number(newMentor.maxGroups),maxInterns:Number(newMentor.maxInterns)};
@@ -37,7 +38,7 @@ export default function AdminMentorsPage() {
       await load();
     } catch(e) {setErr(e.message);} finally {setBusy("");}
   }
-  async function assign(g, reassign = false) {
+  async function assign(g, reassign = false) {setFeedbackArea("assignment");
     const mentorId = selected[g.id];
     if (!mentorId) return setErr("Select a mentor first.");
     const detail = await api("/admin/groups/" + g.id + "/manage");
@@ -81,9 +82,7 @@ export default function AdminMentorsPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
-      <section className="card"><h2>Create Mentor Login</h2><p className="muted">Create an account, then assign the mentor to a group below. Use a unique email and a strong initial password.</p>
+      <section className="card"><h2>Create Mentor Login</h2>{feedbackArea==="create"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}<p className="muted">Create an account, then assign the mentor to a group below. Use a unique email and a strong initial password.</p>
         <form className="form-grid" onSubmit={createMentor}>
           <div className="form-field"><label>Mentor Name</label><input className="input" required maxLength={150} value={newMentor.fullName} onChange={e=>setNewMentor(x=>({...x,fullName:e.target.value}))}/></div>
           <div className="form-field"><label>Login Email</label><input className="input" type="email" required value={newMentor.email} onChange={e=>setNewMentor(x=>({...x,email:e.target.value}))}/></div>
@@ -95,7 +94,7 @@ export default function AdminMentorsPage() {
         </form>
       </section>
       <section className="card">
-        <h2>Available Mentors</h2><div className="mentor-capacity-grid">
+        <h2>Available Mentors</h2>{feedbackArea==="assignment"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}<div className="mentor-capacity-grid">
           {mentors.map((m) => (
             <div className="mentor-capacity" key={m.id}>
               <b>{m.full_name}</b>
