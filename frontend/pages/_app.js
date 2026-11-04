@@ -20,7 +20,7 @@ export default function App({ Component, pageProps }) {
   useEffect(()=>{if(!profileOpen)return;const close=e=>{if(!profileRef.current?.contains(e.target))setProfileOpen(false);};const esc=e=>{if(e.key==="Escape")setProfileOpen(false);};document.addEventListener("pointerdown",close);document.addEventListener("keydown",esc);return()=>{document.removeEventListener("pointerdown",close);document.removeEventListener("keydown",esc);};},[profileOpen]);
   const loggedIn=!!session.token;
   const role=session.role||"";
-  const home=role.includes("ADMIN")?"/admin":role==="MENTOR"?"/mentor":"/intern";
+  const home=role.includes("ADMIN")?"/admin":role==="MENTOR"?"/mentor":role==="COLLEGE_COORDINATOR"?"/college-coordinator":"/intern";
   useEffect(()=>{
     if(!loggedIn){pageHistory.current=[];return;}
     const path=router.asPath;
@@ -30,7 +30,7 @@ export default function App({ Component, pageProps }) {
     if(history[history.length-1]!==path)history.push(path);
     if(history.length>30)history.shift();
   },[loggedIn,router.asPath,home]);
-  const links=loggedIn?[{href:home,label:role.includes("ADMIN")?"Admin Dashboard":role==="MENTOR"?"Mentor Dashboard":"Student Dashboard"}]:[{href:"/",label:"Home"},{href:"/login",label:"Student Login"},{href:"/login?role=admin",label:"Admin Login"},{href:"/register",label:"Student Registration"}];
+  const links=loggedIn?[{href:home,label:role.includes("ADMIN")?"Admin Dashboard":role==="MENTOR"?"Mentor Dashboard":role==="COLLEGE_COORDINATOR"?"College Coordinator Dashboard":"Student Dashboard"}]:[{href:"/",label:"Home"},{href:"/login",label:"Student Login"},{href:"/login?role=admin",label:"Admin Login"},{href:"/register",label:"Student Registration"}];
   function goBack(){
     if(!loggedIn){router.push("/");return;}
     const history=pageHistory.current;
