@@ -15,7 +15,9 @@ export default function AdminOffersPage() {
     }),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [issueAt, setIssueAt] = useState(""),
+    [dates, setDates] = useState({});
   const load = () =>
     Promise.all([
       api("/admin/allocations"),
@@ -57,6 +59,8 @@ export default function AdminOffersPage() {
         body: JSON.stringify({
           allocationId: a.id,
           templateId: templates[0].id,
+          fromDate: dates[a.id]?.from || undefined,
+          toDate: dates[a.id]?.to || undefined,
         }),
       });
       setMsg(
@@ -73,6 +77,10 @@ export default function AdminOffersPage() {
     try {
       setPreview(await api("/admin/offer-letters/" + l.id + "/preview"));
       setSelected(l);
+      if (l.status === "DRAFT") {
+        await api("/admin/offer-letters/" + l.id + "/mark-previewed", { method: "POST", body: "{}" });
+        load();
+      }
     } catch (e) {
       setErr(e.message);
     }
@@ -83,6 +91,10 @@ export default function AdminOffersPage() {
       const reason = prompt("Reason is required:");
       if (!reason) return;
       body = { reason };
+    }
+    if (type === "issue") {
+      if (!issueAt) return setErr("Declare the issue date and time before issuing.");
+      body = { issueAt: new Date(issueAt).toISOString() };
     }
     try {
       setBusy(true);
@@ -110,7 +122,7 @@ export default function AdminOffersPage() {
           </p>
         </div>
         <span className="badge">
-          {letters.filter((x) => x.status === "ISSUED").length} issued
+          {letters.filter((x) => ["ISSUED", "REISSUED"].includes(x.status)).length} issued
         </span>
       </div>
       {msg && <p className="success">{msg}</p>}
@@ -181,20 +193,24 @@ export default function AdminOffersPage() {
                 </div>
                 <div className="action-row">
                   {!l ? (
-                    <button
-                      className="btn"
-                      disabled={busy}
-                      onClick={() => draft(a)}
-                    >
-                      Create Draft
-                    </button>
+                    <>
+                      <input className="input" type="date" aria-label="Offer From date" defaultValue={fmt(a.intern_start)} onChange={(e) => setDates((d) => ({ ...d, [a.id]: { ...d[a.id], from: e.target.value } }))} />
+                      <input className="input" type="date" aria-label="Offer To date" defaultValue={fmt(a.intern_end)} onChange={(e) => setDates((d) => ({ ...d, [a.id]: { ...d[a.id], to: e.target.value } }))} />
+                      <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => draft(a)}
+                      >
+                        Create Draft
+                      </button>
+                    </>
                   ) : (
                     <>
                       <span className="status-pill">{l.status}</span>
                       <button className="btn secondary" onClick={() => show(l)}>
                         Preview
                       </button>
-                      {l.status === "DRAFT" && (
+                      {l.status === "PREVIEWED" && (
                         <button
                           className="btn"
                           disabled={busy}
@@ -204,15 +220,24 @@ export default function AdminOffersPage() {
                         </button>
                       )}
                       {l.status === "APPROVED" && (
-                        <button
-                          className="btn"
-                          disabled={busy}
-                          onClick={() => action(l, "issue")}
-                        >
-                          Issue
-                        </button>
+                        <>
+                          <input
+                            className="input"
+                            type="datetime-local"
+                            aria-label="Offer letter issue date and time"
+                            value={issueAt}
+                            onChange={(e) => setIssueAt(e.target.value)}
+                          />
+                          <button
+                            className="btn"
+                            disabled={busy}
+                            onClick={() => action(l, "issue")}
+                          >
+                            Issue
+                          </button>
+                        </>
                       )}
-                      {l.status === "ISSUED" && (
+                      {["ISSUED", "REISSUED"].includes(l.status) && (
                         <>
                           <button
                             className="btn secondary"

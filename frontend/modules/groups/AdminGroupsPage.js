@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function AdminGroupsPage() {
+  const [composition, setComposition] = useState("SINGLE_DOMAIN");
   const [batches, setBatches] = useState([]),
     [batchId, setBatchId] = useState(""),
     [size, setSize] = useState(5),
@@ -41,7 +42,7 @@ export default function AdminGroupsPage() {
       setBusy(true);
       const g = await api("/admin/group-proposals/" + batchId + "/generate", {
         method: "POST",
-        body: JSON.stringify({ groupSize: Number(size) }),
+        body: JSON.stringify({ groupSize: Number(size), composition }),
       });
       setGroups(g);
       setMsg(
@@ -78,6 +79,39 @@ export default function AdminGroupsPage() {
       setEdit(null);
       setMsg("Group proposal updated.");
       setGroups(await api("/admin/group-proposals/" + batchId));
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function mergeGroup(g) {
+    const others = activeGroups.filter((x) => x.id !== g.id && x.batch_id === g.batch_id);
+    if (!others.length) return setErr("There is no other active group in this batch.");
+    const name = prompt("Merge " + g.name + " into which group?\n" + others.map((x) => x.name).join("\n"));
+    if (!name) return;
+    const target = others.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (!target) return setErr("No active group in this batch has that name.");
+    try {
+      setErr("");
+      await api("/admin/groups/" + g.id + "/merge", { method: "POST", body: JSON.stringify({ targetGroupId: target.id }) });
+      setMsg(g.name + " merged into " + target.name + ".");
+      await loadBase();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function splitGroup(g) {
+    try {
+      setErr("");
+      const data = await api("/admin/groups/" + g.id + "/manage");
+      const list = data.members.map((m, i) => i + 1 + ". " + m.full_name).join("\n");
+      const picks = prompt("Numbers of the interns to move (comma separated):\n" + list);
+      if (!picks) return;
+      const internIds = picks.split(",").map((x) => data.members[Number(x.trim()) - 1]?.intern_id).filter(Boolean);
+      const name = prompt("Name for the new group:");
+      if (!name?.trim()) return;
+      await api("/admin/groups/" + g.id + "/split", { method: "POST", body: JSON.stringify({ internIds, name: name.trim() }) });
+      setMsg("Group split. Assign a mentor and project to " + name.trim() + ".");
+      await loadBase();
     } catch (e) {
       setErr(e.message);
     }
@@ -161,6 +195,13 @@ export default function AdminGroupsPage() {
             </select>
           </div>
           <div className="form-field">
+            <label>Composition</label>
+            <select className="input" value={composition} onChange={(e) => setComposition(e.target.value)}>
+              <option value="SINGLE_DOMAIN">Single domain teams</option>
+              <option value="CROSS_FUNCTIONAL">Cross-functional teams</option>
+            </select>
+          </div>
+          <div className="form-field">
             <label>Target Group Size</label>
             <input
               className="input"
@@ -188,9 +229,17 @@ export default function AdminGroupsPage() {
                   {g.type} · {g.status}
                 </div>
               </div>
-              <button className="btn secondary" onClick={() => openManage(g)}>
-                Manage Members
-              </button>
+              <div className="action-row">
+                <button className="btn secondary" onClick={() => openManage(g)}>
+                  Manage Members
+                </button>
+                <button className="btn secondary" disabled={busy} onClick={() => mergeGroup(g)}>
+                  Merge Into…
+                </button>
+                <button className="btn secondary" disabled={busy} onClick={() => splitGroup(g)}>
+                  Split…
+                </button>
+              </div>
             </div>
           ))}
       </section>

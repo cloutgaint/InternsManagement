@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readSecureFile } from "../common/storage/secureFiles.js";
 export async function verifyAttendanceBiometrics({ imageData, baselineImageData, enrollment, challengeType }) {
   const endpoint = process.env.BIOMETRIC_VERIFY_URL;
   const token = process.env.BIOMETRIC_VERIFY_TOKEN;
@@ -14,7 +15,7 @@ export async function verifyAttendanceBiometrics({ imageData, baselineImageData,
   try {
     const enrollmentPath = path.resolve(enrollment.raw_image_path || "");
     if (!enrollment.raw_image_path || !fs.existsSync(enrollmentPath)) return { ok: false, unavailable: true, reason: "Approved enrollment image is unavailable" };
-    const enrollmentImageData = "data:image/" + (enrollmentPath.toLowerCase().endsWith(".png") ? "png" : "jpeg") + ";base64," + fs.readFileSync(enrollmentPath).toString("base64");
+    const enrollmentImageData = "data:image/" + (enrollmentPath.toLowerCase().endsWith(".png") ? "png" : "jpeg") + ";base64," + readSecureFile(enrollmentPath).toString("base64");
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },

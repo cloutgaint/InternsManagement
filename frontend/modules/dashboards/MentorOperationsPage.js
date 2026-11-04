@@ -4,10 +4,39 @@ import { api } from "@/shared/api/client";
 export default function MentorOperationsPage() {
   const [d, setD] = useState(null),
     [tab, setTab] = useState("attendance"),
-    [q, setQ] = useState("");
+    [q, setQ] = useState(""),
+    [exceptions, setExceptions] = useState([]),
+    [notes, setNotes] = useState({}),
+    [msg, setMsg] = useState(""),
+    [err, setErr] = useState("");
+  const load = () =>
+    Promise.all([api("/mentor/operations"), api("/mentor/attendance-exceptions")])
+      .then(([o, e]) => {
+        setD(o);
+        setExceptions(e);
+      })
+      .catch((e) => setErr(e.message));
   useEffect(() => {
-    api("/mentor/operations").then(setD);
+    load();
   }, []);
+  async function decide(path, x, status) {
+    setErr("");
+    setMsg("");
+    try {
+      await api("/mentor/" + path + "/" + x.id + "/decision", { method: "POST", body: JSON.stringify({ status, reason: notes[x.id] || "" }) });
+      setMsg("Decision recorded.");
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  const decisionControls = (path, x) => (
+    <div className="action-row">
+      <input className="input" aria-label={"Decision note for " + x.full_name} placeholder="Reason" value={notes[x.id] || ""} onChange={(e) => setNotes((n) => ({ ...n, [x.id]: e.target.value }))} />
+      <button className="btn" onClick={() => decide(path, x, "APPROVED")}>Approve</button>
+      <button className="btn danger" onClick={() => decide(path, x, "REJECTED")}>Reject</button>
+    </div>
+  );
   if (!d) return <main className="wrap">Loading operational workspace…</main>;
   const match = (x) =>
     (x.full_name + " " + (x.group_name || ""))
@@ -24,8 +53,10 @@ export default function MentorOperationsPage() {
           </p>
         </div>
       </div>
+      {msg && <p className="success" role="status">{msg}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
       <div className="tab-row">
-        {["attendance", "leave", "reports", "milestones"].map((x) => (
+        {["attendance", "exceptions", "leave", "reports", "milestones"].map((x) => (
           <button
             className={"btn " + (tab === x ? "" : "secondary")}
             onClick={() => setTab(x)}
@@ -58,6 +89,24 @@ export default function MentorOperationsPage() {
           ))}
         </section>
       )}
+      {tab === "exceptions" && (
+        <section className="card ops-list">
+          <h2>Attendance Corrections</h2>
+          {exceptions.filter(match).map((x) => (
+            <div className="workflow-row" key={x.id}>
+              <div>
+                <b>{x.full_name}</b>
+                <small>{x.group_name} · {String(x.day).slice(0, 10)} · {x.kind === "FAILED_MATCH" ? "Failed face match" : "Correction request"}</small>
+                <p>{x.reason}</p>
+                {x.decision_reason && <p className="muted">Decision: {x.decision_reason}</p>}
+              </div>
+              <span className="status-pill">{x.status}</span>
+              {["DETECTED", "REQUESTED"].includes(x.status) && decisionControls("attendance-exceptions", x)}
+            </div>
+          ))}
+          {!exceptions.length && <p className="muted">No attendance corrections for your groups.</p>}
+        </section>
+      )}
       {tab === "leave" && (
         <section className="card ops-list">
           <h2>Leave Requests</h2>
@@ -72,6 +121,7 @@ export default function MentorOperationsPage() {
                 <p>{x.reason}</p>
               </div>
               <span className="status-pill">{x.status}</span>
+              {x.status === "REQUESTED" && decisionControls("leave-requests", x)}
             </div>
           ))}
         </section>

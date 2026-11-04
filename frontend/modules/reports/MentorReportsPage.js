@@ -4,12 +4,45 @@ import { api } from "@/shared/api/client";
 export default function MentorReportsPage() {
   const [reviews, setReviews] = useState([]),
     [report, setReport] = useState(null),
-    [err, setErr] = useState("");
-  useEffect(() => {
+    [err, setErr] = useState(""),
+    [msg, setMsg] = useState(""),
+    [edit, setEdit] = useState(null);
+  const load = () =>
     api("/mentor/reviews")
       .then(setReviews)
       .catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
   }, []);
+  async function startEdit(x) {
+    try {
+      const members = await api("/mentor/groups/" + x.group_id + "/members");
+      const saved = (await api("/mentor/reviews/" + x.id + "/report")).members;
+      setEdit({
+        id: x.id, title: x.group_name + " · Fortnight " + x.period_no, status: x.status === "SCHEDULED" ? "CONDUCTED" : x.status,
+        progress: x.progress || "", domainReview: x.domain_review || "", presentationReview: x.presentation_review || "", groupMarks: x.group_marks ?? "", feedback: x.feedback || "", actionItems: x.action_items || "", nextExpectations: x.next_expectations || "",
+        marks: members.map((m) => { const s = saved.find((v) => v.full_name === m.full_name); return { internId: m.id, name: m.full_name, marks: s?.marks ?? "", note: s?.contribution_note || "" }; }),
+      });
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function saveEdit(e) {
+    e.preventDefault();
+    setErr("");
+    const individualMarks = edit.marks.filter((m) => m.marks !== "").map((m) => ({ internId: m.internId, marks: Number(m.marks), note: m.note }));
+    try {
+      await api("/mentor/reviews/" + edit.id, {
+        method: "PATCH",
+        body: JSON.stringify({ status: edit.status, progress: edit.progress, domainReview: edit.domainReview, presentationReview: edit.presentationReview, groupMarks: edit.groupMarks === "" ? null : Number(edit.groupMarks), feedback: edit.feedback, actionItems: edit.actionItems, nextExpectations: edit.nextExpectations, individualMarks }),
+      });
+      setMsg(edit.status === "PUBLISHED" ? "Review published to the group." : "Review saved.");
+      setEdit(null);
+      await load();
+    } catch (x) {
+      setErr(x.message);
+    }
+  }
   async function open(x) {
     try {
       setReport(await api("/mentor/reviews/" + x.id + "/report"));
@@ -29,6 +62,29 @@ export default function MentorReportsPage() {
         </div>
       </div>
       {err && <p className="error">{err}</p>}
+      {msg && <p className="success" role="status">{msg}</p>}
+      {edit && (
+        <section className="card">
+          <h2>{edit.title}</h2>
+          <form className="form-grid" onSubmit={saveEdit}>
+            <div className="form-field"><label>Status</label><select className="input" value={edit.status} onChange={(e) => setEdit((x) => ({ ...x, status: e.target.value }))}><option value="CONDUCTED">Conducted</option><option value="MARKS_ENTERED">Marks Entered</option><option value="PUBLISHED">Published</option></select></div>
+            <div className="form-field"><label>Group Marks (0-100)</label><input className="input" type="number" min="0" max="100" value={edit.groupMarks} onChange={(e) => setEdit((x) => ({ ...x, groupMarks: e.target.value }))} /></div>
+            {[["progress", "Progress"], ["domainReview", "Domain Work Review"], ["presentationReview", "Presentation / Demo"], ["feedback", "Feedback"], ["actionItems", "Action Items"], ["nextExpectations", "Next Review Expectations"]].map(([k, label]) => (
+              <div className="form-field" key={k} style={{ gridColumn: "1 / -1" }}><label>{label}</label><textarea className="input" value={edit[k]} onChange={(e) => setEdit((x) => ({ ...x, [k]: e.target.value }))} /></div>
+            ))}
+            {edit.marks.map((m, i) => (
+              <div className="form-field" key={m.internId} style={{ gridColumn: "1 / -1" }}>
+                <label>{m.name}: Individual Marks and Contribution</label>
+                <div className="action-row">
+                  <input className="input" type="number" min="0" max="100" aria-label={"Marks for " + m.name} value={m.marks} onChange={(e) => setEdit((x) => ({ ...x, marks: x.marks.map((v, j) => (j === i ? { ...v, marks: e.target.value } : v)) }))} />
+                  <input className="input" aria-label={"Contribution note for " + m.name} placeholder="Contribution note" value={m.note} onChange={(e) => setEdit((x) => ({ ...x, marks: x.marks.map((v, j) => (j === i ? { ...v, note: e.target.value } : v)) }))} />
+                </div>
+              </div>
+            ))}
+            <div className="form-actions action-row"><button className="btn">Save Review</button><button type="button" className="btn secondary" onClick={() => setEdit(null)}>Cancel</button></div>
+          </form>
+        </section>
+      )}
       <section className="card workflow-section">
         {reviews.length ? (
           reviews.map((x) => (
@@ -42,9 +98,12 @@ export default function MentorReportsPage() {
                   {x.individual_count} individual review(s)
                 </div>
               </div>
-              <button className="btn" onClick={() => open(x)}>
-                Generate Report
-              </button>
+              <div className="action-row">
+                {x.status !== "PUBLISHED" && <button className="btn secondary" onClick={() => startEdit(x)}>Update Review</button>}
+                <button className="btn" onClick={() => open(x)}>
+                  Generate Report
+                </button>
+              </div>
             </div>
           ))
         ) : (

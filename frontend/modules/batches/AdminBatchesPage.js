@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 import BatchAllotmentOrders from "./BatchAllotmentOrders";
+import BatchSettings from "./BatchSettings";
 export default function AdminBatchesPage() {
   const [interns, setInterns] = useState([]),
     [batches, setBatches] = useState([]),
@@ -215,7 +216,7 @@ export default function AdminBatchesPage() {
           </div>
         </form>
       </section>
-      <section className="card workflow-section"><h2>Existing Semester Batches</h2>{batches.map(b=><div className="workflow-row" key={b.id}><div><b>{b.name}</b><p className="muted">{b.code} · {b.semester||"Semester not set"} · {String(b.start_date).slice(0,10)} to {String(b.end_date).slice(0,10)}</p></div></div>)}</section>
+      <section className="card workflow-section"><h2>Existing Semester Batches</h2>{batches.map(b=><div className="workflow-row" key={b.id}><div><b>{b.name}</b><p className="muted">{b.code} · {b.semester||"Semester not set"} · {String(b.start_date).slice(0,10)} to {String(b.end_date).slice(0,10)} · {b.status} · {b.mode}</p></div><BatchSettings batch={b} onSaved={load}/></div>)}</section>
       <section className="card workflow-section">
         <h2>Intern Allotment</h2>
         <p className="muted">

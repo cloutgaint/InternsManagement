@@ -65,8 +65,10 @@ export default function InternCertificatePage() {
         </section>
         <section className="card">
           <h2>2. Completion Approval</h2>
-          <span className="status-pill">{d.approval?.status || "PENDING"}</span>
-          {d.approval?.reason && <p>{d.approval.reason}</p>}
+          <span className="status-pill">{d.exit?.type || ({ APPROVED: "SUCCESSFULLY COMPLETED", INCOMPLETE: "INCOMPLETE", REJECTED: "INCOMPLETE", EXTENDED: "EXTENDED" })[d.approval?.status] || "PENDING"}</span>
+          {d.approval?.extended_to && <p>Extended to {String(d.approval.extended_to).slice(0, 10)}.</p>}
+          {(d.exit?.reason || d.approval?.reason) && <p>{d.exit?.reason || d.approval.reason}</p>}
+          <p className="muted">College completion report: {d.collegeReport ? "Generated" : "Not generated yet"}</p>
         </section>
         <section className="card">
           <h2>3. Certificate</h2>
@@ -76,9 +78,14 @@ export default function InternCertificatePage() {
                 <b>{d.certificate.certificate_id}</b>
               </p>
               <p>Issued: {String(d.certificate.issue_date).slice(0, 10)}</p>
-              <button className="btn" onClick={dl}>
-                Download Certificate PDF
-              </button>
+              {d.certificate.mode === "OFFLINE" ? (
+                <p>Offline certificate{d.certificate.serial_number ? " · Serial " + d.certificate.serial_number : ""}. GAINT will provide your copy.</p>
+              ) : (
+                <button className="btn" onClick={dl}>
+                  Download Certificate PDF
+                </button>
+              )}
+              <p className="muted">Anyone can check it at /verify-certificate?id={d.certificate.certificate_id}</p>
             </>
           ) : (
             <p className="muted">

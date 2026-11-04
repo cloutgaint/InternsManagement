@@ -2,11 +2,15 @@ import { Router } from "express";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import multer from "multer";import {documentUpload,validExternalDocumentUrl,validateUploadedDocument} from "../services/collaborationService.js";import {notifyGroup} from "../common/notifications/notification.service.js";
+import multer from "multer";import {documentUpload,validExternalDocumentUrl,validateUploadedDocument} from "../services/collaborationService.js";import {notify,notifyGroup,notifyAdmins} from "../common/notifications/notification.service.js";
 import { q, tx } from "../common/database/index.js";
 import { sendOfferPdf } from "../services/offerLetterPdfService.js";
 import { verifyAttendanceBiometrics } from "../services/attendanceBiometricVerifier.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
+import { audit } from "../common/audit/audit.service.js";
+import { writeSecureFile } from "../common/storage/secureFiles.js";
+import { attendanceDayState, notifyGroupMentors } from "../services/attendanceService.js";
+import { latestProof, sendProofFile, storeProofFiles, validateProofDetails } from "../services/proofService.js";
 const r = Router();
 const submissionDir = path.resolve("uploads/task-submissions");
 fs.mkdirSync(submissionDir, { recursive: true });
@@ -21,18 +25,36 @@ const taskUpload = multer({
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "video/mp4",
       "text/plain",
+      "image/png",
+      "image/jpeg",
     ].includes(file.mimetype);
     cb(ok ? null : new Error("Unsupported task submission file type"), ok);
   },
 });
 r.use(auth, permit("INTERN"));
+const shuffled = (items) => {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+// An assessment is the common section plus sections for the intern's preferred domains (Section 6.5).
+async function sectionsForIntern(assessmentId, profile) {
+  const prefs = (Array.isArray(profile.preferred_domains) ? profile.preferred_domains : []).map((x) => String(x).toLowerCase());
+  const rows = (await q("SELECT s.*,d.name domain_name FROM assessment_sections s LEFT JOIN domains d ON d.id=s.domain_id WHERE s.assessment_id=$1 ORDER BY s.id", [assessmentId])).rows;
+  if (!prefs.length) return rows;
+  const matched = rows.filter((s) => !s.domain_id || prefs.includes(String(s.domain_id).toLowerCase()) || prefs.includes(String(s.domain_name).toLowerCase()));
+  return matched.length ? matched : rows;
+}
 async function me(uid) {
   return (await q("SELECT * FROM intern_profiles WHERE user_id=$1", [uid]))
     .rows[0];
 }
-r.get("/collaboration",async(req,res)=>{const p=await me(req.user.id);const g=(await q("SELECT g.* FROM groups g JOIN group_members gm ON gm.group_id=g.id WHERE gm.intern_id=$1 AND gm.active LIMIT 1",[p.id])).rows[0];if(!g)return res.json({group:null,documents:[],messages:[]});const documents=(await q("SELECT id,kind,title,external_url,original_name,mime_type,size_bytes,created_at,owner_user_id FROM documents WHERE active AND (visibility='ALL' OR group_id=$1 OR owner_user_id=$2) ORDER BY created_at DESC",[g.id,req.user.id])).rows;const messages=(await q(`SELECT cm.*,u.email sender_email,COALESCE(ip.full_name,m.full_name,'Admin') sender_name,d.title attachment_title,d.original_name attachment_name FROM chat_messages cm JOIN users u ON u.id=cm.sender_id LEFT JOIN intern_profiles ip ON ip.user_id=u.id LEFT JOIN mentors m ON m.user_id=u.id LEFT JOIN documents d ON d.id=cm.attachment_id WHERE cm.group_id=$1 ORDER BY cm.created_at DESC LIMIT 100`,[g.id])).rows.reverse();res.json({group:g,documents,messages})});
+r.get("/collaboration",async(req,res)=>{const p=await me(req.user.id);const g=(await q("SELECT g.* FROM groups g JOIN group_members gm ON gm.group_id=g.id WHERE gm.intern_id=$1 AND gm.active LIMIT 1",[p.id])).rows[0];if(!g)return res.json({group:null,documents:(await q("SELECT id,kind,title,external_url,original_name,mime_type,size_bytes,created_at,owner_user_id FROM documents WHERE active AND (visibility='ALL' OR owner_user_id=$1 OR (visibility='BATCH' AND batch_id IN (SELECT batch_id FROM batch_allocations WHERE intern_id=$2))) ORDER BY created_at DESC",[req.user.id,p.id])).rows,messages:[]});const documents=(await q("SELECT id,kind,title,external_url,original_name,mime_type,size_bytes,created_at,owner_user_id FROM documents WHERE active AND (visibility='ALL' OR group_id=$1 OR owner_user_id=$2 OR (visibility='BATCH' AND batch_id IN (SELECT batch_id FROM batch_allocations WHERE intern_id=$3))) ORDER BY created_at DESC",[g.id,req.user.id,p.id])).rows;const messages=(await q(`SELECT cm.*,u.email sender_email,COALESCE(ip.full_name,m.full_name,'Admin') sender_name,d.title attachment_title,d.original_name attachment_name FROM chat_messages cm JOIN users u ON u.id=cm.sender_id LEFT JOIN intern_profiles ip ON ip.user_id=u.id LEFT JOIN mentors m ON m.user_id=u.id LEFT JOIN documents d ON d.id=cm.attachment_id WHERE cm.group_id=$1 ORDER BY cm.created_at DESC LIMIT 100`,[g.id])).rows.reverse();res.json({group:g,documents,messages})});
 r.post("/documents",documentUpload.single("file"),async(req,res)=>{const p=await me(req.user.id),g=(await q("SELECT group_id FROM group_members WHERE intern_id=$1 AND active LIMIT 1",[p.id])).rows[0];if(!g){if(req.file)fs.unlinkSync(req.file.path);return res.status(409).json({error:"Active group required"})}if(req.file&&!validateUploadedDocument(req.file)){fs.unlinkSync(req.file.path);return res.status(400).json({error:"Uploaded file content does not match its declared type"});}if(req.body.externalUrl&&!validExternalDocumentUrl(req.body.externalUrl)){if(req.file)fs.unlinkSync(req.file.path);return res.status(400).json({error:"External document URL must be a valid HTTP(S) link"});}if(!req.file&&!req.body.externalUrl)return res.status(400).json({error:"Upload a document or provide an external URL"});const x=(await q("INSERT INTO documents(owner_user_id,group_id,kind,title,file_path,external_url,visibility,uploaded_by_role,mime_type,original_name,size_bytes) VALUES($1,$2,$3,$4,$5,$6,'GROUP','INTERN',$7,$8,$9) RETURNING *",[req.user.id,g.group_id,req.body.kind||"WORK",req.body.title||req.file?.originalname||"Document",req.file?.path||null,req.body.externalUrl||null,req.file?.mimetype||null,req.file?.originalname||null,req.file?.size||null])).rows[0];await notifyGroup(g.group_id,"DOCUMENT_SHARED","Document shared",p.full_name+" shared "+x.title,"/intern/collaboration","DOC:"+x.id,req.user.id);res.status(201).json(x)});
-r.get("/documents/:id/file",async(req,res)=>{const p=await me(req.user.id);const d=(await q(`SELECT d.* FROM documents d LEFT JOIN group_members gm ON gm.group_id=d.group_id AND gm.intern_id=$1 AND gm.active WHERE d.id=$2 AND d.active AND (d.visibility='ALL' OR d.owner_user_id=$3 OR gm.intern_id IS NOT NULL)`,[p.id,req.params.id,req.user.id])).rows[0];if(!d?.file_path||!fs.existsSync(d.file_path))return res.status(404).json({error:"File not found"});res.download(path.resolve(d.file_path),d.original_name||path.basename(d.file_path))});
+r.get("/documents/:id/file",async(req,res)=>{const p=await me(req.user.id);const d=(await q(`SELECT d.* FROM documents d LEFT JOIN group_members gm ON gm.group_id=d.group_id AND gm.intern_id=$1 AND gm.active WHERE d.id=$2 AND d.active AND (d.visibility='ALL' OR d.owner_user_id=$3 OR gm.intern_id IS NOT NULL OR (d.visibility='BATCH' AND d.batch_id IN (SELECT batch_id FROM batch_allocations WHERE intern_id=$1)))`,[p.id,req.params.id,req.user.id])).rows[0];if(!d?.file_path||!fs.existsSync(d.file_path))return res.status(404).json({error:"File not found"});res.download(path.resolve(d.file_path),d.original_name||path.basename(d.file_path))});
 r.post("/chat",async(req,res)=>{const p=await me(req.user.id),g=(await q("SELECT group_id FROM group_members WHERE intern_id=$1 AND active LIMIT 1",[p.id])).rows[0];const message=String(req.body.message||"").trim();if(!g)return res.status(409).json({error:"Active group required"});if(!message&&!req.body.attachmentId)return res.status(400).json({error:"Message or attachment is required"});if(req.body.attachmentId){const ok=(await q("SELECT 1 FROM documents WHERE id=$1 AND active AND group_id=$2",[req.body.attachmentId,g.group_id])).rowCount;if(!ok)return res.status(403).json({error:"Attachment is not available to this group"})}const x=(await q("INSERT INTO chat_messages(group_id,sender_id,message,attachment_id) VALUES($1,$2,$3,$4) RETURNING *",[g.group_id,req.user.id,message,req.body.attachmentId||null])).rows[0];await notifyGroup(g.group_id,"GROUP_CHAT","New group message",p.full_name+": "+(message.slice(0,120)||"shared an attachment"),"/intern/collaboration","CHAT:"+x.id,req.user.id);res.status(201).json(x)});
 r.get("/notifications",async(req,res)=>res.json((await q("SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",[req.user.id])).rows));
 r.post("/notifications/:id/read",async(req,res)=>{const x=(await q("UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING *",[req.params.id,req.user.id])).rows[0];if(!x)return res.status(404).json({error:"Notification not found"});res.json(x)});
@@ -58,8 +80,8 @@ r.get("/dashboard", async (req, res) => {
       [p.id],
     ),
     q(
-      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') ORDER BY wt.due_at`,
-      [p.id],
+      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') AND (wt.domain_id IS NULL OR wt.domain_id=$2) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=$1 AND gm.active)) ORDER BY wt.due_at`,
+      [p.id, p.final_domain_id],
     ),
     q(
       "SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20",
@@ -76,42 +98,44 @@ r.get("/dashboard", async (req, res) => {
     notifications: notes.rows,
   });
 });
-r.post("/proofs", async (req, res) => {
+const proofUpload = multer({ dest: path.resolve("uploads/registration"), limits: { fileSize: 5 * 1024 * 1024, files: 2 } });
+r.get("/proofs", async (req, res) => {
   const p = await me(req.user.id);
-  const b = req.body;
-  if (new Date(b.issueDate) > new Date())
-    return res.status(400).json({ error: "Issue date cannot be future" });
-  const hash = crypto
-    .createHash("sha256")
-    .update(String(b.filePath || "") + String(b.referenceNumber))
-    .digest("hex");
+  res.json((await q(
+    "SELECT id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,status,reason,version,override_due_date,batch_order_id,file_names,created_at FROM college_proofs WHERE intern_id=$1 ORDER BY created_at DESC,id DESC",
+    [p.id],
+  )).rows);
+});
+r.get("/proofs/:id/file", async (req, res) => {
+  const p = await me(req.user.id);
+  const proof = (await q("SELECT id,file_path FROM college_proofs WHERE id=$1 AND intern_id=$2", [req.params.id, p.id])).rows[0];
+  if (!proof) return res.status(404).json({ error: "Proof not found" });
+  await audit(req, "PROOF_FILE_VIEWED", "college_proof", proof.id, null, { index: Number(req.query.index) || 0 });
+  sendProofFile(res, proof, req.query.index);
+});
+// Active interns only reach this while an override is waiting for the real document.
+r.post("/proofs", proofUpload.array("proofFiles", 2), async (req, res) => {
+  const p = await me(req.user.id);
+  const files = req.files || [];
+  const discard = () => files.forEach((file) => fs.unlink(file.path, () => {}));
   try {
-    const x = (
-      await q(
-        "INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,file_path,file_hash,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'UPLOADED') RETURNING *",
-        [
-          p.id,
-          b.proofType,
-          b.issuingAuthority,
-          b.referenceNumber,
-          b.issueDate,
-          b.approvedFrom,
-          b.approvedTo,
-          b.filePath,
-          hash,
-        ],
-      )
-    ).rows[0];
-    await q("UPDATE users SET status='PROOF_UNDER_REVIEW' WHERE id=$1", [
-      req.user.id,
-    ]);
+    const previous = await latestProof(p.id);
+    if (previous?.status !== "OVERRIDE") {
+      discard();
+      return res.status(409).json({ error: "Your college proof cannot be changed at this stage" });
+    }
+    validateProofDetails(req.body);
+    const stored = await storeProofFiles(files);
+    const x = (await q(
+      "INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,coordinator_id,file_path,file_hash,file_names,version,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'UPLOADED') RETURNING id,status,version",
+      [p.id, req.body.proofType, req.body.issuingAuthority, req.body.referenceNumber, req.body.issueDate, req.body.approvedFrom, req.body.approvedTo, previous.coordinator_id, stored.filePaths, stored.fileHash, stored.fileNames, Number(previous.version || 0) + 1],
+    )).rows[0];
+    await notifyAdmins("PROOF_UPLOADED", "College proof submitted", p.full_name + " submitted the outstanding college proof.", "/admin/verification");
     res.status(201).json(x);
-  } catch (e) {
-    if (e.code === "23505")
-      return res
-        .status(409)
-        .json({ error: "Duplicate proof/reference detected" });
-    throw e;
+  } catch (error) {
+    discard();
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    throw error;
   }
 });
 r.post("/face-enrollment", async (req, res) => {
@@ -152,7 +176,13 @@ r.post("/face-enrollment", async (req, res) => {
   fs.mkdirSync(dir, { recursive: true });
   const ext = type === "png" ? "png" : "jpg",
     file = path.join(dir, p.id + "-" + Date.now() + "." + ext);
-  fs.writeFileSync(file, buf);
+  writeSecureFile(file, buf);
+  // A superseded rejected/re-enrollment capture has no further purpose (Blueprint 19).
+  const superseded = (await q("SELECT id,raw_image_path FROM face_enrollments WHERE intern_id=$1 AND status IN ('REJECTED','REENROLLMENT_REQUIRED') AND raw_image_path IS NOT NULL", [p.id])).rows;
+  for (const old of superseded) {
+    fs.unlink(old.raw_image_path, () => {});
+    await q("UPDATE face_enrollments SET raw_image_path=NULL WHERE id=$1", [old.id]);
+  }
   const hash = crypto.createHash("sha256").update(buf).digest("hex");
   const x = (
     await q(
@@ -160,6 +190,7 @@ r.post("/face-enrollment", async (req, res) => {
       [p.id, "capture:" + hash, file, Number(req.body.qualityScore || 1)],
     )
   ).rows[0];
+  await notifyAdmins("FACE_ENROLLMENT_SUBMITTED", "Face enrollment submitted", p.full_name + " submitted a face enrollment for approval.", "/admin/attendance");
   res.status(201).json(x);
 });
 r.get("/attendance/status", async (req, res) => {
@@ -176,7 +207,32 @@ r.get("/attendance/status", async (req, res) => {
       [p.id],
     )
   ).rows[0];
-  res.json({ face, today });
+  const [allocation, summary, history, exceptions, dayState] = await Promise.all([
+    q("SELECT ba.id,ba.batch_id,ba.intern_start,ba.intern_end,b.name batch_name,b.mode,b.min_attendance,b.late_after FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 ORDER BY ba.intern_start DESC NULLS LAST LIMIT 1", [p.id]),
+    q("SELECT s.* FROM attendance_summary s JOIN batch_allocations ba ON ba.id=s.allocation_id WHERE s.intern_id=$1 ORDER BY ba.intern_start DESC NULLS LAST LIMIT 1", [p.id]),
+    q("SELECT day,status,check_in,check_out,working_minutes,source,holiday_name FROM attendance_calendar WHERE intern_id=$1 ORDER BY day DESC LIMIT 60", [p.id]),
+    q("SELECT id,day,kind,reason,status,decision_reason,requested_value,created_at,decided_at FROM attendance_exceptions WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 30", [p.id]),
+    attendanceDayState(p.id),
+  ]);
+  res.json({ face, today, allocation: allocation.rows[0] || null, summary: summary.rows[0] || null, history: history.rows, exceptions: exceptions.rows, dayState });
+});
+r.post("/attendance/correction", async (req, res) => {
+  const p = await me(req.user.id);
+  const { day, requestedStatus = "PRESENT", checkIn, checkOut, reason } = req.body;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || "")) || !String(reason || "").trim())
+    return res.status(400).json({ error: "Date and reason are required" });
+  if (!["PRESENT", "LATE"].includes(requestedStatus))
+    return res.status(400).json({ error: "Correction can request Present or Late" });
+  const allowed = (await q("SELECT 1 FROM batch_allocations WHERE intern_id=$1 AND $2::date BETWEEN intern_start AND LEAST(intern_end,current_date) LIMIT 1", [p.id, day])).rowCount;
+  if (!allowed) return res.status(409).json({ error: "Choose a past or current day within your internship" });
+  const open = (await q("SELECT 1 FROM attendance_exceptions WHERE intern_id=$1 AND day=$2 AND kind='CORRECTION_REQUEST' AND status='REQUESTED'", [p.id, day])).rowCount;
+  if (open) return res.status(409).json({ error: "A correction request for this date is already pending" });
+  const x = (await q(
+    "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,$2,'CORRECTION_REQUEST',$3,'REQUESTED',$4) RETURNING *",
+    [p.id, day, String(reason).trim(), { requestedStatus, checkIn: checkIn || null, checkOut: checkOut || null }],
+  )).rows[0];
+  await notifyAdmins("ATTENDANCE_CORRECTION_REQUESTED", "Attendance correction requested", p.full_name + " requested a correction for " + day + ".", "/admin/attendance");
+  res.status(201).json(x);
 });
 r.post("/attendance/verify", async (req, res) => {
   const p = await me(req.user.id);
@@ -210,6 +266,8 @@ r.post("/attendance/verify", async (req, res) => {
     return res
       .status(409)
       .json({ error: "No active internship allocation for today" });
+  const dayState = await attendanceDayState(p.id);
+  if (dayState.blocked) return res.status(409).json({ error: dayState.message });
   const current = (await q("SELECT check_in,check_out FROM attendance_daily WHERE intern_id=$1 AND day=current_date", [p.id])).rows[0];
   if (eventType === "CHECK_IN" && current?.check_in) return res.status(409).json({ error: "Already checked in today" });
   if (eventType === "CHECK_OUT" && !current?.check_in) return res.status(409).json({ error: "Check in before checking out" });
@@ -218,32 +276,34 @@ r.post("/attendance/verify", async (req, res) => {
   if (verified.unavailable) return res.status(503).json({ error: verified.reason });
   if (verified.rejected) return res.status(422).json({ error: verified.reason });
   const { matchScore, livenessScore, challengePass } = verified;
+  if (!verified.ok) {
+    // Retry first; only an unresolved failure becomes an exception (Blueprint 9.1).
+    await q(
+      "INSERT INTO attendance_events(intern_id,batch_id,event_type,match_score,liveness_pass,liveness_score,challenge_type,challenge_pass,status,failure_reason) VALUES($1,$2,$3,$4,false,$5,$6,$7,'FAILED',$8)",
+      [p.id, alloc.batch_id, eventType, Number(matchScore), Number(livenessScore), challengeType, challengePass, verified.reason],
+    );
+    const failures = (await q("SELECT count(*)::int n FROM attendance_events WHERE intern_id=$1 AND event_type=$2 AND status='FAILED' AND event_time::date=current_date", [p.id, eventType])).rows[0].n;
+    const maxRetries = Number(process.env.ATTENDANCE_MAX_RETRIES || 3);
+    if (failures < maxRetries)
+      return res.status(422).json({ error: "Face match failed. Please retry.", retriesLeft: maxRetries - failures });
+    let ex = (await q("SELECT * FROM attendance_exceptions WHERE intern_id=$1 AND day=current_date AND kind='FAILED_MATCH' AND status='DETECTED' LIMIT 1", [p.id])).rows[0];
+    if (!ex) {
+      ex = (await q(
+        "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold after retries','DETECTED',$2) RETURNING *",
+        [p.id, { eventType, requestedStatus: "PRESENT", attempts: failures, matchScore: Number(matchScore), livenessScore: Number(livenessScore), challengeType, challengePass }],
+      )).rows[0];
+      await notifyAdmins("ATTENDANCE_EXCEPTION", "Attendance exception", p.full_name + " could not be verified after " + failures + " attempts.", "/admin/attendance", "ATT-EX:" + ex.id);
+    }
+    return res.status(422).json({
+      error: "Face match failed. Attendance was not recorded; a correction request was sent to Admin.",
+      exception: ex,
+      retriesLeft: 0,
+    });
+  }
   const dir = path.resolve("uploads/attendance-evidence");
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, p.id + "-" + Date.now() + ".jpg");
-  fs.writeFileSync(file, buf);
-  if (!verified.ok) {
-    const ex = (
-      await q(
-        "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold','DETECTED',$2) RETURNING *",
-        [
-          p.id,
-          {
-            matchScore: Number(matchScore),
-            livenessScore: Number(livenessScore),
-            challengeType,
-            challengePass,
-          },
-        ],
-      )
-    ).rows[0];
-    return res
-      .status(422)
-      .json({
-        error: "Face match failed. Attendance was not recorded.",
-        exception: ex,
-      });
-  }
+  writeSecureFile(file, buf);
   const outcome = await tx(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [p.id + ":attendance:" + new Date().toISOString().slice(0,10)]);
     const today = (await client.query(
@@ -254,11 +314,13 @@ r.post("/attendance/verify", async (req, res) => {
     if (eventType === "CHECK_OUT" && today?.check_out) return { error: "Already checked out today" };
     const daily = eventType === "CHECK_IN"
       ? (await client.query(
-        "INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status) VALUES($1,$2,current_date,now(),'PRESENT') ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status='PRESENT' RETURNING *",
+        `INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status)
+         SELECT $1,b.id,current_date,now(),CASE WHEN (now() AT TIME ZONE b.timezone)::time>b.late_after THEN 'LATE' ELSE 'PRESENT' END FROM batches b WHERE b.id=$2
+         ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status=EXCLUDED.status RETURNING *`,
         [p.id, alloc.batch_id],
       )).rows[0]
       : (await client.query(
-        "UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int,status='PRESENT' WHERE intern_id=$1 AND day=current_date AND check_in IS NOT NULL AND check_out IS NULL RETURNING *",
+        "UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int WHERE intern_id=$1 AND day=current_date AND check_in IS NOT NULL AND check_out IS NULL RETURNING *",
         [p.id],
       )).rows[0];
     if (!daily) throw new Error("Attendance daily record could not be updated");
@@ -363,7 +425,7 @@ r.post("/daily-report", async (req, res) => {
         plannedTasks || null,
         completedTasks || null,
         pendingBlockers || null,
-        proofLinks,
+        JSON.stringify(proofLinks),
         phase,
       ],
     )
@@ -383,7 +445,7 @@ r.post("/leave", async (req, res) => {
       .json({ error: "Leave end date cannot be before start date" });
   const alloc = (
     await q(
-      "SELECT ba.*,b.leave_limit_days FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 AND $2::date BETWEEN ba.intern_start AND ba.intern_end AND $3::date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1",
+      "SELECT ba.*,b.leave_limit_days,b.working_days FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=$1 AND $2::date BETWEEN ba.intern_start AND ba.intern_end AND $3::date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1",
       [p.id, fromDate, toDate],
     )
   ).rows[0];
@@ -393,8 +455,8 @@ r.post("/leave", async (req, res) => {
       .json({ error: "Leave dates must be inside your internship allocation" });
   const days = (
     await q(
-      `SELECT count(*)::int n FROM generate_series($1::date,$2::date,'1 day') d WHERE extract(isodow from d)<6 AND NOT EXISTS(SELECT 1 FROM holidays h WHERE h.batch_id=$3 AND h.day=d::date)`,
-      [fromDate, toDate, alloc.batch_id],
+      `SELECT count(*)::int n FROM generate_series($1::date,$2::date,'1 day') d WHERE $4::jsonb @> to_jsonb(extract(dow from d)::int) AND NOT EXISTS(SELECT 1 FROM holidays h WHERE h.batch_id=$3 AND h.day=d::date)`,
+      [fromDate, toDate, alloc.batch_id, JSON.stringify(alloc.working_days)],
     )
   ).rows[0].n;
   if (!days)
@@ -434,6 +496,8 @@ r.post("/leave", async (req, res) => {
       [p.id, fromDate, toDate, reason.trim(), days],
     )
   ).rows[0];
+  await notifyAdmins("LEAVE_REQUESTED", "Leave requested", p.full_name + " requested leave from " + fromDate + " to " + toDate + ".", "/admin/leave");
+  await notifyGroupMentors(p.id, "LEAVE_REQUESTED", "Leave requested", p.full_name + " requested leave from " + fromDate + " to " + toDate + ".", "/mentor/operations");
   res.status(201).json(x);
 });
 r.get("/tasks/:id/submissions", async (req, res) => {
@@ -441,7 +505,7 @@ r.get("/tasks/:id/submissions", async (req, res) => {
   res.json(
     (
       await q(
-        "SELECT id,content,file_name,mime_type,status,submitted_at,is_late,attempt FROM task_submissions WHERE task_id=$1 AND intern_id=$2 ORDER BY attempt DESC",
+        "SELECT ts.id,ts.content,ts.file_name,ts.mime_type,ts.status,ts.submitted_at,ts.is_late,ts.attempt,ts.mentor_feedback,ts.rework_due_at,te.marks,te.rework_instructions FROM task_submissions ts LEFT JOIN LATERAL(SELECT marks,rework_instructions FROM task_evaluations e WHERE e.submission_id=ts.id ORDER BY e.created_at DESC LIMIT 1) te ON true WHERE ts.task_id=$1 AND ts.intern_id=$2 ORDER BY ts.attempt DESC",
         [req.params.id, p.id],
       )
     ).rows,
@@ -460,8 +524,8 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
   }
   const alloc = (
     await q(
-      "SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) LIMIT 1",
-      [p.id, t.batch_id, t.group_id],
+      "SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) AND ($4::uuid IS NULL OR $4=$5::uuid) LIMIT 1",
+      [p.id, t.batch_id, t.group_id, t.domain_id, p.final_domain_id],
     )
   ).rowCount;
   if (!alloc) {
@@ -476,22 +540,18 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "Invalid submission content" });
   }
   const allowed = t.submission_types || [];
+  const rejectContent = (message) => {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: message });
+  };
   if (content.repositoryUrl && !allowed.includes("REPOSITORY"))
-    return res
-      .status(400)
-      .json({ error: "Repository submission is not enabled for this task" });
+    return rejectContent("Repository submission is not enabled for this task");
   if (content.videoUrl && !allowed.includes("VIDEO"))
-    return res
-      .status(400)
-      .json({ error: "Video link submission is not enabled for this task" });
+    return rejectContent("Video link submission is not enabled for this task");
   if (content.link && !allowed.includes("LINK"))
-    return res
-      .status(400)
-      .json({ error: "Link submission is not enabled for this task" });
+    return rejectContent("Link submission is not enabled for this task");
   if (content.text && !allowed.includes("TEXT"))
-    return res
-      .status(400)
-      .json({ error: "Text submission is not enabled for this task" });
+    return rejectContent("Text submission is not enabled for this task");
   if (
     req.file &&
     !["FILE", "DOCUMENT", "PRESENTATION", "VIDEO"].some((x) =>
@@ -512,9 +572,7 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
       const x = new URL(u);
       if (!["http:", "https:"].includes(x.protocol)) throw 0;
     } catch {
-      return res
-        .status(400)
-        .json({ error: "Submission URLs must be valid http/https links" });
+      return rejectContent("Submission URLs must be valid http/https links");
     }
   }
   if (!req.file && !Object.values(content).some(Boolean))
@@ -557,6 +615,7 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
       ],
     )
   ).rows[0];
+  await notifyGroupMentors(p.id, "TASK_SUBMITTED", "Task submitted", p.full_name + " submitted " + t.title + ".", "/mentor");
   res.status(201).json(x);
 });
 r.get("/assessments", async (req, res) => {
@@ -584,6 +643,8 @@ r.post("/assessments/:id/start", async (req, res) => {
     return res.status(409).json({ error: "Assessment has not opened yet" });
   if (a.window_end && now > new Date(a.window_end))
     return res.status(409).json({ error: "Assessment window has closed" });
+  const active = (await q("SELECT * FROM assessment_attempts WHERE assessment_id=$1 AND intern_id=$2 AND status='IN_PROGRESS' ORDER BY started_at DESC LIMIT 1", [a.id, p.id])).rows[0];
+  if (active) return res.json(active);
   const count = Number(
     (
       await q(
@@ -619,12 +680,7 @@ r.get("/assessments/:id/questions", async (req, res) => {
   );
   if (at.window_end && new Date(at.window_end) < deadline)
     deadline.setTime(new Date(at.window_end).getTime());
-  const sec = (
-    await q(
-      "SELECT * FROM assessment_sections WHERE assessment_id=$1 ORDER BY id",
-      [req.params.id],
-    )
-  ).rows;
+  const sec = await sectionsForIntern(req.params.id, p);
   const ids = sec.flatMap((x) => x.question_ids || []);
   let qs = ids.length
     ? (
@@ -636,14 +692,22 @@ r.get("/assessments/:id/questions", async (req, res) => {
     : [];
   const order = new Map(ids.map((id, i) => [id, i]));
   qs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  if (at.randomize) qs = qs.sort(() => Math.random() - 0.5);
+  if (at.randomize) {
+    qs = shuffled(qs).map((x) => (Array.isArray(x.options) ? { ...x, options: shuffled(x.options) } : x));
+  }
   res.json({
     attemptId: at.id,
     startedAt: at.started_at,
     deadline: deadline.toISOString(),
-    sections: sec,
+    sections: sec.map(({ id, name, domain_id, question_ids }) => ({ id, name, domain_id, question_ids })),
     questions: qs,
   });
+});
+r.post("/assessments/:id/tab-switch", async (req, res) => {
+  const p = await me(req.user.id);
+  const x = (await q("UPDATE assessment_attempts SET tab_switches=tab_switches+1 WHERE assessment_id=$1 AND intern_id=$2 AND status='IN_PROGRESS' RETURNING tab_switches", [req.params.id, p.id])).rows[0];
+  if (!x) return res.status(409).json({ error: "No active assessment attempt" });
+  res.json(x);
 });
 r.post("/assessments/:id/submit", async (req, res) => {
   const p = await me(req.user.id);
@@ -662,7 +726,7 @@ r.post("/assessments/:id/submit", async (req, res) => {
       const deadline = new Date(new Date(at.started_at).getTime() + Number(at.duration_minutes || 60) * 60000);
       if (at.window_end && new Date(at.window_end) < deadline) deadline.setTime(new Date(at.window_end).getTime());
       if (Date.now() > deadline.getTime()) return { error: "Assessment submission deadline has passed", code: 409 };
-      const sections = (await client.query("SELECT question_ids FROM assessment_sections WHERE assessment_id=$1", [req.params.id])).rows;
+      const sections = await sectionsForIntern(req.params.id, p);
       const validIds = new Set(sections.flatMap((section) => section.question_ids || []));
       if (ids.some((id) => !validIds.has(id))) return { error: "Submitted answer contains an invalid question", code: 400 };
       const questions = ids.length ? (await client.query(
@@ -725,7 +789,7 @@ r.get("/reviews", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT fr.* FROM fortnight_reviews fr JOIN group_members gm ON gm.group_id=fr.group_id WHERE gm.intern_id=$1 AND fr.status IN ('CONDUCTED','PUBLISHED') ORDER BY fr.review_date DESC`,
+        `SELECT fr.id,fr.group_id,fr.period_no,fr.review_date,fr.status,fr.progress,fr.domain_review,fr.presentation_review,fr.group_marks,fr.feedback,fr.action_items,fr.next_expectations,fr.published_at,fr.rubric_scores,rim.marks individual_marks,rim.contribution_note FROM fortnight_reviews fr JOIN group_members gm ON gm.group_id=fr.group_id LEFT JOIN review_individual_marks rim ON rim.review_id=fr.id AND rim.intern_id=gm.intern_id WHERE gm.intern_id=$1 AND gm.active AND (fr.status='PUBLISHED' OR fr.status='SCHEDULED') ORDER BY fr.review_date DESC`,
         [p.id],
       )
     ).rows,
@@ -736,7 +800,7 @@ r.get("/offer-letters", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT ol.id,ol.student_name_snapshot,ol.college_snapshot,ol.batch_snapshot,ol.from_date,ol.to_date,ol.duration_text,ol.issue_at,ol.reference_number,ol.status,ol.reason,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ba.intern_id=$1 AND ol.status IN ('ISSUED','REVOKED') ORDER BY ol.created_at DESC`,
+        `SELECT ol.id,ol.student_name_snapshot,ol.college_snapshot,ol.batch_snapshot,ol.from_date,ol.to_date,ol.duration_text,ol.issue_at,ol.reference_number,ol.status,ol.reason,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ba.intern_id=$1 AND ol.status IN ('ISSUED','REISSUED','REVOKED') ORDER BY ol.created_at DESC`,
         [p.id],
       )
     ).rows,
@@ -746,7 +810,7 @@ r.get("/offer-letters/:id/view", async (req, res) => {
   const p = await me(req.user.id);
   const x = (
     await q(
-      `SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status IN ('ISSUED','REVOKED')`,
+      `SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status IN ('ISSUED','REISSUED','REVOKED')`,
       [req.params.id, p.id],
     )
   ).rows[0];
@@ -768,7 +832,7 @@ r.get("/offer-letters/:id/view", async (req, res) => {
 r.get("/offer-letters/:id/pdf", async (req, res) => {
   const p = await me(req.user.id);
   const offer = (await q(
-    "SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status='ISSUED'",
+    "SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1 AND ba.intern_id=$2 AND ol.status IN ('ISSUED','REISSUED')",
     [req.params.id, p.id],
   )).rows[0];
   if (!offer) return res.status(404).json({ error: "Issued offer letter not found" });
@@ -779,7 +843,7 @@ r.get("/completion", async (req, res) => {
   const p = await me(req.user.id);
   const evaluation = (
     await q(
-      "SELECT * FROM final_evaluations WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM final_evaluations WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
       [p.id],
     )
   ).rows[0];
@@ -795,7 +859,9 @@ r.get("/completion", async (req, res) => {
       [p.id],
     )
   ).rows[0];
-  res.json({ evaluation, approval, certificate });
+  const exit = (await q("SELECT type,exit_date,reason FROM exit_records WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1", [p.id])).rows[0];
+  const report = (await q("SELECT id,status,created_at FROM college_completion_reports WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1", [p.id])).rows[0];
+  res.json({ evaluation, approval, certificate, exit, collegeReport: report || null });
 });
 
 r.get("/final-project-submission",async(req,res)=>{

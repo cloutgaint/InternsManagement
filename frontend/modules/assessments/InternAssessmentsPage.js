@@ -48,6 +48,15 @@ export default function InternAssessmentsPage() {
       setBusy(false);
     }
   }
+  // Optional integrity signal (Blueprint 7.1): leaving the tab is logged, never blocked.
+  useEffect(() => {
+    if (!exam?.assessment?.id) return;
+    const report = () => {
+      if (document.hidden) api("/intern/assessments/" + exam.assessment.id + "/tab-switch", { method: "POST", body: "{}" }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", report);
+    return () => document.removeEventListener("visibilitychange", report);
+  }, [exam?.assessment?.id]);
   function setAnswer(q, v) {
     setAnswers((x) => ({ ...x, [q.id]: v }));
   }

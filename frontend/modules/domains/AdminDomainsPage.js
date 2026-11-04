@@ -5,10 +5,15 @@ export default function AdminDomainsPage() {
   const [rows, setRows] = useState([]),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [busy, setBusy] = useState("");
+    [busy, setBusy] = useState(""),
+    [domains, setDomains] = useState([]),
+    [other, setOther] = useState({});
   const load = () =>
-    api("/admin/domain-recommendations")
-      .then(setRows)
+    Promise.all([api("/admin/domain-recommendations"), api("/admin/domains")])
+      .then(([r, d]) => {
+        setRows(r);
+        setDomains(d.filter((x) => x.active));
+      })
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
@@ -29,7 +34,12 @@ export default function AdminDomainsPage() {
     }
   }
   async function confirm(x, d) {
-    if (
+    const top = x.recommendations?.[0]?.domainId;
+    let reason;
+    if (d.domainId !== top) {
+      reason = prompt("Reason for confirming " + d.domainName + " instead of the top recommendation:");
+      if (!reason?.trim()) return;
+    } else if (
       !window.confirm(
         "Confirm " +
           d.domainName +
@@ -47,6 +57,7 @@ export default function AdminDomainsPage() {
           internId: x.intern_id,
           batchId: x.batch_id,
           domainId: d.domainId,
+          reason,
         }),
       });
       setMsg("Final domain confirmed for " + x.full_name + ".");
@@ -85,7 +96,9 @@ export default function AdminDomainsPage() {
                 <span className="status-pill status-verified">
                   CONFIRMED: {x.final_domain_name}
                 </span>
-              ) : (
+              ) : null}
+              {(
+
                 <button
                   className="btn secondary"
                   disabled={busy === x.intern_id}
@@ -117,13 +130,20 @@ export default function AdminDomainsPage() {
                       </small>
                     </div>
                     <strong>{d.recommendationScore}</strong>
-                    {!x.final_domain_id && (
+                    {x.final_domain_id !== d.domainId && (
                       <button className="btn" onClick={() => confirm(x, d)}>
-                        Confirm Domain
+                        {x.final_domain_id ? "Change to This Domain" : "Confirm Domain"}
                       </button>
                     )}
                   </div>
                 ))}
+                <div className="action-row">
+                  <select className="input" aria-label={"Choose a different domain for " + x.full_name} value={other[x.intern_id] || ""} onChange={(e) => setOther((o) => ({ ...o, [x.intern_id]: e.target.value }))}>
+                    <option value="">Assign a different domain…</option>
+                    {domains.filter((d) => d.id !== x.final_domain_id && !x.recommendations.some((r) => r.domainId === d.id)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <button className="btn secondary" disabled={!other[x.intern_id]} onClick={() => confirm(x, { domainId: other[x.intern_id], domainName: domains.find((d) => d.id === other[x.intern_id])?.name })}>Assign</button>
+                </div>
               </div>
             )}
           </div>
@@ -134,7 +154,7 @@ export default function AdminDomainsPage() {
         <span>
           90% of the recommendation score comes from evaluated domain assessment
           performance. Up to 10 points reflect the student's stated domain
-          preference. The system recommends; Admin confirms the final domain.
+          preference. The system recommends; Admin confirms or changes the final domain and records a reason when departing from the recommendation.
         </span>
       </div>
     </main>

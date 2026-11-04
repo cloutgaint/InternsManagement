@@ -20,8 +20,8 @@ test("Phase 6 PostgreSQL performance weights API and calculated dashboard", {ski
   admin=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','ADMIN','ACTIVE',true) RETURNING id",["performance-admin-"+suffix+"@example.test"]);
   const intern=await one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'test','INTERN','ACTIVE',true) RETURNING id",["performance-intern-"+suffix+"@example.test"]);
   const profile=await one("INSERT INTO intern_profiles(user_id,full_name,college_id) VALUES($1,$2,$3) RETURNING id",[intern.id,"Performance Intern "+suffix,college.id]);
-  const batch=await one("INSERT INTO batches(college_id,name,code,start_date,end_date) VALUES($1,'Performance Batch',$2,'2026-01-01','2027-12-31') RETURNING id",[college.id,"P6"+suffix]);
-  await q("INSERT INTO batch_allocations(batch_id,intern_id,status) VALUES($1,$2,'ALLOTMENT_VERIFIED')",[batch.id,profile.id]);
+  const batch=await one("INSERT INTO batches(college_id,name,code,start_date,end_date,working_days) VALUES($1,'Performance Batch',$2,'2026-01-01','2027-12-31','[0,1,2,3,4,5,6]') RETURNING id",[college.id,"P6"+suffix]);
+  await q("INSERT INTO batch_allocations(batch_id,intern_id,status,intern_start,intern_end) VALUES($1,$2,'ALLOTMENT_VERIFIED',current_date,current_date)",[batch.id,profile.id]);
   const weights={attendance:100,tasks:0,reviews:0,final:0};
   const invalid=await request("PUT","/api/admin/performance/weights",{batchId:batch.id,weights:{attendance:99,tasks:0,reviews:0,final:0}});
   assert.equal(invalid.status,400);

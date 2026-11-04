@@ -4,6 +4,7 @@ import { api } from "@/shared/api/client";
 import Link from "next/link";
 const challenges = ["TURN_LEFT", "TURN_RIGHT"];
 export default function InternAttendancePage() {
+  const [correction, setCorrection] = useState({ day: "", requestedStatus: "PRESENT", reason: "" });
   const video = useRef(null),
     canvas = useRef(null),
     stream = useRef(null),
@@ -138,6 +139,19 @@ export default function InternAttendancePage() {
       load();
     }
   }
+  async function requestCorrection(e) {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+    try {
+      await api("/intern/attendance/correction", { method: "POST", body: JSON.stringify(correction) });
+      setMsg("Correction request sent for approval.");
+      setCorrection({ day: "", requestedStatus: "PRESENT", reason: "" });
+      load();
+    } catch (x) {
+      setErr(x.message);
+    }
+  }
   const instruction = {
     TURN_LEFT: "Turn your head to the left",
     TURN_RIGHT: "Turn your head to the right",
@@ -168,7 +182,9 @@ export default function InternAttendancePage() {
             <p className="muted">
               {st?.face?.status === "PENDING_ADMIN_APPROVAL"
                 ? "Your face registration is awaiting Admin approval. Attendance will be available after approval."
-                : "Register your face before using camera attendance. Admin approval is required."}
+                : st?.face?.status === "REENROLLMENT_REQUIRED" || st?.face?.status === "REJECTED"
+                  ? "Please register again" + (st.face.decision_reason ? ". Admin note: " + st.face.decision_reason : ".")
+                  : "Register your face before using camera attendance. Admin approval is required."}
             </p>
           </div>
           <Link href="/intern/face-enrollment" className="btn secondary">
@@ -227,7 +243,7 @@ export default function InternAttendancePage() {
           {err && <p className="error">{err}</p>}
           <div className="att-actions">
             {(phase === "READY" || phase === "DONE") && !dayComplete && (
-              <button className="btn" disabled={!approved} onClick={start}>
+              <button className="btn" disabled={!approved || st?.dayState?.blocked} onClick={start}>
                 {eventType === "CHECK_IN" ? "Start check-in" : "Start check-out"}
               </button>
             )}
@@ -246,9 +262,46 @@ export default function InternAttendancePage() {
           </ul>
         </div>
       </section>
+      {st?.dayState?.blocked && <p className="proof-alert" role="status">{st.dayState.message}</p>}
+      {st?.summary && (
+        <section className="card">
+          <h2>Attendance Summary{st.allocation?.batch_name ? " · " + st.allocation.batch_name : ""}</h2>
+          <div className="att-stats">
+            <div className="card"><small>Attendance</small><strong>{st.summary.attendance_percent}%</strong></div>
+            <div className="card"><small>Present / Late</small><strong>{st.summary.present_days} / {st.summary.late_days}</strong></div>
+            <div className="card"><small>Absent</small><strong>{st.summary.absent_days}</strong></div>
+            <div className="card"><small>On leave / Holiday</small><strong>{st.summary.leave_days} / {st.summary.holiday_days}</strong></div>
+          </div>
+          <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted.</p>
+          <div>
+            {(st.history || []).slice(0, 14).map((x) => (
+              <div className="status-row" key={x.day}>
+                <span>{x.day}{x.holiday_name ? " · " + x.holiday_name : ""}{x.source === "MANUAL" ? " · corrected" : ""}</span>
+                <span className="status-pill">{String(x.status).replace("_", " ")}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="card">
+        <h2>Request a Correction</h2>
+        <p className="muted">If a camera or matching problem cost you attendance, ask for it to be reviewed. Corrections need approval and are recorded.</p>
+        <form className="form-grid" onSubmit={requestCorrection}>
+          <div className="form-field"><label htmlFor="correction-day">Date</label><input id="correction-day" className="input" type="date" required value={correction.day} onChange={(e) => setCorrection((x) => ({ ...x, day: e.target.value }))} /></div>
+          <div className="form-field"><label htmlFor="correction-status">Mark as</label><select id="correction-status" className="input" value={correction.requestedStatus} onChange={(e) => setCorrection((x) => ({ ...x, requestedStatus: e.target.value }))}><option value="PRESENT">Present</option><option value="LATE">Late</option></select></div>
+          <div className="form-field" style={{ gridColumn: "1 / -1" }}><label htmlFor="correction-reason">Reason</label><textarea id="correction-reason" className="input" required value={correction.reason} onChange={(e) => setCorrection((x) => ({ ...x, reason: e.target.value }))} /></div>
+          <div className="form-actions"><button className="btn secondary">Send Request</button></div>
+        </form>
+        {(st?.exceptions || []).map((x) => (
+          <div className="status-row" key={x.id}>
+            <span><b>{x.day}</b> · {x.kind === "FAILED_MATCH" ? "Failed face match" : "Correction request"}<br /><small>{x.decision_reason || x.reason}</small></span>
+            <span className="status-pill">{x.status}</span>
+          </div>
+        ))}
+      </section>
       <p className="att-privacy muted">
         Your captures are compared with your approved face registration and kept as attendance evidence. If
-        verification fails, attendance is not recorded and an Admin can review the attempt.
+        verification fails you can retry; repeated failures create an exception for an Admin to review.
       </p>
     </main>
   );

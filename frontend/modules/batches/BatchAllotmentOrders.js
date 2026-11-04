@@ -8,6 +8,8 @@ export default function BatchAllotmentOrders({ batches }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [linking, setLinking] = useState({});
+  const [linked, setLinked] = useState({});
   async function load() { try { setOrders(await api("/admin/batch-allotment-orders")); } catch (e) { setError(e.message); } }
   useEffect(() => { load(); }, []);
   async function upload(e) {
@@ -36,6 +38,20 @@ export default function BatchAllotmentOrders({ batches }) {
       await load();
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
+  async function linkStudents(order) {
+    const rollNumbers = String(linking[order.id] || "").split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+    if (!rollNumbers.length) return setError("Paste the roll numbers listed on this order.");
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const r = await api("/admin/batch-allotment-orders/" + order.id + "/students", { method: "POST", body: JSON.stringify({ rollNumbers }) });
+      setMessage(r.linked + " roll number(s) linked; " + r.registered + " already registered. Others are covered automatically when they register.");
+      setLinking((x) => ({ ...x, [order.id]: "" }));
+      await showStudents(order);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+  async function showStudents(order) {
+    try { const rows = await api("/admin/batch-allotment-orders/" + order.id + "/students"); setLinked((x) => ({ ...x, [order.id]: rows })); } catch (err) { setError(err.message); }
+  }
   async function download(order) {
     try {
       const blob = await apiBlob("/admin/batch-allotment-orders/" + order.id + "/file");
@@ -48,7 +64,7 @@ export default function BatchAllotmentOrders({ batches }) {
   }
   return <section className="card workflow-section">
     <h2>Batch Allotment Orders</h2>
-    <p className="muted">Upload a college-issued allotment order and verify it before using it as supporting batch evidence.</p>
+    <p className="muted">Upload one college-issued order, verify it, then link the listed roll numbers. Linked students do not need to upload an individual proof.</p>
     {error && <p className="error">{error}</p>}{message && <p className="success">{message}</p>}
     <form className="form-grid" onSubmit={upload}>
       <div className="form-field"><label>Batch</label><select className="input" required value={form.batchId} onChange={e => setForm(x => ({...x,batchId:e.target.value}))}><option value="">Select batch</option>{batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
@@ -63,6 +79,11 @@ export default function BatchAllotmentOrders({ batches }) {
     {orders.length ? orders.map(o => <div className="workflow-row" key={o.id}>
       <div><b>{o.reference_number}</b><div className="muted">{o.batch_name} · {String(o.approved_from).slice(0,10)} to {String(o.approved_to).slice(0,10)}</div><span className="status-pill">{o.status}</span>{o.verification_reason && <p className="muted">{o.verification_reason}</p>}</div>
       <div className="action-row"><button className="btn secondary" type="button" onClick={() => download(o)}>Download</button>{o.status === "UPLOADED" && <><button className="btn" disabled={busy} type="button" onClick={() => review(o,"VERIFIED")}>Verify</button><button className="btn danger" disabled={busy} type="button" onClick={() => review(o,"REJECTED")}>Reject</button></>}</div>
+      {o.status === "VERIFIED" && <div style={{ width: "100%" }}>
+        <div className="form-field"><label htmlFor={"order-rolls-" + o.id}>Roll numbers on this order (comma or line separated)</label><textarea id={"order-rolls-" + o.id} className="input" rows={2} value={linking[o.id] || ""} onChange={e => setLinking(x => ({ ...x, [o.id]: e.target.value }))}/></div>
+        <div className="action-row"><button className="btn" type="button" disabled={busy} onClick={() => linkStudents(o)}>Link Students</button><button className="btn secondary" type="button" onClick={() => showStudents(o)}>View Linked Students</button></div>
+        {linked[o.id] && <p className="muted">{linked[o.id].length ? linked[o.id].map(x => x.roll_number + (x.full_name ? " (" + x.full_name + ")" : " (not registered)")).join(", ") : "No students linked yet."}</p>}
+      </div>}
     </div>) : <p className="muted">No batch allotment orders uploaded yet.</p>}
   </section>;
 }

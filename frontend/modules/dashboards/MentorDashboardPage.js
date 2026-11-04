@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/shared/api/client";
+import { api, apiBlob } from "@/shared/api/client";
 export default function MentorDashboardPage() {
   const [d, setD] = useState(null),
     [msg, setMsg] = useState(""),
@@ -61,7 +61,9 @@ export default function MentorDashboardPage() {
       setMsg(
         x.decision === "REWORK_REQUIRED"
           ? "Rework requested."
-          : "Task approved.",
+          : x.decision === "REJECTED"
+            ? "Task rejected."
+            : "Task approved.",
       );
       setTaskEval(null);
       load();
@@ -285,6 +287,11 @@ export default function MentorDashboardPage() {
                 taskEval.content?.link ||
                 "Submission evidence attached."}
             </p>
+            {taskEval.file_name && (
+              <button type="button" className="btn secondary" onClick={() => apiBlob("/mentor/submissions/" + taskEval.id + "/file").then((b) => { const u = URL.createObjectURL(b), a = document.createElement("a"); a.href = u; a.download = taskEval.file_name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 10000); })}>
+                Download {taskEval.file_name}
+              </button>
+            )}
             {(taskEval.rubric_criteria || []).length ? (
               <div className="rubric-eval">
                 <h3>{taskEval.rubric_name}</h3>
@@ -347,6 +354,7 @@ export default function MentorDashboardPage() {
               >
                 <option value="APPROVED">Approve</option>
                 <option value="REWORK_REQUIRED">Request Rework</option>
+                <option value="REJECTED">Reject</option>
               </select>
             </label>
             {taskEval.decision === "REWORK_REQUIRED" && (

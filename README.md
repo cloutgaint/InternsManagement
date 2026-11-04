@@ -69,3 +69,13 @@ The migration creates the full lifecycle model: users/roles, intern profiles, co
 The source document itself leaves several items to decide before final development, especially the selected **face matching/liveness technology and devices**, biometric retry/fallback/retention policy, exact domain/rubric weights, completion authority, certificate template/mode, offer-letter template/signatory/numbering, retention policies, and optional AI provider. These are not safely inventable. The application includes the workflow/data contracts around them; production activation requires GAINT to set those choices.
 
 See `REQUIREMENTS_CHECKLIST.md` for traceability.
+
+## Production settings
+
+Before going live set `FILE_ENCRYPTION_KEY` (uploads fail without it in production), `SMTP_*` (applicants without login access only hear about decisions by email), and optionally `CLAMAV_HOST` and the retention periods. `.env.example` documents each one.
+
+Run the full test suite against a disposable database whose name contains `intern_test`:
+
+```bash
+RUN_DB_E2E=1 DATABASE_URL=postgresql://.../intern_test npm test
+```

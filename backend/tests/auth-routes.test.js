@@ -14,6 +14,12 @@ test("auth module preserves the public endpoint surface", () => {
   assert.deepEqual(routeSurface, [
     "GET /colleges",
     "POST /register",
+    "POST /application-status",
+    "POST /application-correction",
+    "POST /proof-reupload",
+    "POST /password/forgot",
+    "POST /password/reset",
+    "POST /password/change",
     "POST /login",
     "POST /mfa/setup",
     "POST /mfa/verify",

@@ -1,4 +1,5 @@
 "use client";
+import ProofStatusCard from "@/modules/interns/ProofStatusCard";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
 
@@ -213,7 +214,7 @@ export default function InternDashboardPage() {
                   >
                     View / Print
                   </button>
-                  {x.status === "ISSUED" && (
+                  {["ISSUED", "REISSUED"].includes(x.status) && (
                     <button className="btn secondary" onClick={() => downloadOffer(x)}>
                       Download PDF
                     </button>
@@ -227,6 +228,7 @@ export default function InternDashboardPage() {
             </p>
           )}
         </section>
+        <ProofStatusCard />
         <section className="card intern-pane intern-pane-work">
           <h2>Attendance</h2>
           <div className="form-actions">
@@ -314,9 +316,11 @@ export default function InternDashboardPage() {
             reviews.map((x) => (
               <div className="status-row" key={x.id}>
                 <span>
-                  Review {x.period_no}: {x.feedback || "Published"}
+                  Review {x.period_no} ({String(x.review_date).slice(0, 10)}): {x.status === "SCHEDULED" ? "Scheduled" : x.feedback || "Published"}
+                  {x.action_items ? <><br /><small>Action items: {x.action_items}</small></> : null}
+                  {x.contribution_note ? <><br /><small>Your contribution: {x.contribution_note}</small></> : null}
                 </span>
-                <b>{x.group_marks ?? "—"}</b>
+                <b>{x.status === "SCHEDULED" ? "—" : "Group " + (x.group_marks ?? "—") + " · You " + (x.individual_marks ?? "—")}</b>
               </div>
             ))
           ) : (

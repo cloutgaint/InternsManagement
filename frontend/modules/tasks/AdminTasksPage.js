@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+import TaskTemplates from "./TaskTemplates";
 const types = [
   "TEXT",
   "LINK",
@@ -48,6 +49,31 @@ export default function AdminTasksPage() {
   useEffect(() => {
     load();
   }, []);
+  async function control(t, action) {
+    setErr("");
+    setMsg("");
+    try {
+      await api("/admin/tasks/" + t.id + "/" + action, { method: "POST", body: "{}" });
+      setMsg(action === "publish" ? "Task published." : "Task " + action + "d.");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function reschedule(t) {
+    const value = prompt("New release date and time (YYYY-MM-DD HH:MM):");
+    if (!value) return;
+    const releaseAt = new Date(value.replace(" ", "T"));
+    if (Number.isNaN(releaseAt.getTime())) return setErr("Enter the release time as YYYY-MM-DD HH:MM.");
+    setErr("");
+    try {
+      await api("/admin/tasks/" + t.id, { method: "PATCH", body: JSON.stringify({ releaseAt: releaseAt.toISOString() }) });
+      setMsg("Task rescheduled.");
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
   function toggle(t) {
     setF((x) => ({
       ...x,
@@ -236,6 +262,7 @@ export default function AdminTasksPage() {
           <button className="btn">Schedule Weekly Task</button>
         </form>
       </section>
+      <TaskTemplates domains={domains} />
       <section className="card">
         <h2>Task Release Queue</h2>
         {tasks.map((t) => (
@@ -252,6 +279,12 @@ export default function AdminTasksPage() {
               <small>{(t.submission_types || []).join(", ")}</small>
             </span>
             <span className="status-pill">{t.status}</span>
+            <div className="action-row">
+              {t.status === "SCHEDULED" && <button type="button" className="btn secondary" onClick={() => control(t, "pause")}>Pause</button>}
+              {t.status === "PAUSED" && <button type="button" className="btn secondary" onClick={() => control(t, "resume")}>Resume</button>}
+              {["SCHEDULED", "PAUSED"].includes(t.status) && <button type="button" className="btn secondary" onClick={() => reschedule(t)}>Reschedule</button>}
+              {["SCHEDULED", "PAUSED"].includes(t.status) && <button type="button" className="btn" onClick={() => control(t, "publish")}>Publish Now</button>}
+            </div>
           </div>
         ))}
       </section>

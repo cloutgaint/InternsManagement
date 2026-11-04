@@ -19,7 +19,7 @@ export default function LoginPage() {
   function finish(d) {
     sessionStorage.setItem("token", d.token);
     sessionStorage.setItem("role", d.user.role);
-    location.href = d.user.role.includes("ADMIN")
+    location.href = d.user.mustChangePassword ? "/account/password?required=1" : d.user.role.includes("ADMIN")
       ? "/admin"
       : d.user.role === "COLLEGE_COORDINATOR" ? "/college-coordinator"
       : d.user.role === "MENTOR"
@@ -134,7 +134,7 @@ export default function LoginPage() {
             <button className="btn auth-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign in"}
             </button>
-            <p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link> · College coordinator? <Link href="/login?role=college">Coordinator Login</Link></>}</p>
+            <p className="auth-login-switch"><Link href="/forgot-password">Forgot password?</Link>{!adminMode&&!collegeMode&&<> · <Link href="/application-status">Check application status</Link></>}</p><p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link> · College coordinator? <Link href="/login?role=college">Coordinator Login</Link></>}</p>
           </form>
         ) : (
           <form onSubmit={verify}>

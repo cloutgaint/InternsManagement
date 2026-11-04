@@ -52,8 +52,8 @@ export async function createCollegeCoordinator(client, c) {
 
 export async function createCollegeProof(client, p) {
   return (await run(client)(
-    "INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,coordinator_id,file_path,file_hash,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'UPLOADED') RETURNING id,status",
-    [p.internId,p.proofType,p.issuingAuthority,p.referenceNumber,p.issueDate,p.approvedFrom,p.approvedTo,p.coordinatorId,p.filePaths,p.fileHash],
+    "INSERT INTO college_proofs(intern_id,proof_type,issuing_authority,reference_number,issue_date,approved_from,approved_to,coordinator_id,file_path,file_hash,status,file_names,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'UPLOADED',$11,$12) RETURNING id,status",
+    [p.internId,p.proofType,p.issuingAuthority,p.referenceNumber,p.issueDate,p.approvedFrom,p.approvedTo,p.coordinatorId,p.filePaths,p.fileHash,p.fileNames||"[]",p.version||1],
   )).rows[0];
 }
 
@@ -75,7 +75,7 @@ export async function enableMfa(userId) {
 
 export async function findPublicUserById(userId) {
   return (await q(
-    "SELECT id,email,role,status,is_active FROM users WHERE id=$1",
+    "SELECT id,email,role,status,is_active,must_change_password FROM users WHERE id=$1",
     [userId],
   )).rows[0];
 }

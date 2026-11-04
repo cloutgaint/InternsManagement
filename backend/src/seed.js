@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { q, pool } from "./common/database/index.js";
 const pw = await bcrypt.hash("ChangeMe123!", 12);
 await q(
-  `INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,$2,'SUPER_ADMIN','ACTIVE',true) ON CONFLICT(email) DO NOTHING`,
+  `INSERT INTO users(email,password_hash,role,status,is_active,must_change_password) SELECT $1,$2,'SUPER_ADMIN','ACTIVE',true,true WHERE NOT EXISTS(SELECT 1 FROM users WHERE lower(btrim(email))=$1 AND status<>'DELETED')`,
   ["admin@gaintclout.com", pw],
 );
 for (const [name, code, cat] of [

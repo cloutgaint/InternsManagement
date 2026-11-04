@@ -9,7 +9,7 @@ export async function createNotification({
   eventKey,
 }) {
   await q(
-    "INSERT INTO notifications(user_id,type,title,body,action_url,event_key) VALUES($1,$2,$3,$4,$5,$6)",
+    "INSERT INTO notifications(user_id,type,title,body,action_url,event_key) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING",
     [userId, type, title, body, actionUrl, eventKey],
   );
 }

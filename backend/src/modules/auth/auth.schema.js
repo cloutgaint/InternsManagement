@@ -16,11 +16,13 @@ export const registrationSchema = z.object({
   yearSemester: z.string().min(1), rollNumber: z.string().min(1),
   preferredDomains: z.string().default("[]"), preferredBatch: z.string().optional(),
   modePreference: z.string().optional(), skillsTools: z.string().optional(),
-  resumePortfolioUrl: z.string().optional(), proofType: z.string().min(1),
-  issuingAuthority: z.string().min(1), referenceNumber: z.string().min(1),
-  issueDate: z.string().min(1), approvedFrom: z.string().min(1),
-  approvedTo: z.string().min(1), coordinatorName: z.string().min(1),
-  coordinatorDesignation: z.string().min(1), coordinatorEmail: z.string().email(),
-  coordinatorPhone: z.string().min(1), consentGenuine: z.enum(["true"]),
+  resumePortfolioUrl: z.string().optional(), proofType: z.string().optional(),
+  issuingAuthority: z.string().optional(), referenceNumber: z.string().optional(),
+  issueDate: z.string().optional(), approvedFrom: z.string().optional(),
+  approvedTo: z.string().optional(), coordinatorName: z.string().optional(),
+  coordinatorDesignation: z.string().optional(), coordinatorEmail: z.string().email().optional().or(z.literal("")),
+  coordinatorPhone: z.string().optional(), consentGenuine: z.enum(["true"]),
   consentStorage: z.enum(["true"]),
 });
+
+export const passwordSchema = registrationSchema.shape.password;

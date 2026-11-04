@@ -22,6 +22,12 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/gaint_interns
       JWT_SECRET: change-me-in-production
+      FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       PORT: 8000
       FRONTEND_URL: http://localhost:3000
     ports:

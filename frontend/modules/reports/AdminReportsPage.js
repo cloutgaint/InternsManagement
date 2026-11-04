@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import OperationsReport from "./OperationsReport";
 export default function AdminReportsPage() {
   const [rows, setRows] = useState([]),
     [q, setQ] = useState(""),
@@ -51,6 +52,27 @@ export default function AdminReportsPage() {
       setErr(e.message);
     }
   }
+  async function emailReport(x) {
+    const email = prompt("Send to faculty coordinator email (blank uses the coordinator on file):");
+    if (email === null) return;
+    try {
+      const r = await api("/admin/reports/completion/" + x.completion_report_id + "/email", { method: "POST", body: JSON.stringify({ email: email.trim() || undefined }) });
+      setMsg("Report emailed to " + r.to + ".");
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function pdf() {
+    try {
+      const u = URL.createObjectURL(await apiBlob("/admin/reports/export.pdf")), a = document.createElement("a");
+      a.href = u;
+      a.download = "GAINT-Intern-Report.pdf";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
   async function csv() {
     try {
       const b = await apiBlob("/admin/reports/export.csv"),
@@ -74,9 +96,14 @@ export default function AdminReportsPage() {
             export.
           </p>
         </div>
-        <button className="btn" onClick={csv}>
-          Export CSV
-        </button>
+        <div className="action-row">
+          <button className="btn" onClick={csv}>
+            Export CSV (Excel)
+          </button>
+          <button className="btn secondary" onClick={pdf}>
+            Export PDF
+          </button>
+        </div>
       </div>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
@@ -119,12 +146,17 @@ export default function AdminReportsPage() {
             </span>
             <span>
               {x.completion_report_id ? (
-                <button
-                  className="btn secondary"
-                  onClick={() => dl(x.completion_report_id, x.full_name)}
-                >
-                  Download PDF
-                </button>
+                <>
+                  <button
+                    className="btn secondary"
+                    onClick={() => dl(x.completion_report_id, x.full_name)}
+                  >
+                    Download PDF
+                  </button>
+                  <button className="btn secondary" onClick={() => emailReport(x)}>
+                    Email Coordinator
+                  </button>
+                </>
               ) : (
                 <button
                   className="btn"
@@ -138,6 +170,8 @@ export default function AdminReportsPage() {
           </div>
         ))}
       </section>
+    <h2>Operational Reports</h2>
+      <OperationsReport />
     </main>
   );
 }

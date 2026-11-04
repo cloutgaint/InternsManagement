@@ -17,7 +17,11 @@ export default function AdminVerificationPage() {
     [reason, setReason] = useState(""),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [role, setRole] = useState("");
+  useEffect(() => {
+    setRole(sessionStorage.getItem("role") || "");
+  }, []);
   async function removeStudent(p) {
     if (!window.confirm(`Remove student "${p.full_name}" (${p.email}) from active records? The student will lose login access. Historical records will be retained.`)) return;
     setBusy(true);setErr("");setMsg("");
@@ -48,9 +52,9 @@ export default function AdminVerificationPage() {
     setErr("");
     setMsg("");
   }
-  async function view(id) {
+  async function view(id, index = 0) {
     try {
-      const b = await apiBlob("/admin/proofs/" + id + "/file");
+      const b = await apiBlob("/admin/proofs/" + id + "/file?index=" + index);
       const u = URL.createObjectURL(b);
       window.open(u, "_blank");
       setTimeout(() => URL.revokeObjectURL(u), 60000);
@@ -87,6 +91,35 @@ export default function AdminVerificationPage() {
             ? "Re-upload requested with reason recorded."
             : "Proof rejected with reason recorded.",
       );
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function accountDecision(p, route, done) {
+    if (!reason.trim()) return setErr("Enter a reason in the Admin Note first.");
+    try {
+      setBusy(true);
+      setErr("");
+      await api("/admin/interns/" + p.user_id + "/" + route, { method: "POST", body: JSON.stringify({ reason: reason.trim() }) });
+      setMsg(done);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function override(p) {
+    if (!reason.trim()) return setErr("Enter the override reason in the Admin Note first.");
+    const dueDate = prompt("Optional: date the student must submit the proof by (YYYY-MM-DD). Leave blank for none.") || undefined;
+    try {
+      setBusy(true);
+      setErr("");
+      await api("/admin/interns/" + p.user_id + "/approve", { method: "POST", body: JSON.stringify({ overrideReason: reason.trim(), dueDate }) });
+      setMsg("Override recorded in the audit trail and account activated.");
       await load();
     } catch (e) {
       setErr(e.message);
@@ -178,17 +211,24 @@ export default function AdminVerificationPage() {
                   </p>
                 </div>
                 <button type="button" className="btn danger" disabled={busy} onClick={() => removeStudent(selected)}>Delete Student</button>
-                <button
-                  className="btn secondary"
-                  onClick={() => view(selected.id)}
-                >
-                  View Uploaded Proof
-                </button>
+                {(Array.isArray(selected.file_names) && selected.file_names.length > 1 ? selected.file_names : [null]).map((name, i) => (
+                  <button
+                    key={i}
+                    className="btn secondary"
+                    onClick={() => view(selected.id, i)}
+                  >
+                    {name ? "View " + name : "View Uploaded Proof"}
+                  </button>
+                ))}
               </div>
               <div className="detail-grid proof-meta">
                 <div>
                   <b>College</b>
                   <span>{selected.college_name || "—"}</span>
+                </div>
+                <div>
+                  <b>Account Status</b>
+                  <span>{String(selected.account_status || "—").replaceAll("_", " ")}{selected.account_status_reason ? " · " + selected.account_status_reason : ""}</span>
                 </div>
                 <div>
                   <b>University</b>
@@ -206,7 +246,7 @@ export default function AdminVerificationPage() {
                 </div>
                 <div>
                   <b>Proof Type</b>
-                  <span>{selected.proof_type}</span>
+                  <span>{selected.proof_type}{selected.batch_order_id ? " (covers this student)" : ""} · Version {selected.version}</span>
                 </div>
                 <div>
                   <b>Reference Number</b>
@@ -326,7 +366,7 @@ export default function AdminVerificationPage() {
                 >
                   Reject Proof
                 </button>
-                {selected.status === "VERIFIED" && !selected.is_active && (
+                {["VERIFIED", "OVERRIDE"].includes(selected.status) && !selected.is_active && (
                   <button
                     className="btn secondary"
                     disabled={busy}
@@ -334,6 +374,21 @@ export default function AdminVerificationPage() {
                   >
                     Approve Account
                   </button>
+                )}
+                {!selected.is_active && (
+                  <>
+                    <button className="btn secondary" disabled={busy} onClick={() => accountDecision(selected, "request-correction", "Correction requested from the student.")}>
+                      Request Correction
+                    </button>
+                    <button className="btn danger" disabled={busy} onClick={() => accountDecision(selected, "reject", "Application rejected.")}>
+                      Reject Application
+                    </button>
+                    {role === "SUPER_ADMIN" && !["VERIFIED", "OVERRIDE"].includes(selected.status) && (
+                      <button className="btn warning" disabled={busy} onClick={() => override(selected)}>
+                        Super Admin Override &amp; Approve
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </>

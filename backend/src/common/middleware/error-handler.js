@@ -1,5 +1,5 @@
 export function errorHandler(err, req, res, next) {
-  console.error(err);
+  if (!err?.status) console.error(err);
 
   if (err?.name === "MulterError") {
     if (err.code === "LIMIT_FILE_SIZE") {
@@ -22,6 +22,14 @@ export function errorHandler(err, req, res, next) {
     }
     return res.status(400).json({ error: `Upload failed: ${err.message}` });
   }
+
+  // Malformed ids/dates and missing references are client errors, not server faults.
+  if (err?.code === "22P02" || err?.code === "22007" || err?.code === "22008")
+    return res.status(400).json({ error: "Invalid identifier or date in request" });
+  if (err?.code === "23503")
+    return res.status(400).json({ error: "A referenced record does not exist" });
+  if (err?.code === "23505")
+    return res.status(409).json({ error: "This record already exists" });
 
   res
     .status(err.status || 500)

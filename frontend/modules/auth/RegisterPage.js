@@ -73,6 +73,7 @@ export default function RegisterPage() {
     }),
     [files, setFiles] = useState([]),
     [photo, setPhoto] = useState(null),
+    [covered, setCovered] = useState(false),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [resumeError,setResumeError] = useState(""),
@@ -91,6 +92,8 @@ export default function RegisterPage() {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   async function submit(e) {
     e.preventDefault();
+    // React clears currentTarget once the handler awaits.
+    const form = e.currentTarget;
     setErr("");
     setResumeError("");
     setMsg("");
@@ -106,7 +109,7 @@ export default function RegisterPage() {
         throw new Error("Enter a valid student email address.");
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw new Error("Enter a valid 10-digit Indian mobile number.");
-      let validResumeLink=false;
+      let validResumeLink=!f.resumePortfolioUrl.trim();
       try{const url=new URL(f.resumePortfolioUrl.trim());validResumeLink=url.protocol==="https:"&&!!url.hostname;}catch{}
       if (!validResumeLink) {
         setResumeError("Enter a valid HTTPS link to your resume or portfolio.");
@@ -146,21 +149,17 @@ export default function RegisterPage() {
         throw new Error("Internship end date cannot be before the start date.");
       if (f.issueDate && new Date(f.issueDate) > today)
         throw new Error("Proof issue date cannot be in the future.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.coordinatorEmail.trim()))
+      if (!covered && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.coordinatorEmail.trim()))
         throw new Error("Enter a valid faculty coordinator email.");
-      if (!/^\d{10}$/.test(coordPhone))
+      if (!covered && !/^\d{10}$/.test(coordPhone))
         throw new Error(
           "Enter a valid 10-digit faculty coordinator phone number.",
         );
-      if (!photo)
-        throw new Error(
-          "Student photo is required. Please upload a JPG or PNG photo.",
-        );
-      if (!["image/jpeg", "image/png"].includes(photo.type))
+      if (photo && !["image/jpeg", "image/png"].includes(photo.type))
         throw new Error("Student photo must be JPG or PNG.");
-      if (photo.size > 5 * 1024 * 1024)
+      if (photo && photo.size > 5 * 1024 * 1024)
         throw new Error("Student photo must be 5 MB or smaller.");
-      if (!files.length)
+      if (!covered && !files.length)
         throw new Error("Please upload the college permission proof.");
       if (files.length > 2)
         throw new Error("Maximum 2 proof files are allowed.");
@@ -176,10 +175,10 @@ export default function RegisterPage() {
       const body = new FormData();
       Object.entries(f).forEach(([k, v]) => body.append(k, String(v)));
       body.set("preferredDomains", JSON.stringify(prefs));
-      files.forEach((x) => body.append("proofFiles", x));
+      if (!covered) files.forEach((x) => body.append("proofFiles", x));
       if (photo) body.append("photo", photo);
       await api("/auth/register", { method: "POST", body });
-      e.currentTarget.reset();
+      form.reset();
       setF(x=>Object.fromEntries(Object.entries(x).map(([key,value])=>[key,typeof value==="boolean"?false:""])));
       setFiles([]);setPhoto(null);setCollegeChoice("");setShowPassword(false);
       await router.replace("/login?registered=1");
@@ -261,13 +260,12 @@ export default function RegisterPage() {
               />
             </div>
             <div className="form-field">
-              <label>Student Photo (required)</label>
+              <label>Student Photo (optional)</label>
               <input
                 className="input"
                 type="file"
                 accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-                required
               />
               <span className="muted">JPG or PNG, maximum 5 MB.</span>
             </div>
@@ -433,11 +431,10 @@ export default function RegisterPage() {
               />
             </div>
             <div className="form-field">
-              <label htmlFor="resume-drive-link">Resume or Portfolio Link *</label>
+              <label htmlFor="resume-drive-link">Resume or Portfolio Link (optional)</label>
               <input
                 className="input"
                 type="url"
-                required
                 id="resume-drive-link"
                 ref={resumeRef}
                 aria-invalid={!!resumeError}
@@ -450,6 +447,13 @@ export default function RegisterPage() {
             </div>
           </div>
           <h3 className="form-section-title">College Permission Proof</h3>
+          <div className="consent-box">
+            <label>
+              <input type="checkbox" checked={covered} onChange={(e) => setCovered(e.target.checked)} />{" "}
+              My college issued one allotment order for our batch and GAINT has my roll number on it. I do not need to upload an individual proof.
+            </label>
+          </div>
+          {!covered && <>
           <div className="form-grid">
             <div className="form-field">
               <label>Proof Type</label>
@@ -579,6 +583,7 @@ export default function RegisterPage() {
               />
             </div>
           </div>
+          </>}
           <div className="form-grid form-grid-final">
             <div className="form-field">
               <label>Password</label>

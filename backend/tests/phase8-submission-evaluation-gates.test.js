@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const mentor=readFileSync(new URL("../src/routes/mentor.js",import.meta.url),"utf8");
 const intern=readFileSync(new URL("../src/routes/intern.js",import.meta.url),"utf8");
-const admin=readFileSync(new URL("../src/routes/admin.js",import.meta.url),"utf8");
+const admin=readFileSync(new URL("../src/routes/adminWorkflow.js",import.meta.url),"utf8");
 test("submission acceptance is a prerequisite to final evaluation",()=>{
  const route=mentor.slice(mentor.indexOf('r.post("/final-evaluations"'),mentor.indexOf('r.get("/final-project-submissions"'));
  assert.match(route,/final_project_submissions WHERE group_id=\$1 AND status='ACCEPTED'/);

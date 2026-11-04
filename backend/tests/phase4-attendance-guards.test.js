@@ -10,10 +10,9 @@ test("face enrollment review only transitions pending enrollments", () => {
   assert.match(route, /Enrollment decision changed/);
 });
 test("attendance exception decisions require reason and pending status", () => {
-  const route = admin.split('r.post("/attendance-exceptions/:id/decision"')[1]?.split('r.get("/proofs/:id/file"')[0];
-  assert.ok(route);
+  const route = fs.readFileSync(new URL("../src/services/attendanceService.js", import.meta.url), "utf8");
   assert.match(route, /\["APPROVED", "REJECTED"\]/);
   assert.match(route, /String\(reason \|\| ""\)\.trim\(\)/);
-  assert.match(route, /AND status IN \('DETECTED','REQUESTED'\) RETURNING/);
+  assert.match(route, /\["DETECTED", "REQUESTED"\]/);
   assert.match(route, /ATTENDANCE_EXCEPTION_/);
 });

@@ -18,9 +18,10 @@ test("assessment submission guards duplicate and unassigned questions", () => {
   assert.match(submit, /at\.status !== "IN_PROGRESS"/);
 });
 test("Admin domain confirmation updates decision and profile atomically", () => {
-  const confirm = admin.split('r.post("/domain-confirm"')[1]?.split('r.post("/groups/:id/approve"')[0];
+  const confirm = admin.split('r.post("/domain-confirm"')[1]?.split('r.get("/leave-requests"')[0];
   assert.ok(confirm);
   assert.match(confirm, /await tx\(async \(client\) =>/);
-  assert.match(confirm, /confirmed_domain_id IS NULL/);
+  assert.match(confirm, /already confirmed/);
+  assert.match(confirm, /differs from the top recommendation/);
   assert.match(confirm, /UPDATE intern_profiles SET final_domain_id/);
 });

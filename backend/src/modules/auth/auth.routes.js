@@ -13,6 +13,12 @@ router.post(
   ]),
   controller.register,
 );
+router.post("/application-status", controller.applicationStatus);
+router.post("/application-correction", controller.submitCorrection);
+router.post("/proof-reupload", registrationUpload.fields([{ name: "proofFiles", maxCount: 2 }]), controller.reuploadProof);
+router.post("/password/forgot", controller.forgotPassword);
+router.post("/password/reset", controller.resetPassword);
+router.post("/password/change", auth, controller.changePassword);
 router.post("/login", controller.login);
 router.post("/mfa/setup", controller.setupMfa);
 router.post("/mfa/verify", controller.verifyMfa);
