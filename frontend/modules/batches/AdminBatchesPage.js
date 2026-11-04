@@ -18,6 +18,7 @@ export default function AdminBatchesPage() {
       mode: "ONSITE",
     }),
     [pick, setPick] = useState(null),
+    [early, setEarly] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false);
@@ -87,6 +88,15 @@ export default function AdminBatchesPage() {
       internEnd: b?.end_date?.slice(0, 10) || "",
       overrideReason: "",
     }));
+  }
+  async function submitEarlyEnd(e) {
+    e.preventDefault();setErr("");setMsg("");
+    try{
+      setBusy(true);
+      await api("/admin/allocations/"+early.id+"/early-end",{method:"POST",body:JSON.stringify({endDate:early.endDate,reason:early.reason})});
+      setMsg("Early end date recorded. Complete the final evaluation and approval workflow separately.");
+      setEarly(null);await load();
+    }catch(e){setErr(e.message);}finally{setBusy(false);}
   }
   async function allocate(e) {
     e.preventDefault();
@@ -220,8 +230,7 @@ export default function AdminBatchesPage() {
       <section className="card workflow-section">
         <h2>Intern Allotment</h2>
         <p className="muted">
-          Only students with a verified college proof can be allotted. Dates are
-          checked again by the backend.
+          GAINT Admin controls internship dates. Batch dates are applied automatically. College-approved periods are checked by the backend.
         </p>
         {interns.map((i) => {
           const a = allocations.find((x) => x.intern_id === i.id);
@@ -249,16 +258,12 @@ export default function AdminBatchesPage() {
                   </div>
                 )}
               </div>
-              <button
-                className="btn secondary"
-                onClick={() => startAllocation(i)}
-              >
-                {a ? "Review / Change Duration" : "Allot Internship"}
-              </button>
+              <div className="action-row"><button className="btn secondary" onClick={()=>startAllocation(i)}>{a?"Review Allotment":"Allot Internship"}</button>{a&&<button className="btn secondary" onClick={()=>setEarly({id:a.id,name:i.full_name,startDate:String(a.intern_start).slice(0,10),currentEnd:String(a.intern_end).slice(0,10),endDate:String(a.intern_end).slice(0,10),reason:""})}>Early End</button>}</div>
             </div>
           );
         })}
       </section>
+      {early&&<div className="modal-backdrop" onMouseDown={()=>setEarly(null)}><section className="modal-card" onMouseDown={e=>e.stopPropagation()}><h2>End Internship Early</h2><p className="muted">{early.name} · Current end: {early.currentEnd}</p><p className="muted">This changes the scheduled end date only. It does not bypass final assessment, completion approval or certificate requirements.</p><form onSubmit={submitEarlyEnd}><div className="form-field"><label>Revised End Date</label><input className="input" type="date" required min={early.startDate} max={early.currentEnd} value={early.endDate} onChange={e=>setEarly(x=>({...x,endDate:e.target.value}))}/></div><div className="form-field"><label>Reason for Early End</label><textarea className="input" required minLength={10} value={early.reason} onChange={e=>setEarly(x=>({...x,reason:e.target.value}))}/></div><div className="form-actions action-row"><button type="button" className="btn secondary" onClick={()=>setEarly(null)}>Cancel</button><button className="btn" disabled={busy}>Save Early End</button></div></form></section></div>}
       {pick && (
         <div className="modal-backdrop" onMouseDown={() => setPick(null)}>
           <section
@@ -307,9 +312,7 @@ export default function AdminBatchesPage() {
                     className="input"
                     type="date"
                     value={pick.internStart}
-                    onChange={(e) =>
-                      setPick((x) => ({ ...x, internStart: e.target.value }))
-                    }
+                    readOnly
                     required
                   />
                 </div>
@@ -320,9 +323,7 @@ export default function AdminBatchesPage() {
                     type="date"
                     min={pick.internStart}
                     value={pick.internEnd}
-                    onChange={(e) =>
-                      setPick((x) => ({ ...x, internEnd: e.target.value }))
-                    }
+                    readOnly
                     required
                   />
                 </div>
@@ -330,10 +331,7 @@ export default function AdminBatchesPage() {
               <div className="proof-alert">
                 <b>Verification rule</b>
                 <span>
-                  The selected dates must be inside both the batch period and
-                  the verified college permission period. If the college period
-                  does not cover the dates, an Admin override reason is
-                  mandatory and will be audited.
+                  Internship dates are set by GAINT Admin when creating the batch. Students cannot edit them. If the college permission period differs, Super Admin must provide an audited override.
                 </span>
               </div>
               <div className="form-field">
