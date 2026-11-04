@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 import { tx, q } from "../../common/database/index.js";
 import * as repository from "./auth.repository.js";
 
-const privileged = (role) => ["ADMIN", "SUPER_ADMIN", "MENTOR"].includes(role);
+const privileged = (role) => ["ADMIN", "SUPER_ADMIN", "MENTOR", "COLLEGE_COORDINATOR"].includes(role);
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
 const sign = (user) => jwt.sign(
   { id: user.id, email: user.email, role: user.role, mfa: true },
