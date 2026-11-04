@@ -9,6 +9,7 @@ export default function AdminAttendancePage() {
     [reason, setReason] = useState({}),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("face"),
     [images,setImages] = useState({}),
     [preview,setPreview] = useState(null);
   const [filters, setFilters] = useState({ batchId: "", status: "", from: "", to: "" }),
@@ -32,7 +33,7 @@ export default function AdminAttendancePage() {
     load();
   }, [filters]);
   useEffect(()=>{let cancelled=false;const urls=[];Promise.all(faces.map(async x=>{try{const blob=await apiBlob("/admin/face-enrollments/"+x.id+"/image");const url=URL.createObjectURL(blob);urls.push(url);if(!cancelled)setImages(prev=>({...prev,[x.id]:url}));}catch{}}));return()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};},[faces]);
-  async function face(x, status) {
+  async function face(x, status) {setFeedbackArea("face");
     try {
       await api("/admin/face-enrollments/" + x.id + "/decision", {
         method: "POST",
@@ -44,7 +45,7 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
-  async function requireReenrollment(x) {
+  async function requireReenrollment(x) {setFeedbackArea("requireReenrollment");
     if (!String(reason[x.id] || "").trim()) return setErr("Enter a reason for re-enrollment.");
     try {
       setErr("");
@@ -55,7 +56,7 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
-  async function deleteFace(x) {
+  async function deleteFace(x) {setFeedbackArea("deleteFace");
     if(!window.confirm("Remove this face registration? The student may need to register again. Attendance history will be preserved."))return;
     try{
       setErr("");await api("/admin/face-enrollments/"+x.id,{method:"DELETE"});
@@ -63,7 +64,7 @@ export default function AdminAttendancePage() {
       setMsg("Face registration removed.");await load();
     }catch(e){setErr(e.message);}
   }
-  async function exception(x, status) {
+  async function exception(x, status) {setFeedbackArea("exception");
     try {
       await api("/admin/attendance-exceptions/" + x.id + "/decision", {
         method: "POST",
@@ -86,8 +87,6 @@ export default function AdminAttendancePage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <div className="tab-row">
         <button
           className={tab === "faces" ? "btn" : "btn secondary"}
@@ -116,7 +115,7 @@ export default function AdminAttendancePage() {
         </button>
       </div>
       {tab === "faces" && (
-        <section className="card workflow-section">
+        <section className="card workflow-section">{["face","requireReenrollment","deleteFace"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {faces.map((x) => (
             <div className="face-admin-row" key={x.id}>
               <div className="face-admin-image">{images[x.id]?<img src={images[x.id]} alt={"Face enrollment of "+x.full_name}/>:<div className="face-admin-photo-fallback" role="img" aria-label="Enrollment image unavailable">Photo unavailable</div>}<button type="button" className="btn secondary" disabled={!images[x.id]} onClick={()=>setPreview({name:x.full_name,url:images[x.id]})}>View Image</button></div>
@@ -206,7 +205,7 @@ export default function AdminAttendancePage() {
         </section>
       )}
       {tab === "exceptions" && (
-        <section className="card workflow-section">
+        <section className="card workflow-section">{["exception"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {exceptions.map((x) => (
             <div className="workflow-row" key={x.id}>
               <div>
