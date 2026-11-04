@@ -21,7 +21,8 @@ export default function AdminProjectsPage() {
     [editId, setEditId] = useState(""),
     [choice, setChoice] = useState({}),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("save");
   const load = () =>
     Promise.all([
       api("/admin/projects"),
@@ -53,7 +54,7 @@ export default function AdminProjectsPage() {
       milestones: x.milestones.map((m, n) => (n === i ? { ...m, [k]: v } : m)),
     }));
   }
-  async function save(e) {
+  async function save(e) {setFeedbackArea("save");
     e.preventDefault();
     try {
       const path = editId ? "/admin/projects/" + editId : "/admin/projects";
@@ -86,7 +87,7 @@ export default function AdminProjectsPage() {
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  async function assign(g) {
+  async function assign(g) {setFeedbackArea("assign");
     const projectId = choice[g.id];
     if (!projectId) return;
     try {
@@ -111,10 +112,8 @@ export default function AdminProjectsPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
-        <h2>{editId ? "Edit Project" : "Create Project"}</h2>
+        <h2>{editId ? "Edit Project" : "Create Project"}</h2>{["save"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={save}>
           <div className="form-grid">
             <div className="form-field">
@@ -307,7 +306,7 @@ export default function AdminProjectsPage() {
         ))}
       </section>
       <section className="card workflow-section">
-        <h2>Project Assignment</h2>
+        <h2>Project Assignment</h2>{["assign"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {groups.map((g) => {
           const current = assignments.find(
             (a) => a.group_id === g.id && a.status === "ASSIGNED",
