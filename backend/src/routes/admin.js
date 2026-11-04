@@ -2388,6 +2388,15 @@ r.post("/questions/:id/status", async (req, res) => {
   await audit(req, "QUESTION_STATUS", "question_bank", x.id, before, x);
   res.json(x);
 });
+r.delete("/questions/:id", async (req, res) => {
+  const before = (await q("SELECT * FROM question_bank WHERE id=$1", [req.params.id])).rows[0];
+  if (!before) return res.status(404).json({ error: "Question not found" });
+  const used = (await q(`SELECT EXISTS(SELECT 1 FROM assessment_answers WHERE question_id=$1) OR EXISTS(SELECT 1 FROM assessment_sections WHERE question_ids ? $2) AS referenced`, [req.params.id, req.params.id])).rows[0]?.referenced;
+  if (used) return res.status(409).json({ error: "This question is used in an assessment. Deactivate it instead to preserve assessment history." });
+  await q("DELETE FROM question_bank WHERE id=$1", [req.params.id]);
+  await audit(req, "QUESTION_DELETE", "question_bank", before.id, before, null);
+  res.json({ deleted: true, id: before.id });
+});
 r.get("/rubrics", async (req, res) =>
   res.json(
     (
