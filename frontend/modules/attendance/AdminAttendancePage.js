@@ -39,6 +39,14 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
+  async function deleteFace(x) {
+    if(!window.confirm("Remove this face registration? The student may need to register again. Attendance history will be preserved."))return;
+    try{
+      setErr("");await api("/admin/face-enrollments/"+x.id,{method:"DELETE"});
+      setPreview(null);setImages(prev=>{const next={...prev};delete next[x.id];return next;});
+      setMsg("Face registration removed.");await load();
+    }catch(e){setErr(e.message);}
+  }
   async function exception(x, status) {
     try {
       await api("/admin/attendance-exceptions/" + x.id + "/decision", {
@@ -104,6 +112,7 @@ export default function AdminAttendancePage() {
                 </p>
                 {x.decision_reason && <p>{x.decision_reason}</p>}
               </div>
+              <button type="button" className="btn secondary" onClick={()=>deleteFace(x)}>Delete Record</button>
               {x.status === "PENDING_ADMIN_APPROVAL" && (
                 <div className="face-admin-actions">
                   <input

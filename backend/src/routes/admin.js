@@ -951,20 +951,28 @@ r.get("/face-enrollments", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT fe.*,ip.full_name,ip.roll_number,u.email,b.name batch_name FROM face_enrollments fe JOIN intern_profiles ip ON ip.id=fe.intern_id JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT b.name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=ip.id ORDER BY ba.intern_start DESC LIMIT 1)b ON true ORDER BY CASE fe.status WHEN 'PENDING_ADMIN_APPROVAL' THEN 0 ELSE 1 END,fe.created_at DESC`,
+        `SELECT fe.*,ip.full_name,ip.roll_number,u.email,b.name batch_name FROM face_enrollments fe JOIN intern_profiles ip ON ip.id=fe.intern_id JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT b.name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id WHERE ba.intern_id=ip.id ORDER BY ba.intern_start DESC LIMIT 1)b ON true WHERE fe.status<>'DELETED' ORDER BY CASE fe.status WHEN 'PENDING_ADMIN_APPROVAL' THEN 0 ELSE 1 END,fe.created_at DESC`,
       )
     ).rows,
   ),
 );
 r.get("/face-enrollments/:id/image", async (req, res) => {
   const x = (
-    await q("SELECT raw_image_path FROM face_enrollments WHERE id=$1", [
+    await q("SELECT raw_image_path FROM face_enrollments WHERE id=$1 AND status<>'DELETED'", [
       req.params.id,
     ])
   ).rows[0];
   if (!x?.raw_image_path || !fs.existsSync(path.resolve(x.raw_image_path)))
     return res.status(404).json({ error: "Enrollment image not found" });
   res.sendFile(path.resolve(x.raw_image_path));
+});
+r.delete("/face-enrollments/:id", async (req, res) => {
+  const before=(await q("SELECT * FROM face_enrollments WHERE id=$1 AND status<>'DELETED'",[req.params.id])).rows[0];
+  if(!before)return res.status(404).json({error:"Face enrollment not found"});
+  const x=(await q("UPDATE face_enrollments SET status='DELETED',decision_reason='Removed by administrator',approved_at=NULL WHERE id=$1 AND status<>'DELETED' RETURNING *",[req.params.id])).rows[0];
+  if(!x)return res.status(409).json({error:"Enrollment changed; reload"});
+  await audit(req,"FACE_ENROLLMENT_DELETED","face_enrollment",x.id,before,{status:"DELETED"});
+  res.json({ok:true});
 });
 r.post("/face-enrollments/:id/decision", async (req, res) => {
   const { status, reason } = req.body;

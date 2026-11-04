@@ -50,7 +50,7 @@ r.get("/dashboard", async (req, res) => {
       [p.id],
     ),
     q(
-      "SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
       [p.id],
     ),
     q(
@@ -125,7 +125,7 @@ r.post("/face-enrollment", async (req, res) => {
       .json({ error: "A camera-captured JPEG/PNG image is required" });
   const latest = (
     await q(
-      "SELECT * FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
       [p.id],
     )
   ).rows[0];
@@ -166,7 +166,7 @@ r.get("/attendance/status", async (req, res) => {
   const p = await me(req.user.id);
   const face = (
     await q(
-      "SELECT id,status,decision_reason,approved_at FROM face_enrollments WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT id,status,decision_reason,approved_at FROM face_enrollments WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
       [p.id],
     )
   ).rows[0];
@@ -182,7 +182,7 @@ r.post("/attendance/verify", async (req, res) => {
   const p = await me(req.user.id);
   const f = (
     await q(
-      "SELECT * FROM face_enrollments WHERE intern_id=$1 AND status='APPROVED' ORDER BY approved_at DESC LIMIT 1",
+      "SELECT * FROM face_enrollments WHERE intern_id=$1 AND status='APPROVED' AND id=(SELECT id FROM face_enrollments WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1)",
       [p.id],
     )
   ).rows[0];
@@ -779,7 +779,7 @@ r.get("/completion", async (req, res) => {
   const p = await me(req.user.id);
   const evaluation = (
     await q(
-      "SELECT * FROM final_evaluations WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM final_evaluations WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
       [p.id],
     )
   ).rows[0];
@@ -791,7 +791,7 @@ r.get("/completion", async (req, res) => {
   ).rows[0];
   const certificate = (
     await q(
-      "SELECT * FROM certificates WHERE intern_id=$1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM certificates WHERE intern_id=$1 AND status<>'DELETED' ORDER BY created_at DESC LIMIT 1",
       [p.id],
     )
   ).rows[0];
