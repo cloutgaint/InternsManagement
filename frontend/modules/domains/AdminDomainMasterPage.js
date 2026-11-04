@@ -96,10 +96,8 @@ export default function AdminDomainMasterPage() {
         </div>
         <span className="badge">{domains.length} domains</span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
-        <h2>Create Domain</h2>
+        <h2>Create Domain</h2>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
         <form className="form-grid" onSubmit={create}>
           <div className="form-field">
             <label>Name</label>
