@@ -30,7 +30,8 @@ export default function AdminTasksPage() {
       marks: 100,
     }),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("save");
   const load = () =>
     Promise.all([
       api("/admin/tasks"),
@@ -49,7 +50,7 @@ export default function AdminTasksPage() {
   useEffect(() => {
     load();
   }, []);
-  async function control(t, action) {
+  async function control(t, action) {setFeedbackArea("control");
     setErr("");
     setMsg("");
     try {
@@ -60,7 +61,7 @@ export default function AdminTasksPage() {
       setErr(e.message);
     }
   }
-  async function reschedule(t) {
+  async function reschedule(t) {setFeedbackArea("reschedule");
     const value = prompt("New release date and time (YYYY-MM-DD HH:MM):");
     if (!value) return;
     const releaseAt = new Date(value.replace(" ", "T"));
@@ -82,7 +83,7 @@ export default function AdminTasksPage() {
         : [...x.submissionTypes, t],
     }));
   }
-  async function save(e) {
+  async function save(e) {setFeedbackArea("save");
     e.preventDefault();
     try {
       await api("/admin/tasks", { method: "POST", body: JSON.stringify(f) });
@@ -114,9 +115,7 @@ export default function AdminTasksPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
-      <section className="card">
+      <section className="card">{["save"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={save}>
           <div className="form-grid">
             <label>
@@ -264,7 +263,7 @@ export default function AdminTasksPage() {
       </section>
       <TaskTemplates domains={domains} />
       <section className="card">
-        <h2>Task Release Queue</h2>
+        <h2>Task Release Queue</h2>{["control","reschedule"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {tasks.map((t) => (
           <div className="status-row" key={t.id}>
             <span>
