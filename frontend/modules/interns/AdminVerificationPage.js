@@ -158,11 +158,9 @@ export default function AdminVerificationPage() {
         </div>
         <span className="badge">{pending.length} pending</span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <div className="verification-layout">
         <section className="card">
-          <h2>Verification Queue</h2>
+          <h2>Verification Queue</h2>{!selected&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {!rows.length ? (
             <p className="muted">No proof submissions found.</p>
           ) : (
@@ -205,7 +203,7 @@ export default function AdminVerificationPage() {
             <>
               <div className="verification-title">
                 <div>
-                  <h2>{selected.full_name}</h2>
+                  <h2>{selected.full_name}</h2><>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>
                   <p className="muted">
                     {selected.email} · {selected.mobile || "No mobile"}
                   </p>
