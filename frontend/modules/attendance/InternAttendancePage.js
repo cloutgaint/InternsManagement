@@ -46,6 +46,7 @@ export default function InternAttendancePage() {
       return setErr("Allow camera permission to continue.");
     }
     setErr("");
+    setMsg("");
     setPhase("STARTING");
     try {
       // The baseline must be a real frame showing the student facing forward,
@@ -138,106 +139,117 @@ export default function InternAttendancePage() {
     }
   }
   const instruction = {
-    TURN_LEFT: "Turn your head to the LEFT",
-    TURN_RIGHT: "Turn your head to the RIGHT",
-    BLINK: "Blink your eyes",
-    SMILE: "Smile naturally",
+    TURN_LEFT: "Turn your head to the left",
+    TURN_RIGHT: "Turn your head to the right",
   }[challenge];
+  const approved = st?.face?.status === "APPROVED";
+  const dayComplete = Boolean(st?.today?.check_in && st?.today?.check_out);
+  const cameraOn = ["STARTING", "CHALLENGE", "VERIFYING"].includes(phase);
+  const step = phase === "STARTING" ? 1 : phase === "CHALLENGE" ? 2 : phase === "VERIFYING" ? 3 : 0;
+  const time = (v) => (v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—");
+  const minutes = st?.today?.working_minutes || 0;
   return (
-    <main className="wrap">
+    <main className="wrap att-page">
       <div className="intern-head">
         <div>
           <h1>Camera Attendance</h1>
           <p className="muted">
-            Attendance is recorded only after approved enrollment, a live
-            challenge and biometric face matching.
+            {new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <span className="status-pill">
-          {st?.face?.status || "NO FACE ENROLLMENT"}
+        <span className={"status-pill " + (approved ? "status-verified" : "")}>
+          {approved ? "FACE APPROVED" : (st?.face?.status || "NO FACE ENROLLMENT").replaceAll("_", " ")}
         </span>
       </div>
-      {st?.face?.status !== "APPROVED" && <section className="card" style={{marginBottom:16}}><h2>Face Registration Required</h2><p className="muted">{st?.face?.status==="PENDING_ADMIN_APPROVAL"?"Your face registration is awaiting Admin approval. Attendance will be available after approval.":"Register your face before using camera attendance. Admin approval is required."}</p><Link href="/intern/face-enrollment" className="btn secondary">{st?.face?.status==="PENDING_ADMIN_APPROVAL"?"View Face Registration":"Register Face"}</Link></section>}
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
+      {st && !approved && (
+        <section className="card att-register">
+          <div>
+            <h2>Face registration required</h2>
+            <p className="muted">
+              {st?.face?.status === "PENDING_ADMIN_APPROVAL"
+                ? "Your face registration is awaiting Admin approval. Attendance will be available after approval."
+                : "Register your face before using camera attendance. Admin approval is required."}
+            </p>
+          </div>
+          <Link href="/intern/face-enrollment" className="btn secondary">
+            {st?.face?.status === "PENDING_ADMIN_APPROVAL" ? "View Face Registration" : "Register Face"}
+          </Link>
+        </section>
+      )}
+      <div className="att-stats">
+        <div className="card">
+          <small>Check in</small>
+          <strong>{time(st?.today?.check_in)}</strong>
+        </div>
+        <div className="card">
+          <small>Check out</small>
+          <strong>{time(st?.today?.check_out)}</strong>
+        </div>
+        <div className="card">
+          <small>Working time</small>
+          <strong>{Math.floor(minutes / 60)}h {minutes % 60}m</strong>
+        </div>
+      </div>
       <section className="card attendance-camera">
-        <div className="camera-stage">
-          <video ref={video} className="face-video" playsInline muted />
+        <div className={"camera-stage" + (cameraOn ? " live" : "")}>
+          <video ref={video} className="face-video att-video" playsInline muted />
           <canvas ref={canvas} hidden />
+          {!cameraOn && (
+            <div className="att-placeholder">
+              <svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true">
+                <path fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.3l1.4-2h5.6l1.4 2h1.3A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z M12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
+              </svg>
+              <span>{phase === "DONE" ? "Attendance recorded" : dayComplete ? "You're done for today" : "Camera is off"}</span>
+            </div>
+          )}
+          {cameraOn && <div className="att-oval" aria-hidden="true" />}
+          {phase === "STARTING" && <div className="att-banner">Looking for your face…</div>}
+          {phase === "VERIFYING" && <div className="att-banner">Verifying your face…</div>}
           {phase === "CHALLENGE" && (
             <div className="liveness-challenge">
               <small>LIVE CHALLENGE</small>
               <strong>{instruction}</strong>
-              <span>Complete the action naturally, then press Verify.</span>
+              <span>Hold the turned position, then press Verify.</span>
             </div>
           )}
         </div>
         <div className="attendance-side">
-          <h2>{eventType === "CHECK_IN" ? "Check In" : "Check Out"}</h2>
-          {st?.today ? (
-            <div className="detail-grid">
-              <div>
-                <b>Check in</b>
-                <span>
-                  {st.today.check_in
-                    ? new Date(st.today.check_in).toLocaleTimeString()
-                    : "—"}
-                </span>
-              </div>
-              <div>
-                <b>Check out</b>
-                <span>
-                  {st.today.check_out
-                    ? new Date(st.today.check_out).toLocaleTimeString()
-                    : "—"}
-                </span>
-              </div>
-              <div>
-                <b>Working time</b>
-                <span>{st.today.working_minutes || 0} minutes</span>
-              </div>
-            </div>
-          ) : (
-            <p className="muted">No attendance recorded today.</p>
-          )}
-          <div className="form-actions">
-            {phase === "READY" && (
-              <button
-                className="btn"
-                disabled={st?.face?.status !== "APPROVED"}
-                onClick={start}
-              >
-                Start Camera Verification
+          <h2>{dayComplete ? "Attendance complete" : eventType === "CHECK_IN" ? "Check in" : "Check out"}</h2>
+          <ol className="att-steps">
+            {["Start the camera and face it directly", "Follow the on-screen head turn", "Press Verify to record attendance"].map((label, i) => (
+              <li key={label} className={step === i + 1 ? "active" : step > i + 1 ? "done" : ""}>
+                <span>{i + 1}</span>
+                {label}
+              </li>
+            ))}
+          </ol>
+          {msg && <p className="success">{msg}</p>}
+          {err && <p className="error">{err}</p>}
+          <div className="att-actions">
+            {(phase === "READY" || phase === "DONE") && !dayComplete && (
+              <button className="btn" disabled={!approved} onClick={start}>
+                {eventType === "CHECK_IN" ? "Start check-in" : "Start check-out"}
               </button>
             )}
-            {phase === "CHALLENGE" && (
-              <button className="btn" onClick={verify}>
-                I Completed It — Verify Face
-              </button>
-            )}
-            {phase === "STARTING" && (
-              <button className="btn" disabled>
-                Detecting face…
-              </button>
-            )}
-            {(phase === "STARTING" || phase === "CHALLENGE" || phase === "VERIFYING") && <button type="button" className="btn secondary" onClick={stopCamera}>Stop Camera</button>}
-            {phase === "VERIFYING" && (
-              <button className="btn" disabled>
-                Verifying…
+            {phase === "STARTING" && <button className="btn" disabled>Detecting face…</button>}
+            {phase === "CHALLENGE" && <button className="btn" onClick={verify}>Verify face</button>}
+            {phase === "VERIFYING" && <button className="btn" disabled>Verifying…</button>}
+            {cameraOn && (
+              <button type="button" className="btn secondary" onClick={stopCamera}>
+                Stop camera
               </button>
             )}
           </div>
+          <ul className="att-tips muted">
+            <li>Use good, even lighting and keep your face inside the oval.</li>
+            <li>Only you should be in the frame. Remove masks or dark glasses.</li>
+          </ul>
         </div>
       </section>
-      <div className="proof-alert">
-        <b>Anti-spoof protection</b>
-        <span>
-          A random action challenge is required, but the challenge and face
-          similarity must be validated by the configured biometric/liveness
-          engine. The application does not fabricate a successful biometric
-          result.
-        </span>
-      </div>
+      <p className="att-privacy muted">
+        Your captures are compared with your approved face registration and kept as attendance evidence. If
+        verification fails, attendance is not recorded and an Admin can review the attempt.
+      </p>
     </main>
   );
 }
