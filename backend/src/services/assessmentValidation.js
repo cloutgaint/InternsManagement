@@ -9,6 +9,18 @@ export function questionSelectionError(sections, eligibleIds = null) {
   if (new Set(ids).size !== ids.length)
     return "A question cannot appear in multiple sections of the same assessment";
   if (eligibleIds && ids.some((id) => !eligibleIds.has(id)))
-    return "Every assessment question must be approved and active before publishing";
+    return "Every Initial Assessment question must be an approved, active single-answer MCQ with four options";
   return null;
+}
+
+export function summarizeAssessmentAttempt(sectionResults, status) {
+  const rows = Array.isArray(sectionResults) ? sectionResults : [];
+  const earned = rows.reduce((sum, section) => sum + Number(section.earned || 0), 0);
+  const possible = rows.reduce((sum, section) => sum + Number(section.possible || 0), 0);
+  return {
+    earned,
+    possible,
+    percentage: possible ? Number(((earned / possible) * 100).toFixed(2)) : 0,
+    passed: status === "EVALUATED" ? Boolean(rows.length) && rows.every((section) => section.passed) : null,
+  };
 }

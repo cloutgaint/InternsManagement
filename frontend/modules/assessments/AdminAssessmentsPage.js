@@ -17,7 +17,6 @@ const fresh = () => ({
       domainId: "",
       passScore: 50,
       questionIds: [],
-      rubricId: "",
     },
   ],
 });
@@ -33,26 +32,7 @@ export default function AdminAssessmentsPage() {
     [err, setErr] = useState(""),
     [feedbackArea,setFeedbackArea]=useState("create"),
     [sectionErrors, setSectionErrors] = useState({}),
-    [busy, setBusy] = useState(false),
-    [rubrics, setRubrics] = useState([]),
-    [rubric, setRubric] = useState({
-      name: "",
-      domainId: "",
-      criteria: [
-        {
-          name: "Technical Accuracy",
-          maxMarks: 10,
-          weight: 50,
-          kind: "DOMAIN",
-        },
-        {
-          name: "Clarity & Reasoning",
-          maxMarks: 10,
-          weight: 50,
-          kind: "COMMUNICATION",
-        },
-      ],
-    });
+    [busy, setBusy] = useState(false);
   const load = () =>
     Promise.all([
       api("/admin/batches"),
@@ -60,15 +40,13 @@ export default function AdminAssessmentsPage() {
       api("/admin/domains"),
       api("/admin/assessments"),
       api("/admin/assessment-submissions"),
-      api("/admin/rubrics"),
     ])
-      .then(([b, q, d, a, s, r]) => {
+      .then(([b, q, d, a, s]) => {
         setBatches(b);
         setQuestions(q);
         setDomains(d);
         setAssessments(a);
         setSubs(s);
-        setRubrics(r);
       })
       .catch((e) => setErr(e.message));
   useEffect(() => {
@@ -85,7 +63,7 @@ export default function AdminAssessmentsPage() {
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
     const emptySections = form.sections.reduce((out, section, index) => (!section.questionIds.length ? { ...out, [index]: "Add at least one eligible question to this section." } : out), {});
     if(Object.keys(emptySections).length){setSectionErrors(emptySections);return;}
-    const ineligibleSections = form.sections.reduce((out, section, index) => section.questionIds.some((id) => questions.find((question) => question.id === id)?.status !== "ACTIVE") ? { ...out, [index]: "Every selected question must be approved and active." } : out, {});
+    const ineligibleSections = form.sections.reduce((out, section, index) => section.questionIds.some((id) => { const question = questions.find((row) => row.id === id); return question?.status !== "ACTIVE" || question?.type !== "MCQ"; }) ? { ...out, [index]: "Every selected question must be an approved, active MCQ." } : out, {});
     if(Object.keys(ineligibleSections).length){setSectionErrors(ineligibleSections);return;}
     const selected=form.sections.flatMap(x=>x.questionIds);
     if(new Set(selected).size!==selected.length){
@@ -157,132 +135,11 @@ export default function AdminAssessmentsPage() {
         <div>
           <h1>Assessments</h1>
           <p className="muted">
-            Create timed assessments from approved Question Bank questions and
-            review written answers.
+            Create timed, automatically scored assessments from approved MCQs.
           </p>
         </div>
         <span className="badge">{assessments.length} assessments</span>
       </div>
-      <section className="card workflow-section">
-        <h2>Scoring Rubrics</h2>{feedbackArea==="rubric"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-        <p className="muted">
-          Create reusable weighted criteria for descriptive assessment answers.
-          Criterion weights must total 100%.
-        </p>
-        <div className="form-grid">
-          <div className="form-field">
-            <label>Rubric Name</label>
-            <input
-              className="input"
-              value={rubric.name}
-              onChange={(e) =>
-                setRubric((x) => ({ ...x, name: e.target.value }))
-              }
-            />
-          </div>
-          <div className="form-field">
-            <label>Domain</label>
-            <select
-              className="input"
-              value={rubric.domainId}
-              onChange={(e) =>
-                setRubric((x) => ({ ...x, domainId: e.target.value }))
-              }
-            >
-              <option value="">Common</option>
-              {domains.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        {rubric.criteria.map((c, i) => (
-          <div className="rubric-row" key={i}>
-            <input
-              className="input"
-              value={c.name}
-              onChange={(e) =>
-                setRubric((x) => ({
-                  ...x,
-                  criteria: x.criteria.map((v, n) =>
-                    n === i ? { ...v, name: e.target.value } : v,
-                  ),
-                }))
-              }
-            />
-            <input
-              className="input"
-              type="number"
-              min="1"
-              value={c.maxMarks}
-              onChange={(e) =>
-                setRubric((x) => ({
-                  ...x,
-                  criteria: x.criteria.map((v, n) =>
-                    n === i ? { ...v, maxMarks: Number(e.target.value) } : v,
-                  ),
-                }))
-              }
-            />
-            <input
-              className="input"
-              type="number"
-              min="1"
-              max="100"
-              value={c.weight}
-              onChange={(e) =>
-                setRubric((x) => ({
-                  ...x,
-                  criteria: x.criteria.map((v, n) =>
-                    n === i ? { ...v, weight: Number(e.target.value) } : v,
-                  ),
-                }))
-              }
-            />
-          </div>
-        ))}
-        <div className="action-row">
-          <button
-            className="btn secondary"
-            onClick={() =>
-              setRubric((x) => ({
-                ...x,
-                criteria: [
-                  ...x.criteria,
-                  {
-                    name: "New Criterion",
-                    maxMarks: 10,
-                    weight: 0,
-                    kind: "DOMAIN",
-                  },
-                ],
-              }))
-            }
-          >
-            + Criterion
-          </button>
-          <button
-            className="btn"
-            onClick={async () => {
-              try {
-                setFeedbackArea("rubric");setErr("");setMsg("");
-                await api("/admin/rubrics", {
-                  method: "POST",
-                  body: JSON.stringify(rubric),
-                });
-                setMsg("Scoring rubric created.");
-                load();
-              } catch (e) {
-                setErr(e.message);
-              }
-            }}
-          >
-            Save Rubric
-          </button>
-        </div>
-      </section>
       <section className="card">
         <h2>Create Assessment</h2>{feedbackArea==="create"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={create}>
@@ -423,28 +280,6 @@ export default function AdminAssessmentsPage() {
                   </select>
                 </div>
                 <div className="form-field">
-                  <label>Scoring Rubric</label>
-                  <select
-                    className="input"
-                    value={s.rubricId || ""}
-                    onChange={(e) => sec(i, "rubricId", e.target.value)}
-                  >
-                    <option value="">No rubric / direct marks</option>
-                    {rubrics
-                      .filter(
-                        (r) =>
-                          !s.domainId ||
-                          !r.domain_id ||
-                          r.domain_id === s.domainId,
-                      )
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="form-field">
                   <label>Pass Score (%)</label>
                   <input
                     className="input"
@@ -488,7 +323,6 @@ export default function AdminAssessmentsPage() {
                       domainId: "",
                       passScore: 50,
                       questionIds: [],
-                      rubricId: "",
                     },
                   ],
                 }))

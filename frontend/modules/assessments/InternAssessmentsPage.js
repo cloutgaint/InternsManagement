@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function InternAssessmentsPage() {
   const submittingRef=useRef(false);
@@ -49,6 +49,15 @@ export default function InternAssessmentsPage() {
     } finally {
       setBusy(false);
     }
+  }
+  function canStart(assessment) {
+    if (!["PUBLISHED", "ACTIVE"].includes(assessment.status)) return false;
+    const history = assessment.attempt_history || [];
+    const inProgress = history.some((attempt) => attempt.status === "IN_PROGRESS");
+    const withinWindow =
+      (!assessment.window_start || new Date(assessment.window_start) <= new Date()) &&
+      (!assessment.window_end || new Date(assessment.window_end) > new Date());
+    return withinWindow && (inProgress || history.length < Number(assessment.attempt_count || 1));
   }
   // Optional integrity signal (Blueprint 7.1): leaving the tab is logged, never blocked.
   useEffect(() => {
@@ -276,38 +285,23 @@ export default function InternAssessmentsPage() {
         {msg&&<p className="success" role="status">{msg}</p>}{err&&<p className="error" role="alert">{err}</p>}
         {list.length ? (
           list.map((a) => (
-            <div className="workflow-row" key={a.id}>
-              <div>
-                <b>{a.name}</b>
-                <div className="muted">
-                  {a.duration_minutes} minutes · {a.attempt_count} attempt(s)
-                  {a.window_end
-                    ? " · closes " + new Date(a.window_end).toLocaleString()
-                    : ""}
+            <div className="assessment-history-card" key={a.id}>
+              <div className="workflow-row">
+                <div><b>{a.name}</b><div className="muted">{a.duration_minutes} minutes · {a.attempt_count} attempt(s){a.window_end ? " · closes " + new Date(a.window_end).toLocaleString() : ""}</div></div>
+                <div className="action-row">
+                  <span className="status-pill">{a.attempt_status || "AVAILABLE"}</span>
+                  {canStart(a) && <button className="btn" disabled={busy} onClick={() => start(a)}>{a.attempt_status === "IN_PROGRESS" ? "Resume Assessment" : (a.attempt_history || []).length ? "Start Next Attempt" : "Start Assessment"}</button>}
+                  {a.attempt_status === "PENDING_EVALUATION" && <span className="muted">Evaluation pending</span>}
+                  {a.attempt_status === "EVALUATED" && <b>Score: {a.total_score}</b>}
                 </div>
               </div>
-              <div className="action-row">
-                <span className="status-pill">
-                  {a.attempt_status || "AVAILABLE"}
-                </span>
-                {!["PENDING_EVALUATION", "EVALUATED"].includes(
-                  a.attempt_status,
-                ) && (!a.window_start||new Date(a.window_start)<=new Date())&&(!a.window_end||new Date(a.window_end)>new Date()) && (
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => start(a)}
-                  >
-                    Start Assessment
-                  </button>
-                )}
-                {a.attempt_status === "PENDING_EVALUATION" && (
-                  <span className="muted">Written answers under review</span>
-                )}
-                {a.attempt_status === "EVALUATED" && (
-                  <b>Score: {a.total_score}</b>
-                )}
-              </div>
+              {!!a.attempt_history?.length && <div className="assessment-history">
+                <b>Assessment History</b>
+                {a.attempt_history.map((attempt, index) => <div className="attempt-result" key={attempt.id}>
+                  <div className="attempt-result-head"><span>Attempt {a.attempt_history.length - index} · {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : "In progress"}</span><span className={attempt.passed === true ? "result-pass" : attempt.passed === false ? "result-fail" : "muted"}>{attempt.passed === true ? "PASSED" : attempt.passed === false ? "NOT PASSED" : attempt.status}</span></div>
+                  {attempt.status === "EVALUATED" && <><div className="overall-result"><b>{attempt.earned}/{attempt.possible} marks</b><span>{attempt.percentage}% overall</span></div><div className="section-results">{attempt.sectionResults.map((section) => <span key={section.sectionId}>{section.name}: {section.earned}/{section.possible} ({section.percentage}%) · {section.passed ? "Pass" : `Below ${section.passScore}%`}</span>)}</div></>}
+                </div>)}
+              </div>}
             </div>
           ))
         ) : (

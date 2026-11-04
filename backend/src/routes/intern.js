@@ -11,6 +11,7 @@ import { audit } from "../common/audit/audit.service.js";
 import { writeSecureFile } from "../common/storage/secureFiles.js";
 import { attendanceDayState, notifyGroupMentors } from "../services/attendanceService.js";
 import { latestProof, sendProofFile, storeProofFiles, validateProofDetails } from "../services/proofService.js";
+import { summarizeAssessmentAttempt } from "../services/assessmentValidation.js";
 const r = Router();
 const submissionDir = path.resolve("uploads/task-submissions");
 fs.mkdirSync(submissionDir, { recursive: true });
@@ -620,14 +621,44 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
 });
 r.get("/assessments", async (req, res) => {
   const p = await me(req.user.id);
-  res.json(
-    (
-      await q(
-        `SELECT a.*,aa.id attempt_id,aa.status attempt_status,aa.total_score,aa.started_at,aa.submitted_at FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id AND ba.intern_id=$1 LEFT JOIN LATERAL (SELECT * FROM assessment_attempts x WHERE x.assessment_id=a.id AND x.intern_id=$1 ORDER BY x.started_at DESC LIMIT 1) aa ON true WHERE a.status IN ('PUBLISHED','ACTIVE') ORDER BY a.window_start NULLS FIRST`,
-        [p.id],
-      )
-    ).rows,
+  const assessments = (
+    await q(
+      `SELECT a.*,aa.id attempt_id,aa.status attempt_status,aa.total_score,aa.started_at,aa.submitted_at FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id AND ba.intern_id=$1 LEFT JOIN LATERAL (SELECT * FROM assessment_attempts x WHERE x.assessment_id=a.id AND x.intern_id=$1 ORDER BY x.started_at DESC LIMIT 1) aa ON true WHERE a.status IN ('PUBLISHED','ACTIVE') OR (a.status='CLOSED' AND aa.id IS NOT NULL) ORDER BY a.window_start NULLS FIRST`,
+      [p.id],
+    )
+  ).rows;
+  if (!assessments.length) return res.json([]);
+  const assessmentIds = assessments.map((assessment) => assessment.id);
+  const sectionsByAssessment = new Map(
+    await Promise.all(assessmentIds.map(async (assessmentId) => [assessmentId, await sectionsForIntern(assessmentId, p)])),
   );
+  const sectionIds = [...sectionsByAssessment.values()].flat().map((section) => section.id);
+  const attempts = (
+    await q(
+      "SELECT id,assessment_id,status,total_score,started_at,submitted_at FROM assessment_attempts WHERE intern_id=$1 AND assessment_id=ANY($2::uuid[]) ORDER BY started_at DESC",
+      [p.id, assessmentIds],
+    )
+  ).rows;
+  const sectionScores = sectionIds.length ? (
+    await q(
+      `SELECT aa.id attempt_id,s.id section_id,s.name,s.pass_score,COALESCE(SUM(COALESCE(ans.auto_score,0)),0) earned,COALESCE(SUM(qb.marks),0) possible FROM assessment_attempts aa JOIN assessment_sections s ON s.assessment_id=aa.assessment_id JOIN question_bank qb ON s.question_ids ? qb.id::text LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id AND ans.question_id=qb.id WHERE aa.intern_id=$1 AND aa.assessment_id=ANY($2::uuid[]) AND s.id=ANY($3::uuid[]) GROUP BY aa.id,s.id,s.name,s.pass_score ORDER BY s.name`,
+      [p.id, assessmentIds, sectionIds],
+    )
+  ).rows : [];
+  const scoresByAttempt = new Map();
+  for (const row of sectionScores) {
+    const earned = Number(row.earned || 0), possible = Number(row.possible || 0);
+    const percentage = possible ? Number(((earned / possible) * 100).toFixed(2)) : 0;
+    const result = { sectionId: row.section_id, name: row.name, earned, possible, percentage, passScore: Number(row.pass_score || 0), passed: percentage >= Number(row.pass_score || 0) };
+    scoresByAttempt.set(row.attempt_id, [...(scoresByAttempt.get(row.attempt_id) || []), result]);
+  }
+  for (const assessment of assessments) {
+    assessment.attempt_history = attempts.filter((attempt) => attempt.assessment_id === assessment.id).map((attempt) => {
+      const sectionResults = scoresByAttempt.get(attempt.id) || [];
+      return { ...attempt, sectionResults, ...summarizeAssessmentAttempt(sectionResults, attempt.status) };
+    });
+  }
+  res.json(assessments);
 });
 r.post("/assessments/:id/start", async (req, res) => {
   const p = await me(req.user.id);

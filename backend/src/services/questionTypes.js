@@ -23,11 +23,12 @@ export function questionValidationError(value) {
   if (!["EASY", "MEDIUM", "HARD"].includes(difficulty)) return "Invalid difficulty";
   if (!Number.isFinite(Number(value.marks)) || Number(value.marks) <= 0)
     return "Marks must be greater than zero";
-  if (
-    ["MCQ", "MULTI_SELECT"].includes(type) &&
-    (!Array.isArray(options) || options.filter(Boolean).length < 2)
-  )
-    return "MCQ questions require at least two options";
+  if (type === "MCQ" && (!Array.isArray(options) || options.length !== 4 || options.some((option) => !String(option || "").trim())))
+    return "Single-answer MCQs require exactly four options";
+  if (type === "MCQ" && new Set(options.map((option) => String(option).trim().toLowerCase())).size !== 4)
+    return "MCQ options must be unique";
+  if (type === "MULTI_SELECT" && (!Array.isArray(options) || options.filter(Boolean).length < 2))
+    return "Multiple-select questions require at least two options";
   if (
     isObjectiveQuestion(type) &&
     (correctAnswer === undefined ||
@@ -36,5 +37,7 @@ export function questionValidationError(value) {
       (Array.isArray(correctAnswer) && !correctAnswer.length))
   )
     return "Correct answer is required for objective questions";
+  if (type === "MCQ" && !options.some((option) => String(option).trim() === String(correctAnswer).trim()))
+    return "The MCQ correct answer must match one option";
   return null;
 }

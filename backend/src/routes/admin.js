@@ -2103,7 +2103,7 @@ r.post("/questions/ai-generate", async (req, res) => {
     });
     const saved = [];
     for (const g of generated) {
-      const type = allowed.includes(String(g.type || "").toUpperCase())
+      const type = selected.includes(String(g.type || "").toUpperCase())
         ? String(g.type).toUpperCase()
         : selected[0];
       const x = (
@@ -2226,13 +2226,12 @@ r.post("/questions", async (req, res) => {
     return res.status(400).json({ error: "Invalid question status" });
   if (Number(b.marks) <= 0)
     return res.status(400).json({ error: "Marks must be greater than zero" });
-  if (
-    ["MCQ", "MULTI_SELECT"].includes(type) &&
-    (!Array.isArray(b.options) || b.options.filter(Boolean).length < 2)
-  )
-    return res
-      .status(400)
-      .json({ error: "MCQ questions require at least two options" });
+  if (type === "MCQ" && (!Array.isArray(b.options) || b.options.length !== 4 || b.options.some((option) => !String(option || "").trim())))
+    return res.status(400).json({ error: "Single-answer MCQs require exactly four options" });
+  if (type === "MCQ" && new Set(b.options.map((option) => String(option).trim().toLowerCase())).size !== 4)
+    return res.status(400).json({ error: "MCQ options must be unique" });
+  if (type === "MULTI_SELECT" && (!Array.isArray(b.options) || b.options.filter(Boolean).length < 2))
+    return res.status(400).json({ error: "Multiple-select questions require at least two options" });
   if (
     ["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(type) &&
     (b.correctAnswer === undefined ||
@@ -2242,6 +2241,8 @@ r.post("/questions", async (req, res) => {
     return res
       .status(400)
       .json({ error: "Correct answer is required for objective questions" });
+  if (type === "MCQ" && !b.options.some((option) => String(option).trim() === String(b.correctAnswer).trim()))
+    return res.status(400).json({ error: "The MCQ correct answer must match one option" });
   const x = (
     await q(
       `INSERT INTO question_bank(domain_id,topic,difficulty,type,question,options,correct_answer,marking_guide,marks,explanation,status,source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -2403,7 +2404,7 @@ async function assessmentPublishError(assessmentId) {
   const shapeError = questionSelectionError(sections);
   if (shapeError) return shapeError;
   const eligible = (
-    await q("SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE'", [ids])
+    await q("SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE' AND type='MCQ' AND jsonb_typeof(options)='array' AND jsonb_array_length(options)=4 AND jsonb_typeof(correct_answer)='string' AND options ? (correct_answer #>> '{}')", [ids])
   ).rows;
   return questionSelectionError(sections, new Set(eligible.map((row) => row.id)));
 }
@@ -2478,14 +2479,14 @@ r.post("/assessments", async (req, res) => {
   if(new Set(allIds).size!==allIds.length)return res.status(400).json({error:"A question cannot appear in multiple sections of the same assessment"});
   const valid = (
     await q(
-      "SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE'",
+      "SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE' AND type='MCQ' AND jsonb_typeof(options)='array' AND jsonb_array_length(options)=4 AND jsonb_typeof(correct_answer)='string' AND options ? (correct_answer #>> '{}')",
       [allIds],
     )
   ).rows.map((x) => x.id);
   if (valid.length !== new Set(allIds).size)
     return res
       .status(400)
-      .json({ error: "Every selected question must be active" });
+      .json({ error: "Every selected question must be an approved, active single-answer MCQ with four options" });
   const x = await tx(async (c) => {
     const assessment = (
       await c.query(
@@ -2511,7 +2512,7 @@ r.post("/assessments", async (req, res) => {
           s.name || "Assessment Section",
           Number(s.passScore ?? 50),
           JSON.stringify(s.questionIds || []),
-          s.rubricId || null,
+          null,
         ],
       );
     return assessment;
