@@ -69,14 +69,16 @@ export default function AdminBatchesPage() {
     }
   }
   function startAllocation(i) {setErr("");setMsg("");setFeedbackArea("allotment");
+    const existing=allocations.find(a=>a.intern_id===i.id);
     const available = batches.filter(
       (b) => !b.college_id || b.college_id === i.college_id,
     );
     setPick({
       intern: i,
-      batchId: available[0]?.id || "",
-      internStart: available[0]?.start_date?.slice(0, 10) || "",
-      internEnd: available[0]?.end_date?.slice(0, 10) || "",
+      existingId: existing?.id||null,
+      batchId: existing?.batch_id||available[0]?.id||"",
+      internStart: (existing?batches.find(b=>b.id===existing.batch_id):available[0])?.start_date?.slice(0, 10) || "",
+      internEnd: (existing?batches.find(b=>b.id===existing.batch_id):available[0])?.end_date?.slice(0, 10) || "",
       overrideReason: "",
     });
   }
@@ -106,17 +108,12 @@ export default function AdminBatchesPage() {
     if (!b) return setErr("Select a batch.");
     try {
       setBusy(true);
-      await api("/admin/allocate", {
-        method: "POST",
-        body: JSON.stringify({
-          batchId: pick.batchId,
-          internId: pick.intern.id,
-          internStart: pick.internStart,
-          internEnd: pick.internEnd,
-          overrideReason: pick.overrideReason,
-        }),
+      if(pick.existingId&&allocations.find(a=>a.id===pick.existingId)?.batch_id===pick.batchId)return setErr("Already allocated to this batch. Select a different batch to edit.");
+      await api(pick.existingId?"/admin/allocations/"+pick.existingId+"/batch":"/admin/allocate", {
+        method:pick.existingId?"PATCH":"POST",
+        body:JSON.stringify({batchId:pick.batchId,...(pick.existingId?{}:{internId:pick.intern.id,internStart:pick.internStart,internEnd:pick.internEnd}),overrideReason:pick.overrideReason}),
       });
-      setMsg("Internship duration verified and allotted successfully.");
+      setMsg(pick.existingId?"Intern transferred to the selected batch successfully.":"Internship duration verified and allotted successfully.");
       setPick(null);
       load();
     } catch (e) {
@@ -261,7 +258,7 @@ export default function AdminBatchesPage() {
                   </div>
                 )}
               </div>
-              <div className="action-row"><button className="btn secondary" onClick={()=>startAllocation(i)}>{a?"Review Allotment":"Allot Internship"}</button>{a&&<button className="btn secondary" onClick={()=>setEarly({id:a.id,name:i.full_name,startDate:String(a.intern_start).slice(0,10),currentEnd:String(a.intern_end).slice(0,10),endDate:String(a.intern_end).slice(0,10),reason:""})}>Early End</button>}</div>
+              <div className="action-row"><button className="btn secondary" onClick={()=>startAllocation(i)}>{a?"Edit Batch":"Allot Internship"}</button>{a&&<button className="btn secondary" onClick={()=>setEarly({id:a.id,name:i.full_name,startDate:String(a.intern_start).slice(0,10),currentEnd:String(a.intern_end).slice(0,10),endDate:String(a.intern_end).slice(0,10),reason:""})}>Early End</button>}</div>
             </div>
           );
         })}
@@ -275,8 +272,9 @@ export default function AdminBatchesPage() {
           >
             <div className="verification-title">
               <div>
-                <h2>Internship Allotment</h2>
+                <h2>{pick.existingId?"Edit Batch Allocation":"Internship Allotment"}</h2>
                 {feedbackArea==="allotment"&&err&&<p className="error" role="alert">{err}</p>}
+                {pick.existingId&&<p className="muted">Already allocated. Select a different batch to transfer this intern; duplicate allocation is not allowed.</p>}
                 <p className="muted">
                   {pick.intern.full_name} · {pick.intern.college_name}
                 </p>
@@ -358,7 +356,7 @@ export default function AdminBatchesPage() {
                   Cancel
                 </button>
                 <button className="btn" disabled={busy}>
-                  {busy ? "Verifying…" : "Verify & Allot"}
+                  {busy ? "Saving…" : pick.existingId?"Save Batch Change":"Verify & Allot"}
                 </button>
               </div>
             </form>
