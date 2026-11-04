@@ -11,6 +11,7 @@ export default function AdminBatchesPage() {
       collegeId: "",
       name: "",
       code: "",
+      semester: "SEM1",
       startDate: "",
       endDate: "",
       mode: "ONSITE",
@@ -52,6 +53,7 @@ export default function AdminBatchesPage() {
         collegeId: "",
         name: "",
         code: "",
+        semester: "SEM1",
         startDate: "",
         endDate: "",
         mode: "ONSITE",
@@ -147,6 +149,7 @@ export default function AdminBatchesPage() {
               ))}
             </select>
           </div>
+          <div className="form-field"><label>Semester</label><select className="input" value={form.semester} onChange={e=>setForm(x=>({...x,semester:e.target.value}))}>{Array.from({length:8},(_,i)=><option key={i+1} value={"SEM"+(i+1)}>Semester {i+1}</option>)}</select></div>
           <div className="form-field">
             <label>Batch Name</label>
             <input
@@ -212,6 +215,7 @@ export default function AdminBatchesPage() {
           </div>
         </form>
       </section>
+      <section className="card workflow-section"><h2>Existing Semester Batches</h2>{batches.map(b=><div className="workflow-row" key={b.id}><div><b>{b.name}</b><p className="muted">{b.code} · {b.semester||"Semester not set"} · {String(b.start_date).slice(0,10)} to {String(b.end_date).slice(0,10)}</p></div></div>)}</section>
       <section className="card workflow-section">
         <h2>Intern Allotment</h2>
         <p className="muted">
