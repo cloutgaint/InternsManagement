@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 import { QUESTION_TYPES } from "./AssessmentQuestionWorkspace";
 const aiEmpty = {
+  instructions: "",
   domainId: "",
-  topic: "",
-  difficulty: "MEDIUM",
-  count: 5,
-  types: ["MCQ"],
+  subject: "",
+  difficulty: "BEGINNER",
+  count: 10,
   marks: 1,
 };
 const empty = {
@@ -24,6 +24,7 @@ const empty = {
   status: "DRAFT",
 };
 export default function AdminQuestionsPage() {
+  const aiPreviewRef = useRef(null);
   const [rows, setRows] = useState([]),
     [domains, setDomains] = useState([]),
     [form, setForm] = useState(empty),
@@ -40,17 +41,26 @@ export default function AdminQuestionsPage() {
     [feedbackArea,setFeedbackArea]=useState("save"),
     [busy, setBusy] = useState(false),
     [ai, setAi] = useState(aiEmpty),
-    [aiBusy, setAiBusy] = useState(false);
+    [aiBusy, setAiBusy] = useState(false),
+    [aiDrafts, setAiDrafts] = useState([]),
+    [aiSelectedIds, setAiSelectedIds] = useState([]),
+    [aiEditingId, setAiEditingId] = useState(null),
+    [aiDirtyIds, setAiDirtyIds] = useState([]),
+    [aiError, setAiError] = useState(""),
+    [aiMessage, setAiMessage] = useState("");
   const load = () =>
     Promise.all([api("/admin/questions"), api("/admin/domains")])
       .then(([q, d]) => {
         setRows(q);
         setDomains(d.filter((x) => x.active !== false));
-      })
-      .catch((e) => setErr(e.message));
+      });
   useEffect(() => {
-    load();
+    load().catch((e) => setErr(e.message));
   }, []);
+  useEffect(() => {
+    if (aiDrafts.length)
+      aiPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [aiDrafts.length]);
   const visible = useMemo(
     () =>
       rows.filter(
@@ -65,11 +75,14 @@ export default function AdminQuestionsPage() {
       ),
     [rows, filter],
   );
+  const generatedRows = aiDrafts;
+  const editingAiDraft = Boolean(editId && rows.find((question) => question.id === editId)?.source === "AI" && rows.find((question) => question.id === editId)?.status === "DRAFT");
   function reset() {
     setForm(empty);
     setEditId(null);
   }
   function edit(x) {
+    setFeedbackArea("save"); setErr(""); setMsg("");
     setEditId(x.id);
     setForm({
       domainId: x.domain_id || "",
@@ -88,7 +101,7 @@ export default function AdminQuestionsPage() {
       explanation: x.explanation || "",
       status: x.status || "DRAFT",
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.querySelector(".question-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   async function save(e) {setFeedbackArea("save");
     e.preventDefault();
@@ -124,32 +137,100 @@ export default function AdminQuestionsPage() {
           : "Question added to the bank.",
       );
       reset();
-      load();
+      await load();
     } catch (e) {
       setErr(e.message);
     } finally {
       setBusy(false);
     }
   }
+  const draftError = (question) => {
+    const options = Array.isArray(question.options) ? question.options.map((option) => String(option || "").trim()) : [];
+    if (!String(question.question || "").trim() || options.length !== 4 || options.some((option) => !option) || new Set(options.map((option) => option.toLowerCase())).size !== 4 || !options.includes(String(question.correctAnswer || "").trim()) || !String(question.explanation || "").trim())
+      return "Provide a question, four unique options, one correct answer, and an explanation.";
+    return "";
+  };
+  const withClientIds = (questions) => questions.map((question, index) => ({ ...question, clientId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}` }));
+  function updateAiDraft(clientId, changes) {
+    setAiDrafts((drafts) => drafts.map((draft) => draft.clientId === clientId ? { ...draft, ...changes } : draft));
+    setAiDirtyIds((ids) => ids.includes(clientId) ? ids : [...ids, clientId]);
+  }
+  function updateAiOption(question, index, value) {
+    const options = question.options.map((option, optionIndex) => optionIndex === index ? value : option);
+    updateAiDraft(question.clientId, { options, correctAnswer: question.correctAnswer === question.options[index] ? value : question.correctAnswer });
+  }
+  function discardAiDrafts() {
+    if (aiDirtyIds.length && !window.confirm("Discard all generated MCQs and unsaved edits?")) return;
+    setAiDrafts([]); setAiSelectedIds([]); setAiDirtyIds([]); setAiEditingId(null);
+    setAiError(""); setAiMessage("Generated draft discarded.");
+  }
   async function generateAI(e) {setFeedbackArea("generateAI");
     e.preventDefault();
-    setErr("");
+    if (aiBusy) return;
+    setAiError(""); setAiMessage("");
+    if (!ai.instructions.trim()) return setAiError("Describe the MCQs you want to generate.");
+    if (aiDrafts.length && aiDirtyIds.length && !window.confirm("Replace the edited unsaved MCQs with a new generation?")) return;
     try {
       setAiBusy(true);
       const out = await api("/admin/questions/ai-generate", {
         method: "POST",
-        body: JSON.stringify(ai),
+        body: JSON.stringify({ ...ai, topic: "", types: ["MCQ"] }),
       });
-      setMsg(
-        out.length +
-          " AI-generated question(s) created as DRAFT. Review them before activation.",
-      );
-      load();
+      if (!out.questions?.length) throw new Error("No valid MCQs were generated. Try refining your prompt.");
+      const drafts = withClientIds(out.questions);
+      setAiDrafts(drafts);
+      setAiSelectedIds(drafts.map((question) => question.clientId));
+      setAiDirtyIds([]); setAiEditingId(null);
+      setAiMessage(out.validCount < out.requestedCount ? `${out.validCount} of ${out.requestedCount} requested MCQs were valid. The unsaved preview is shown below; review it and click Save to add questions to the Question Bank.` : `${out.validCount} MCQs generated. The unsaved preview is shown below; review it and click Save to add questions to the Question Bank.`);
     } catch (e) {
-      setErr(e.message);
+      setAiError(e.message);
     } finally {
       setAiBusy(false);
     }
+  }
+  async function approveGenerated(questionIds) {
+    if (aiBusy) return;
+    const drafts = generatedRows.filter((question) => questionIds.includes(question.clientId));
+    if (!drafts.length) return setAiError("Select at least one MCQ to save.");
+    const invalid = drafts.find((question) => draftError(question));
+    if (invalid) return setAiError(`Question ${generatedRows.indexOf(invalid) + 1}: ${draftError(invalid)}`);
+    setAiError(""); setAiMessage(""); setAiBusy(true);
+    try {
+      const saved = await api("/admin/questions/ai-save", { method: "POST", body: JSON.stringify({ questions: drafts }) });
+      await load();
+      const savedIds = new Set(drafts.map((question) => question.clientId));
+      setAiDrafts((items) => items.filter((question) => !savedIds.has(question.clientId)));
+      setAiSelectedIds((ids) => ids.filter((id) => !savedIds.has(id)));
+      setAiDirtyIds((ids) => ids.filter((id) => !savedIds.has(id)));
+      const hidden = saved.some((question) => (filter.q && !question.question.toLowerCase().includes(filter.q.toLowerCase()) && !(question.topic || "").toLowerCase().includes(filter.q.toLowerCase())) || (filter.domain && question.domain_id !== filter.domain) || (filter.difficulty && question.difficulty !== filter.difficulty) || (filter.type && question.type !== filter.type) || (filter.status && question.status !== filter.status));
+      setAiMessage(`${saved.length} question${saved.length === 1 ? "" : "s"} saved successfully to the Question Bank.${hidden ? " Clear the current Question Library filters to view all saved questions." : ""}`);
+    } catch (e) {
+      const detail = String(e.message || "Please try again.").replace(/^Unable to save questions\.\s*/i, "");
+      setAiError(`Unable to save questions. ${detail} Your draft has been preserved.`);
+    } finally { setAiBusy(false); }
+  }
+  async function regenerateGenerated(question) {
+    if (aiBusy) return;
+    if (aiDirtyIds.includes(question.clientId) && !window.confirm("Replace your unsaved edits for this MCQ?")) return;
+    setAiError(""); setAiMessage(""); setAiBusy(true);
+    try {
+      const out = await api("/admin/questions/ai-generate", { method: "POST", body: JSON.stringify({ ...ai, topic: question.topic || "", difficulty: question.difficulty, count: 1, marks: Number(question.marks), types: ["MCQ"] }) });
+      if (!out.questions?.length) throw new Error("No valid replacement MCQ was generated.");
+      const replacement = withClientIds(out.questions.slice(0, 1))[0];
+      setAiDrafts((drafts) => drafts.map((draft) => draft.clientId === question.clientId ? replacement : draft));
+      setAiSelectedIds((ids) => ids.map((id) => id === question.clientId ? replacement.clientId : id));
+      setAiDirtyIds((ids) => ids.filter((id) => id !== question.clientId));
+      setAiEditingId(null);
+      setAiMessage("Replacement MCQ generated for review.");
+    } catch (e) { setAiError(`Regeneration failed: ${e.message}`); } finally { setAiBusy(false); }
+  }
+  async function removeGenerated(question) {
+    if (aiBusy) return;
+    setAiDrafts((drafts) => drafts.filter((draft) => draft.clientId !== question.clientId));
+    setAiSelectedIds((ids) => ids.filter((id) => id !== question.clientId));
+    setAiDirtyIds((ids) => ids.filter((id) => id !== question.clientId));
+    if (aiEditingId === question.clientId) setAiEditingId(null);
+    setAiError(""); setAiMessage("Unsaved MCQ removed from the preview.");
   }
   async function reviewAI(x, decision) {setFeedbackArea("reviewAI");
     let reason = "";
@@ -167,7 +248,7 @@ export default function AdminQuestionsPage() {
           ? "AI question reviewed and approved."
           : "AI question rejected.",
       );
-      load();
+      await load();
     } catch (e) {
       setErr(e.message);
     }
@@ -179,7 +260,7 @@ export default function AdminQuestionsPage() {
         body: JSON.stringify({ status }),
       });
       setMsg("Question status changed to " + status + ".");
-      load();
+      await load();
     } catch (e) {
       setErr(e.message);
     }
@@ -218,17 +299,22 @@ export default function AdminQuestionsPage() {
         <div className="verification-title">
           <div>
             <span className="eyebrow">AI ASSISTED</span>
-            <h2>Generate Assessment Questions</h2>{feedbackArea==="generateAI"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-            <p className="muted">
-              Generated questions are saved as drafts and require Admin review.
-            </p>
+            <h2>Generate Assessment Questions</h2>
+            <p className="muted">Generate single-answer MCQ drafts, review them, then explicitly approve the questions to add them to the active library.</p>
           </div>
           <span className="status-pill">REVIEW REQUIRED</span>
         </div>
-        <form onSubmit={generateAI}>
+        {aiError && <p className="error" role="alert">{aiError}</p>}
+        {aiMessage && <p className="success" role="status">{aiMessage}</p>}
+        <form id="ai-generation-form" onSubmit={generateAI}>
+          <div className="form-field">
+            <label>Describe the questions you want to generate</label>
+            <textarea className="input ai-prompt-input" value={ai.instructions} onChange={(e) => setAi((current) => ({ ...current, instructions: e.target.value }))} placeholder="Example: Generate scenario-based MCQs covering SQL INNER/LEFT joins, duplicate rows, NULL handling, and query-result reasoning. Use intermediate complexity and avoid definition-only questions." required />
+            <span className="field-help">Include topics, subtopics, concepts, preferred question style, and complexity.</span>
+          </div>
           <div className="form-grid">
             <div className="form-field">
-              <label>Domain</label>
+              <label>Domain <span className="muted">(optional)</span></label>
               <select
                 className="input"
                 value={ai.domainId}
@@ -245,15 +331,9 @@ export default function AdminQuestionsPage() {
               </select>
             </div>
             <div className="form-field">
-              <label>Topic / Skill</label>
-              <input
-                className="input"
-                value={ai.topic}
-                onChange={(e) =>
-                  setAi((x) => ({ ...x, topic: e.target.value }))
-                }
-                required
-              />
+              <label>Programming Language / Subject <span className="muted">(optional)</span></label>
+              <input className="input" list="ai-subjects" value={ai.subject} onChange={(e) => setAi((current) => ({ ...current, subject: e.target.value }))} placeholder="Python, Java, SQL, Cybersecurity…" />
+              <datalist id="ai-subjects"><option value="Python"/><option value="Java"/><option value="JavaScript"/><option value="SQL"/><option value="Cybersecurity"/><option value="AI / Machine Learning"/></datalist>
             </div>
             <div className="form-field">
               <label>Difficulty</label>
@@ -264,23 +344,15 @@ export default function AdminQuestionsPage() {
                   setAi((x) => ({ ...x, difficulty: e.target.value }))
                 }
               >
-                <option>EASY</option>
-                <option>MEDIUM</option>
-                <option>HARD</option>
+                <option value="BEGINNER">Beginner</option>
+                <option value="INTERMEDIATE">Intermediate</option>
+                <option value="ADVANCED">Advanced</option>
+                <option value="MIXED">Mixed</option>
               </select>
             </div>
             <div className="form-field">
               <label>Number of Questions</label>
-              <input
-                className="input"
-                type="number"
-                min="1"
-                max="20"
-                value={ai.count}
-                onChange={(e) =>
-                  setAi((x) => ({ ...x, count: Number(e.target.value) }))
-                }
-              />
+              <select className="input" value={ai.count} onChange={(e) => setAi((current) => ({ ...current, count: Number(e.target.value) }))}>{[5,10,15,20,25,30].map((count) => <option key={count} value={count}>{count}</option>)}</select>
             </div>
             <div className="form-field">
               <label>Default Marks</label>
@@ -296,31 +368,33 @@ export default function AdminQuestionsPage() {
               />
             </div>
           </div>
-          <div className="ai-type-picks">
-            {QUESTION_TYPES.map(([t, label]) => (
-              <label key={t}>
-                <input
-                  type="checkbox"
-                  checked={ai.types.includes(t)}
-                  onChange={(e) =>
-                    setAi((x) => ({
-                      ...x,
-                      types: e.target.checked
-                        ? [...x.types, t]
-                        : x.types.filter((v) => v !== t),
-                    }))
-                  }
-                />
-                {label}
-              </label>
-            ))}
-          </div>
           <div className="form-actions">
-            <button className="btn" disabled={aiBusy || !ai.types.length}>
-              {aiBusy ? "Generating…" : "Generate Draft Questions"}
+            <span className="muted">Output: single-correct-answer MCQs</span>
+            <button className="btn" disabled={aiBusy || !ai.instructions.trim()}>
+              {aiBusy ? "Generating MCQs…" : "Generate MCQs with AI"}
             </button>
           </div>
         </form>
+        {!!generatedRows.length && <div className="ai-generated-preview" ref={aiPreviewRef} tabIndex={-1}>
+          <div className="verification-title"><div><h3>Generated MCQs — Review Before Saving</h3><p className="muted">{generatedRows.length} unsaved MCQ{generatedRows.length === 1 ? "" : "s"}. Edit or regenerate before saving to the Question Bank.</p></div><div className="action-row"><button type="submit" form="ai-generation-form" className="btn secondary" disabled={aiBusy}>Regenerate Questions</button><button type="button" className="btn secondary" disabled={aiBusy} onClick={discardAiDrafts}>Discard Draft</button><button type="button" className="btn" disabled={aiBusy || !aiSelectedIds.length} onClick={() => approveGenerated(aiSelectedIds)}>{aiSelectedIds.length === generatedRows.length ? "Save All Valid Questions" : `Save Selected (${aiSelectedIds.length})`}</button></div></div>
+          {generatedRows.map((question, questionIndex) => <div className="ai-preview-question" key={question.clientId}>
+            <label className="ai-preview-select"><input type="checkbox" disabled={aiBusy} checked={aiSelectedIds.includes(question.clientId)} onChange={(e) => setAiSelectedIds((ids) => e.target.checked ? [...ids, question.clientId] : ids.filter((id) => id !== question.clientId))} /></label>
+            <div className="question-main">
+              <div className="question-tags"><span>Question {questionIndex + 1}</span><span>{domainName(question.domainId)}</span><span>{question.topic || "Prompt-defined"}</span><span>{question.difficulty}</span><span>{question.marks} marks</span><span>UNSAVED</span></div>
+              {aiEditingId === question.clientId ? <div className="ai-inline-editor">
+                <div className="form-field"><label>Question text</label><textarea className="input" value={question.question} onChange={(e) => updateAiDraft(question.clientId, { question: e.target.value })} /></div>
+                <div className="mcq-option-grid">{question.options.map((option, optionIndex) => <div className="mcq-option-field" key={optionIndex}><label className="mcq-correct-pick"><input type="radio" name={`ai-correct-${question.clientId}`} checked={question.correctAnswer === option && Boolean(option)} onChange={() => updateAiDraft(question.clientId, { correctAnswer: option })} />Correct</label><div className="form-field"><label>Option {String.fromCharCode(65 + optionIndex)}</label><input className="input" value={option} onChange={(e) => updateAiOption(question, optionIndex, e.target.value)} /></div></div>)}</div>
+                <div className="form-grid"><div className="form-field"><label>Difficulty</label><select className="input" value={question.difficulty} onChange={(e) => updateAiDraft(question.clientId, { difficulty: e.target.value })}><option>EASY</option><option>MEDIUM</option><option>HARD</option></select></div><div className="form-field"><label>Explanation</label><textarea className="input" value={question.explanation} onChange={(e) => updateAiDraft(question.clientId, { explanation: e.target.value })} /></div></div>
+                {draftError(question) && <p className="error" role="alert">{draftError(question)}</p>}
+              </div> : <><b>{question.question}</b><ol className="ai-option-preview">{question.options.map((option) => <li key={option}>{option}</li>)}</ol><small><b>Correct Answer:</b> {String.fromCharCode(65 + question.options.indexOf(question.correctAnswer))}. {question.correctAnswer}</small><small><b>Explanation:</b> {question.explanation}</small></>}
+            </div>
+            <div className="action-row">
+              <button type="button" className="btn secondary" disabled={aiBusy} onClick={() => setAiEditingId((id) => id === question.clientId ? null : question.clientId)}>{aiEditingId === question.clientId ? "Done" : "Edit"}</button>
+              <button type="button" className="btn secondary" disabled={aiBusy} onClick={() => regenerateGenerated(question)}>Regenerate</button>
+              <button type="button" className="btn danger" disabled={aiBusy} onClick={() => removeGenerated(question)}>Delete</button>
+            </div>
+          </div>)}
+        </div>}
       </section>
       <section className="card question-editor">
         <div className="verification-title">
@@ -337,6 +411,7 @@ export default function AdminQuestionsPage() {
             </button>
           )}
         </div>
+        {feedbackArea === "save" && <>{err && <p className="error" role="alert">{err}</p>}{msg && <p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={save}>
           <div className="form-grid">
             <div className="form-field">
@@ -501,6 +576,7 @@ export default function AdminQuestionsPage() {
               <select
                 className="input"
                 value={form.status}
+                disabled={editingAiDraft}
                 onChange={(e) =>
                   setForm((x) => ({ ...x, status: e.target.value }))
                 }
@@ -639,7 +715,7 @@ export default function AdminQuestionsPage() {
                 <button className="btn secondary" onClick={() => edit(x)}>
                   Edit
                 </button>
-                {x.status !== "ACTIVE" && (
+                {x.status !== "ACTIVE" && !(x.source === "AI" && x.status === "DRAFT") && (
                   <button className="btn" onClick={() => status(x, "ACTIVE")}>
                     Activate
                   </button>
