@@ -73,6 +73,7 @@ export default function LoginPage() {
         body: JSON.stringify({ challenge: mfa.challenge, code }),
       });
       if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
+      if(collegeMode&&d.user?.role!=="COLLEGE_COORDINATOR")return setErr("This account does not have college coordinator access.");
       finish(d);
     } catch (x) {
       setErr(x.message);
