@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function AdminMentorsPage() {
-  const [groups, setGroups] = useState([]),
+  const [newMentor,setNewMentor]=useState({fullName:"",email:"",password:"",expertise:"",maxGroups:5,maxInterns:30}),
+    [groups, setGroups] = useState([]),
     [mentors, setMentors] = useState([]),
     [domains, setDomains] = useState([]),
     [selected, setSelected] = useState({}),
@@ -25,6 +26,17 @@ export default function AdminMentorsPage() {
   useEffect(() => {
     load();
   }, []);
+  async function createMentor(e) {
+    e.preventDefault();setErr("");setMsg("");
+    try {
+      setBusy("create");
+      const body={...newMentor,expertise:newMentor.expertise.split(",").map(x=>x.trim()).filter(Boolean),maxGroups:Number(newMentor.maxGroups),maxInterns:Number(newMentor.maxInterns)};
+      await api("/admin/mentors",{method:"POST",body:JSON.stringify(body)});
+      setNewMentor({fullName:"",email:"",password:"",expertise:"",maxGroups:5,maxInterns:30});
+      setMsg("Mentor account created. Share the initial credentials securely.");
+      await load();
+    } catch(e) {setErr(e.message);} finally {setBusy("");}
+  }
   async function assign(g, reassign = false) {
     const mentorId = selected[g.id];
     if (!mentorId) return setErr("Select a mentor first.");
@@ -71,8 +83,19 @@ export default function AdminMentorsPage() {
       </div>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
+      <section className="card"><h2>Create Mentor Login</h2><p className="muted">Create an account, then assign the mentor to a group below. Use a unique email and a strong initial password.</p>
+        <form className="form-grid" onSubmit={createMentor}>
+          <div className="form-field"><label>Mentor Name</label><input className="input" required maxLength={150} value={newMentor.fullName} onChange={e=>setNewMentor(x=>({...x,fullName:e.target.value}))}/></div>
+          <div className="form-field"><label>Login Email</label><input className="input" type="email" required value={newMentor.email} onChange={e=>setNewMentor(x=>({...x,email:e.target.value}))}/></div>
+          <div className="form-field"><label>Initial Password</label><input className="input" type="password" minLength={12} required autoComplete="new-password" value={newMentor.password} onChange={e=>setNewMentor(x=>({...x,password:e.target.value}))}/><small>12+ characters with uppercase, lowercase, number and symbol.</small></div>
+          <div className="form-field"><label>Expertise (comma separated)</label><input className="input" placeholder="Python, React, Cybersecurity" value={newMentor.expertise} onChange={e=>setNewMentor(x=>({...x,expertise:e.target.value}))}/></div>
+          <div className="form-field"><label>Maximum Groups</label><input className="input" type="number" min={1} max={100} required value={newMentor.maxGroups} onChange={e=>setNewMentor(x=>({...x,maxGroups:e.target.value}))}/></div>
+          <div className="form-field"><label>Maximum Interns</label><input className="input" type="number" min={1} max={1000} required value={newMentor.maxInterns} onChange={e=>setNewMentor(x=>({...x,maxInterns:e.target.value}))}/></div>
+          <div className="form-actions"><button className="btn" disabled={busy==="create"}>{busy==="create"?"Creating…":"Create Mentor Account"}</button></div>
+        </form>
+      </section>
       <section className="card">
-        <div className="mentor-capacity-grid">
+        <h2>Available Mentors</h2><div className="mentor-capacity-grid">
           {mentors.map((m) => (
             <div className="mentor-capacity" key={m.id}>
               <b>{m.full_name}</b>
