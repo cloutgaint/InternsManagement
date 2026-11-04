@@ -10,7 +10,8 @@ export default function AdminLeavePage() {
     [reason, setReason] = useState({}),
     [limits, setLimits] = useState({}),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("decide");
   const load = () =>
     Promise.all([
       api("/admin/leave-requests"),
@@ -31,7 +32,7 @@ export default function AdminLeavePage() {
   useEffect(() => {
     load();
   }, []);
-  async function decide(x, status) {
+  async function decide(x, status) {setFeedbackArea("decide");
     try {
       await api("/admin/leave-requests/" + x.id + "/decision", {
         method: "POST",
@@ -43,7 +44,7 @@ export default function AdminLeavePage() {
       setErr(e.message);
     }
   }
-  async function addHoliday(e) {
+  async function addHoliday(e) {setFeedbackArea("addHoliday");
     e.preventDefault();
     try {
       await api("/admin/holidays", {
@@ -57,7 +58,7 @@ export default function AdminLeavePage() {
       setErr(e.message);
     }
   }
-  async function saveLimit(b) {
+  async function saveLimit(b) {setFeedbackArea("saveLimit");
     try {
       await api("/admin/batches/" + b.id + "/leave-policy", {
         method: "PATCH",
@@ -80,10 +81,8 @@ export default function AdminLeavePage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
-        <h2>Batch Leave Policy</h2>
+        <h2>Batch Leave Policy</h2>{["saveLimit"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {batches.map((b) => (
           <div className="workflow-row" key={b.id}>
             <div>
@@ -112,7 +111,7 @@ export default function AdminLeavePage() {
         ))}
       </section>
       <section className="card">
-        <h2>Holiday Calendar</h2>
+        <h2>Holiday Calendar</h2>{["addHoliday"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form className="form-grid" onSubmit={addHoliday}>
           <label>
             Batch
@@ -166,7 +165,7 @@ export default function AdminLeavePage() {
         </div>
       </section>
       <section className="card workflow-section">
-        <h2>Leave Approval Queue</h2>
+        <h2>Leave Approval Queue</h2>{["decide"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {requests.map((x) => (
           <div className="leave-admin-row" key={x.id}>
             <div>
