@@ -2450,6 +2450,7 @@ r.post("/assessments", async (req, res) => {
   const allIds = sections.flatMap((s) => s.questionIds || []);
   if (!allIds.length)
     return res.status(400).json({ error: "Select at least one question" });
+  if(new Set(allIds).size!==allIds.length)return res.status(400).json({error:"A question cannot appear in multiple sections of the same assessment"});
   const valid = (
     await q(
       "SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE'",
@@ -2472,7 +2473,7 @@ r.post("/assessments", async (req, res) => {
           Number(b.durationMinutes || 60),
           Number(b.attemptCount || 1),
           b.randomize !== false,
-          b.status || "DRAFT",
+          String(b.status || "DRAFT").toUpperCase(),
         ],
       )
     ).rows[0];
@@ -2483,7 +2484,7 @@ r.post("/assessments", async (req, res) => {
           assessment.id,
           s.domainId || null,
           s.name || "Assessment Section",
-          Number(s.passScore || 50),
+          Number(s.passScore ?? 50),
           JSON.stringify(s.questionIds || []),
           s.rubricId || null,
         ],
