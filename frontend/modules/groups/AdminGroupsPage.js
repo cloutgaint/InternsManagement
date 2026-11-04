@@ -11,6 +11,7 @@ export default function AdminGroupsPage() {
     [edit, setEdit] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("generate"),
     [busy, setBusy] = useState(false),
     [activeGroups, setActiveGroups] = useState([]),
     [manage, setManage] = useState(null);
@@ -36,7 +37,7 @@ export default function AdminGroupsPage() {
         .then(setGroups)
         .catch((e) => setErr(e.message));
   }, [batchId]);
-  async function generate() {
+  async function generate() {setFeedbackArea("generate");
     if (!batchId) return;
     try {
       setBusy(true);
@@ -55,7 +56,7 @@ export default function AdminGroupsPage() {
       setBusy(false);
     }
   }
-  async function approve(g) {
+  async function approve(g) {setFeedbackArea("approve");
     try {
       await api("/admin/group-proposals/" + g.id + "/approve", {
         method: "POST",
@@ -67,7 +68,7 @@ export default function AdminGroupsPage() {
       setErr(e.message);
     }
   }
-  async function saveEdit() {
+  async function saveEdit() {setFeedbackArea("saveEdit");
     try {
       await api("/admin/group-proposals/" + edit.id, {
         method: "PATCH",
@@ -176,8 +177,6 @@ export default function AdminGroupsPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
         <div className="form-grid">
           <div className="form-field">
@@ -244,7 +243,7 @@ export default function AdminGroupsPage() {
           ))}
       </section>
       <section className="card workflow-section">
-        <h2>Admin Review</h2>
+        <h2>Admin Review</h2>{feedbackArea==="approve"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {!groups.length ? (
           <p className="muted">No draft proposals for this batch.</p>
         ) : (
@@ -287,7 +286,7 @@ export default function AdminGroupsPage() {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="verification-title">
-              <h2>Edit System Proposal</h2>
+              <h2>Edit System Proposal</h2>{feedbackArea==="saveEdit"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
               <button className="icon-close" onClick={() => setEdit(null)}>
                 ×
               </button>
