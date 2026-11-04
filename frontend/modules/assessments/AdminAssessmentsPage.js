@@ -30,6 +30,7 @@ export default function AdminAssessmentsPage() {
     [review, setReview] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("create"),
     [busy, setBusy] = useState(false),
     [rubrics, setRubrics] = useState([]),
     [rubric, setRubric] = useState({
@@ -85,7 +86,7 @@ export default function AdminAssessmentsPage() {
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
     );
   }
-  async function create(e) {
+  async function create(e) {setFeedbackArea("create");
     e.preventDefault();
     try {
       setBusy(true);
@@ -106,7 +107,7 @@ export default function AdminAssessmentsPage() {
       setBusy(false);
     }
   }
-  async function status(a, status) {
+  async function status(a, status) {setFeedbackArea("status");
     try {
       await api("/admin/assessments/" + a.id + "/status", {
         method: "PATCH",
@@ -125,7 +126,7 @@ export default function AdminAssessmentsPage() {
       setErr(e.message);
     }
   }
-  async function score(ans) {
+  async function score(ans) {setFeedbackArea("score");
     const val = window.prompt(
       "Score out of " + ans.marks + ":",
       ans.manual_score ?? "",
@@ -156,8 +157,6 @@ export default function AdminAssessmentsPage() {
         </div>
         <span className="badge">{assessments.length} assessments</span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card workflow-section">
         <h2>Scoring Rubrics</h2>
         <p className="muted">
@@ -278,7 +277,7 @@ export default function AdminAssessmentsPage() {
         </div>
       </section>
       <section className="card">
-        <h2>Create Assessment</h2>
+        <h2>Create Assessment</h2>{feedbackArea==="create"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={create}>
           <div className="form-grid">
             <div className="form-field">
@@ -508,7 +507,7 @@ export default function AdminAssessmentsPage() {
         </form>
       </section>
       <section className="card workflow-section">
-        <h2>Assessment Management</h2>
+        <h2>Assessment Management</h2>{feedbackArea==="status"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {assessments.map((a) => (
           <div className="workflow-row" key={a.id}>
             <div>
@@ -537,7 +536,7 @@ export default function AdminAssessmentsPage() {
         ))}
       </section>
       <section className="card workflow-section">
-        <h2>Written Answer Evaluation</h2>
+        <h2>Written Answer Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {subs.length ? (
           subs.map((x) => (
             <div className="workflow-row" key={x.attempt_id}>
