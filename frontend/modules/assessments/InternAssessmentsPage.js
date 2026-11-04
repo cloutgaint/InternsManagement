@@ -217,6 +217,23 @@ export default function InternAssessmentsPage() {
                 placeholder="Write your answer clearly…"
               />
             )}
+            {["CASE_STUDY", "CODING_PRACTICAL", "WRITING_SAMPLE"].includes(q.type) && (
+              <textarea
+                className="input exam-descriptive"
+                value={answers[q.id] || ""}
+                onChange={(e) => setAnswer(q, e.target.value)}
+                placeholder={q.type === "CODING_PRACTICAL" ? "Enter code, approach, output, or repository details…" : "Write your response clearly…"}
+              />
+            )}
+            {q.type === "PORTFOLIO_LINK" && (
+              <input
+                className="input"
+                type="url"
+                value={answers[q.id] || ""}
+                onChange={(e) => setAnswer(q, e.target.value)}
+                placeholder="https://example.com/your-work"
+              />
+            )}
             <div className="exam-actions">
               <button
                 className="btn secondary"

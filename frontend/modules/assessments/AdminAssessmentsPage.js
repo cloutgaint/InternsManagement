@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+import AssessmentQuestionWorkspace from "./AssessmentQuestionWorkspace";
 const fresh = () => ({
   batchId: "",
   name: "",
@@ -31,6 +32,7 @@ export default function AdminAssessmentsPage() {
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [feedbackArea,setFeedbackArea]=useState("create"),
+    [sectionErrors, setSectionErrors] = useState({}),
     [busy, setBusy] = useState(false),
     [rubrics, setRubrics] = useState([]),
     [rubric, setRubric] = useState({
@@ -62,7 +64,7 @@ export default function AdminAssessmentsPage() {
     ])
       .then(([b, q, d, a, s, r]) => {
         setBatches(b);
-        setQuestions(q.filter((x) => x.status === "ACTIVE"));
+        setQuestions(q);
         setDomains(d);
         setAssessments(a);
         setSubs(s);
@@ -78,20 +80,19 @@ export default function AdminAssessmentsPage() {
       sections: x.sections.map((s, n) => (n === i ? { ...s, [k]: v } : s)),
     }));
   }
-  function toggle(i, id) {
-    const ids = form.sections[i].questionIds;
-    sec(
-      i,
-      "questionIds",
-      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
-    );
-  }
   async function create(e) {setFeedbackArea("create");
-    e.preventDefault();setErr("");setMsg("");
+    e.preventDefault();setErr("");setMsg("");setSectionErrors({});
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
-    if(form.sections.some(x=>!x.questionIds.length))return setErr("Add at least one question to every assessment section.");
+    const emptySections = form.sections.reduce((out, section, index) => (!section.questionIds.length ? { ...out, [index]: "Add at least one eligible question to this section." } : out), {});
+    if(Object.keys(emptySections).length){setSectionErrors(emptySections);return;}
+    const ineligibleSections = form.sections.reduce((out, section, index) => section.questionIds.some((id) => questions.find((question) => question.id === id)?.status !== "ACTIVE") ? { ...out, [index]: "Every selected question must be approved and active." } : out, {});
+    if(Object.keys(ineligibleSections).length){setSectionErrors(ineligibleSections);return;}
     const selected=form.sections.flatMap(x=>x.questionIds);
-    if(new Set(selected).size!==selected.length)return setErr("A question cannot be selected in more than one section.");
+    if(new Set(selected).size!==selected.length){
+      const duplicateIds = selected.filter((id, index) => selected.indexOf(id) !== index);
+      setSectionErrors(form.sections.reduce((out, section, index) => section.questionIds.some((id) => duplicateIds.includes(id)) ? { ...out, [index]: "A question cannot be used in more than one section." } : out, {}));
+      return;
+    }
     try {
       setBusy(true);
       await api("/admin/assessments", {
@@ -104,6 +105,7 @@ export default function AdminAssessmentsPage() {
       });
       setMsg("Assessment created successfully.");
       setForm(fresh());
+      setSectionErrors({});
       load();
     } catch (e) {
       setErr(e.message);
@@ -456,31 +458,20 @@ export default function AdminAssessmentsPage() {
                   />
                 </div>
               </div>
-              <div className="assessment-question-picker">
-                {questions
-                  .filter(
-                    (q) =>
-                      !s.domainId || !q.domain_id || q.domain_id === s.domainId,
-                  )
-                  .map((q) => (
-                    <label key={q.id}>
-                      <input
-                        type="checkbox"
-                        checked={s.questionIds.includes(q.id)}
-                        onChange={() => toggle(i, q.id)}
-                      />
-                      <span>
-                        <b>{q.question}</b>
-                        <small>
-                          {q.type} · {q.difficulty} · {q.marks} marks
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-              </div>
-              <p className="muted">
-                {s.questionIds.length} question(s) selected
-              </p>
+              <AssessmentQuestionWorkspace
+                section={s}
+                sectionIndex={i}
+                questions={questions}
+                domains={domains}
+                usedQuestionIds={new Set(form.sections.flatMap((section, index) => index === i ? [] : section.questionIds))}
+                onChange={(ids) => {
+                  sec(i, "questionIds", ids);
+                  if (ids.length) setSectionErrors((x) => ({ ...x, [i]: "" }));
+                }}
+                onReload={load}
+                error={sectionErrors[i]}
+                setError={(message) => setSectionErrors((x) => ({ ...x, [i]: message }))}
+              />
             </div>
           ))}
           <div className="action-row">
@@ -590,7 +581,7 @@ export default function AdminAssessmentsPage() {
                   Marks: {a.marks} · Auto: {a.auto_score ?? "—"} · Manual:{" "}
                   {a.manual_score ?? "Pending"}
                 </small>
-                {["SHORT_TEXT", "DESCRIPTIVE"].includes(a.type) && (
+                {!['MCQ', 'MULTI_SELECT', 'TRUE_FALSE'].includes(a.type) && (
                   <>
                     <p className="muted">
                       Guide: {a.marking_guide || "No marking guide"}

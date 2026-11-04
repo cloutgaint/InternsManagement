@@ -734,6 +734,15 @@ r.post("/assessments/:id/submit", async (req, res) => {
       )).rows : [];
       const questionMap = new Map(questions.map((question) => [question.id, question]));
       if (questionMap.size !== ids.length) return { error: "Assessment question unavailable", code: 409 };
+      for (const answer of answers) {
+        if (questionMap.get(answer.questionId)?.type !== "PORTFOLIO_LINK" || answer.answer == null || answer.answer === "") continue;
+        try {
+          const url = new URL(String(answer.answer));
+          if (!["http:", "https:"].includes(url.protocol)) return { error: "Portfolio answers must be valid HTTP(S) links", code: 400 };
+        } catch {
+          return { error: "Portfolio answers must be valid HTTP(S) links", code: 400 };
+        }
+      }
       const allQuestions=validIds.size?(await client.query("SELECT id,type FROM question_bank WHERE id=ANY($1::uuid[])",[[...validIds]])).rows:[];
       const submittedIds=new Set(ids);
       let total=0,manualPending=false;

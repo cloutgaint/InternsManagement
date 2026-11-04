@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/shared/api/client";
+import { QUESTION_TYPES } from "./AssessmentQuestionWorkspace";
 const aiEmpty = {
   domainId: "",
   topic: "",
@@ -282,13 +283,7 @@ export default function AdminQuestionsPage() {
             </div>
           </div>
           <div className="ai-type-picks">
-            {[
-              "MCQ",
-              "MULTI_SELECT",
-              "TRUE_FALSE",
-              "SHORT_TEXT",
-              "DESCRIPTIVE",
-            ].map((t) => (
+            {QUESTION_TYPES.map(([t, label]) => (
               <label key={t}>
                 <input
                   type="checkbox"
@@ -302,7 +297,7 @@ export default function AdminQuestionsPage() {
                     }))
                   }
                 />
-                {t.replaceAll("_", " ")}
+                {label}
               </label>
             ))}
           </div>
@@ -386,11 +381,7 @@ export default function AdminQuestionsPage() {
                   }))
                 }
               >
-                <option value="MCQ">Single Choice (MCQ)</option>
-                <option value="MULTI_SELECT">Multiple Select</option>
-                <option value="TRUE_FALSE">True / False</option>
-                <option value="SHORT_TEXT">Short Text</option>
-                <option value="DESCRIPTIVE">Descriptive</option>
+                {QUESTION_TYPES.map(([id, label]) => <option value={id} key={id}>{label}</option>)}
               </select>
             </div>
           </div>
@@ -463,7 +454,7 @@ export default function AdminQuestionsPage() {
               </span>
             </div>
           )}
-          {["SHORT_TEXT", "DESCRIPTIVE"].includes(form.type) && (
+          {!['MCQ', 'MULTI_SELECT', 'TRUE_FALSE'].includes(form.type) && (
             <div className="form-field">
               <label>Marking Guide</label>
               <textarea
@@ -572,11 +563,7 @@ export default function AdminQuestionsPage() {
             onChange={(e) => setFilter((x) => ({ ...x, type: e.target.value }))}
           >
             <option value="">All types</option>
-            <option>MCQ</option>
-            <option>MULTI_SELECT</option>
-            <option>TRUE_FALSE</option>
-            <option>SHORT_TEXT</option>
-            <option>DESCRIPTIVE</option>
+            {QUESTION_TYPES.map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
           <select
             className="input"

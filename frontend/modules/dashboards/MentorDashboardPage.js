@@ -418,7 +418,7 @@ export default function MentorDashboardPage() {
               </button>
             </div>
             {attempt.answers
-              .filter((a) => ["SHORT_TEXT", "DESCRIPTIVE"].includes(a.type))
+              .filter((a) => !["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(a.type))
               .map((a) => (
                 <div className="review-answer" key={a.id}>
                   <b>{a.question}</b>

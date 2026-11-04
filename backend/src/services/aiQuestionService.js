@@ -15,6 +15,8 @@ export async function generateQuestions({
   count,
   types,
   marks,
+  instructions,
+  expectedLevel,
 }) {
   const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
   if (!key)
@@ -25,7 +27,7 @@ export async function generateQuestions({
       { status: 503 },
     );
   const model = process.env.AI_MODEL || "gpt-5-mini";
-  const prompt = `Create ${count} internship assessment questions for domain "${domain || "General"}", topic "${topic || "General fundamentals"}", difficulty ${difficulty}. Allowed types: ${types.join(", ")}. Default marks: ${marks}. Return ONLY valid JSON as {"questions":[...]}. Each question must have: type, question, options (array or null), correctAnswer (string/array/null), markingGuide (string/null), marks (number), explanation (short string). For MCQ provide 4 plausible options and one exact correctAnswer. For MULTI_SELECT provide 4 options and correctAnswer as an array. TRUE_FALSE uses options ["True","False"]. SHORT_TEXT and DESCRIPTIVE must have correctAnswer null and a useful markingGuide. Avoid duplicates and ambiguous questions.`;
+  const prompt = `Create ${count} internship assessment questions for domain "${domain || "General"}", topic "${topic || "General fundamentals"}", difficulty ${difficulty}, expected candidate level ${expectedLevel || "INTERMEDIATE"}. Allowed types: ${types.join(", ")}. Default marks: ${marks}. Admin instructions: ${instructions || "No additional constraints"}. Return ONLY valid JSON as {"questions":[...]}. Each question must have: type, question, options (array or null), correctAnswer (string/array/null), markingGuide (string/null), marks (number), explanation (short string). For MCQ provide 4 plausible options and one exact correctAnswer. For MULTI_SELECT provide 4 options and correctAnswer as an array. TRUE_FALSE uses options ["True","False"]. All non-objective types must have correctAnswer null and a useful markingGuide. Portfolio link questions must explicitly ask for an HTTP(S) URL. Avoid duplicates and ambiguous questions.`;
   const resp = await fetch(endpoint, {
     method: "POST",
     headers: {

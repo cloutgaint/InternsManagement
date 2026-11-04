@@ -26,6 +26,12 @@ import {
 } from "../common/storage/secureFiles.js";
 import { adminResetPassword } from "../modules/auth/auth.service.js";
 import { generateQuestions } from "../services/aiQuestionService.js";
+import {
+  QUESTION_TYPES,
+  isObjectiveQuestion,
+  questionValidationError,
+} from "../services/questionTypes.js";
+import { questionSelectionError } from "../services/assessmentValidation.js";
 import { generateCertificate } from "../services/certificateService.js";
 import { generateCompletionReport } from "../services/completionReportService.js";
 import {
@@ -2058,6 +2064,8 @@ r.post("/questions/ai-generate", async (req, res) => {
       count = 5,
       types = ["MCQ"],
       marks = 1,
+      instructions = "",
+      expectedLevel = "INTERMEDIATE",
     } = req.body;
     const n = Math.max(1, Math.min(20, Number(count) || 5));
     const domain = domainId
@@ -2069,13 +2077,13 @@ r.post("/questions/ai-generate", async (req, res) => {
       : null;
     if (domainId && !domain)
       return res.status(400).json({ error: "Select an active domain" });
-    const allowed = [
-      "MCQ",
-      "MULTI_SELECT",
-      "TRUE_FALSE",
-      "SHORT_TEXT",
-      "DESCRIPTIVE",
-    ];
+    if (!["EASY", "MEDIUM", "HARD"].includes(String(difficulty).toUpperCase()))
+      return res.status(400).json({ error: "Invalid difficulty" });
+    if (!["BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(String(expectedLevel).toUpperCase()))
+      return res.status(400).json({ error: "Invalid expected level" });
+    if (!Number.isFinite(Number(marks)) || Number(marks) <= 0)
+      return res.status(400).json({ error: "Marks must be greater than zero" });
+    const allowed = QUESTION_TYPES;
     const selected = (Array.isArray(types) ? types : [])
       .map((x) => String(x).toUpperCase())
       .filter((x) => allowed.includes(x));
@@ -2090,6 +2098,8 @@ r.post("/questions/ai-generate", async (req, res) => {
       count: n,
       types: selected,
       marks: Number(marks) || 1,
+      instructions: String(instructions || "").trim(),
+      expectedLevel: String(expectedLevel || "INTERMEDIATE").toUpperCase(),
     });
     const saved = [];
     for (const g of generated) {
@@ -2156,6 +2166,13 @@ r.post("/questions/:id/review", async (req, res) => {
     return res.status(400).json({ error: "Rejection reason is required" });
   let x;
   if (decision === "APPROVE") {
+    const validationError = questionValidationError({
+      ...before,
+      ...changes,
+      correctAnswer: changes.correctAnswer ?? before.correct_answer,
+      markingGuide: changes.markingGuide ?? before.marking_guide,
+    });
+    if (validationError) return res.status(400).json({ error: validationError });
     x = (
       await q(
         `UPDATE question_bank SET domain_id=COALESCE($1,domain_id),topic=COALESCE($2,topic),difficulty=COALESCE($3,difficulty),type=COALESCE($4,type),question=COALESCE($5,question),options=COALESCE($6,options),correct_answer=COALESCE($7,correct_answer),marking_guide=COALESCE($8,marking_guide),marks=COALESCE($9,marks),explanation=COALESCE($10,explanation),status='ACTIVE' WHERE id=$11 AND source='AI' AND status='DRAFT' RETURNING *`,
@@ -2200,13 +2217,7 @@ r.post("/questions", async (req, res) => {
   if (!String(b.question || "").trim())
     return res.status(400).json({ error: "Question is required" });
   if (
-    ![
-      "MCQ",
-      "MULTI_SELECT",
-      "TRUE_FALSE",
-      "SHORT_TEXT",
-      "DESCRIPTIVE",
-    ].includes(type)
+    !QUESTION_TYPES.includes(type)
   )
     return res.status(400).json({ error: "Invalid question type" });
   if (!["EASY", "MEDIUM", "HARD"].includes(difficulty))
@@ -2246,7 +2257,7 @@ r.post("/questions", async (req, res) => {
         Number(b.marks || 1),
         b.explanation || null,
         status,
-        b.source || "MANUAL",
+        "MANUAL",
       ],
     )
   ).rows[0];
@@ -2259,6 +2270,8 @@ r.patch("/questions/:id", async (req, res) => {
   ).rows[0];
   if (!before) return res.status(404).json({ error: "Question not found" });
   const b = { ...before, ...req.body };
+  const validationError = questionValidationError(b);
+  if (validationError) return res.status(400).json({ error: validationError });
   if (
     before.source === "AI" &&
     before.status === "DRAFT" &&
@@ -2382,6 +2395,18 @@ r.get("/assessments/:id", async (req, res) => {
   ).rows;
   res.json(x);
 });
+async function assessmentPublishError(assessmentId) {
+  const sections = (
+    await q("SELECT id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
+  ).rows;
+  const ids = sections.flatMap((section) => section.question_ids);
+  const shapeError = questionSelectionError(sections);
+  if (shapeError) return shapeError;
+  const eligible = (
+    await q("SELECT id FROM question_bank WHERE id=ANY($1::uuid[]) AND status='ACTIVE'", [ids])
+  ).rows;
+  return questionSelectionError(sections, new Set(eligible.map((row) => row.id)));
+}
 r.post("/assessments", async (req, res) => {
   const b = req.body;
   if (!b.batchId || !String(b.name || "").trim())
@@ -2505,6 +2530,10 @@ r.patch("/assessments/:id/status", async (req, res) => {
     await q("SELECT * FROM assessments WHERE id=$1", [req.params.id])
   ).rows[0];
   if (!before) return res.status(404).json({ error: "Assessment not found" });
+  if (["PUBLISHED", "ACTIVE"].includes(status)) {
+    const validationError = await assessmentPublishError(before.id);
+    if (validationError) return res.status(409).json({ error: validationError });
+  }
   const x = (
     await q("UPDATE assessments SET status=$1 WHERE id=$2 RETURNING *", [
       status,
@@ -2518,7 +2547,7 @@ r.get("/assessment-submissions", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT aa.id attempt_id,aa.status,aa.total_score,aa.started_at,aa.submitted_at,a.name assessment_name,ip.full_name,COUNT(ans.id) FILTER(WHERE qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id LEFT JOIN question_bank qb ON qb.id=ans.question_id GROUP BY aa.id,a.name,ip.full_name ORDER BY aa.submitted_at DESC NULLS LAST`,
+        `SELECT aa.id attempt_id,aa.status,aa.total_score,aa.started_at,aa.submitted_at,a.name assessment_name,ip.full_name,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id LEFT JOIN question_bank qb ON qb.id=ans.question_id GROUP BY aa.id,a.name,ip.full_name ORDER BY aa.submitted_at DESC NULLS LAST`,
       )
     ).rows,
   ),
@@ -2548,7 +2577,7 @@ r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
     )
   ).rows[0];
   if (!before) return res.status(404).json({ error: "Answer not found" });
-  if (!["SHORT_TEXT", "DESCRIPTIVE"].includes(before.type))
+  if (isObjectiveQuestion(before.type))
     return res
       .status(409)
       .json({ error: "Only written answers require manual evaluation" });
@@ -2564,7 +2593,7 @@ r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
     )
   ).rows[0];
   await q(
-    `UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE aa.status END WHERE aa.id=$1`,
+    `UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE aa.status END WHERE aa.id=$1`,
     [x.attempt_id],
   );
   await audit(

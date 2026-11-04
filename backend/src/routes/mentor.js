@@ -335,7 +335,7 @@ r.get("/assessment-evaluations", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,
+        `SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,
         [m],
       )
     ).rows,
@@ -373,7 +373,7 @@ r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
     return res
       .status(403)
       .json({ error: "Answer not found or intern is not assigned to you" });
-  if (!["SHORT_TEXT", "DESCRIPTIVE"].includes(row.type))
+  if (["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(row.type))
     return res
       .status(409)
       .json({ error: "Only written answers require mentor evaluation" });
@@ -421,7 +421,7 @@ r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
     )
   ).rows[0];
   await q(
-    `UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type IN ('SHORT_TEXT','DESCRIPTIVE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE 'PENDING_EVALUATION' END WHERE aa.id=$1`,
+    `UPDATE assessment_attempts aa SET total_score=(SELECT COALESCE(SUM(COALESCE(manual_score,auto_score,0)),0) FROM assessment_answers WHERE attempt_id=aa.id),status=CASE WHEN NOT EXISTS(SELECT 1 FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id WHERE ans.attempt_id=aa.id AND qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) THEN 'EVALUATED' ELSE 'PENDING_EVALUATION' END WHERE aa.id=$1`,
     [x.attempt_id],
   );
   res.json(x);
