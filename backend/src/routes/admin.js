@@ -4,6 +4,7 @@ import {
   calculatePerformance,
 } from "../services/performanceScoreService.js";
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import batchAllotmentOrders from "./batchAllotmentOrders.js";
 import adminWorkflow from "./adminWorkflow.js";
@@ -40,6 +41,17 @@ import {
   notifyWithEmail,
 } from "../common/notifications/notification.service.js";
 const r = Router();
+const aiGenerationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.AI_GENERATION_RATE_LIMIT || 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "AI generation limit reached. Please try again later or create questions manually." },
+});
+const aiGenerationInFlight = new Set();
+// node-postgres serializes JavaScript arrays as PostgreSQL arrays. Explicit JSON
+// encoding is required for the existing jsonb question columns.
+const questionJsonb = (value) => value === undefined || value === null ? null : JSON.stringify(value);
 async function notifyMentorAssigned(mentorId, groupId) {
   const info = (
     await q(
@@ -2055,19 +2067,64 @@ r.post("/groups/:id/mentor/reassign", async (req, res) => {
   await notifyMentorAssigned(m.id, g.id);
   res.status(201).json(x);
 });
-r.post("/questions/ai-generate", async (req, res) => {
+const aiQuestionKey = (question) => String(question || "").toLowerCase().replace(/\s+/g, " ").trim();
+const aiMaximumQuestions = () => {
+  const configured = Number(process.env.GROQ_MAX_GENERATION_QUESTIONS || 30);
+  return Number.isInteger(configured) && configured > 0 ? Math.min(30, configured) : 30;
+};
+const aiDifficulty = (value, fallback = "MEDIUM") => {
+  const difficulty = String(value || "").toUpperCase();
+  return ({ BEGINNER: "EASY", INTERMEDIATE: "MEDIUM", ADVANCED: "HARD", EASY: "EASY", MEDIUM: "MEDIUM", HARD: "HARD" })[difficulty] || fallback;
+};
+function normalizeGeneratedMcq(value, defaults = {}) {
+  const rawOptions = value?.options;
+  const options = Array.isArray(rawOptions)
+    ? rawOptions.map((option) => String(option || "").trim())
+    : ["A", "B", "C", "D"].map((key) => String(rawOptions?.[key] || "").trim());
+  let correctAnswer = value?.correctAnswer ?? value?.correct_answer ?? "";
+  if (["A", "B", "C", "D"].includes(String(correctAnswer).toUpperCase()))
+    correctAnswer = options[["A", "B", "C", "D"].indexOf(String(correctAnswer).toUpperCase())];
+  return {
+    domainId: value?.domainId || defaults.domainId || null,
+    topic: String(value?.topic || defaults.topic || "Prompt-defined").trim(),
+    difficulty: aiDifficulty(value?.difficulty, defaults.difficulty || "MEDIUM"),
+    type: "MCQ",
+    question: String(value?.question || value?.question_text || "").trim(),
+    options,
+    correctAnswer: String(correctAnswer || "").trim(),
+    markingGuide: null,
+    marks: Number(value?.marks || defaults.marks || 1),
+    explanation: String(value?.explanation || "").trim(),
+  };
+}
+r.post("/questions/ai-generate", aiGenerationLimiter, async (req, res) => {
+  const requestKey = req.user.id;
+  if (aiGenerationInFlight.has(requestKey))
+    return res.status(409).json({ error: "An AI generation request is already running. Please wait." });
+  aiGenerationInFlight.add(requestKey);
   try {
+    const body = req.body || {};
     const {
       domainId,
+      subject,
       topic,
-      difficulty = "MEDIUM",
-      count = 5,
-      types = ["MCQ"],
+      difficulty = "BEGINNER",
+      count = 10,
       marks = 1,
-      instructions = "",
-      expectedLevel = "INTERMEDIATE",
-    } = req.body;
-    const n = Math.max(1, Math.min(20, Number(count) || 5));
+      instructions = body.prompt || "",
+    } = body;
+    const prompt = String(instructions || "").trim();
+    if (!prompt) return res.status(400).json({ error: "Enter a topic or instruction to generate MCQs." });
+    if (prompt.length > 4000) return res.status(400).json({ error: "The generation prompt must be 4,000 characters or fewer." });
+    const maximum = aiMaximumQuestions();
+    const n = Number(count);
+    if (!Number.isInteger(n) || n < 1 || n > maximum)
+      return res.status(400).json({ error: `Number of questions must be between 1 and ${maximum}.` });
+    const requestedDifficulty = String(difficulty || "BEGINNER").toUpperCase();
+    if (!["BEGINNER", "INTERMEDIATE", "ADVANCED", "MIXED", "EASY", "MEDIUM", "HARD"].includes(requestedDifficulty))
+      return res.status(400).json({ error: "Invalid difficulty" });
+    if (!Number.isFinite(Number(marks)) || Number(marks) <= 0)
+      return res.status(400).json({ error: "Marks must be greater than zero" });
     const domain = domainId
       ? (
           await q("SELECT name FROM domains WHERE id=$1 AND active=true", [
@@ -2077,73 +2134,72 @@ r.post("/questions/ai-generate", async (req, res) => {
       : null;
     if (domainId && !domain)
       return res.status(400).json({ error: "Select an active domain" });
-    if (!["EASY", "MEDIUM", "HARD"].includes(String(difficulty).toUpperCase()))
-      return res.status(400).json({ error: "Invalid difficulty" });
-    if (!["BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(String(expectedLevel).toUpperCase()))
-      return res.status(400).json({ error: "Invalid expected level" });
-    if (!Number.isFinite(Number(marks)) || Number(marks) <= 0)
-      return res.status(400).json({ error: "Marks must be greater than zero" });
-    const allowed = QUESTION_TYPES;
-    const selected = (Array.isArray(types) ? types : [])
-      .map((x) => String(x).toUpperCase())
-      .filter((x) => allowed.includes(x));
-    if (!selected.length)
-      return res
-        .status(400)
-        .json({ error: "Select at least one valid question type" });
     const generated = await generateQuestions({
       domain: domain?.name || "Common",
+      subject: String(subject || "").trim(),
       topic: String(topic || "").trim(),
-      difficulty: String(difficulty).toUpperCase(),
+      difficulty: requestedDifficulty,
       count: n,
-      types: selected,
+      types: ["MCQ"],
       marks: Number(marks) || 1,
-      instructions: String(instructions || "").trim(),
-      expectedLevel: String(expectedLevel || "INTERMEDIATE").toUpperCase(),
+      instructions: prompt,
+      expectedLevel: requestedDifficulty === "MIXED" ? "MIXED" : requestedDifficulty,
     });
-    const saved = [];
-    for (const g of generated) {
-      const type = selected.includes(String(g.type || "").toUpperCase())
-        ? String(g.type).toUpperCase()
-        : selected[0];
-      const x = (
-        await q(
-          `INSERT INTO question_bank(domain_id,topic,difficulty,type,question,options,correct_answer,marking_guide,marks,explanation,status,source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'DRAFT','AI') RETURNING *`,
-          [
-            domainId || null,
-            String(topic || "").trim() || null,
-            String(difficulty).toUpperCase(),
-            type,
-            String(g.question || "").trim(),
-            g.options || null,
-            g.correctAnswer ?? null,
-            g.markingGuide || null,
-            Number(g.marks || marks || 1),
-            g.explanation || null,
-          ],
-        )
-      ).rows[0];
-      if (x.question) saved.push(x);
+    const prepared = [];
+    const generatedKeys = new Set();
+    for (const raw of generated) {
+      const item = normalizeGeneratedMcq(raw, { domainId, topic, difficulty: requestedDifficulty === "MIXED" ? "MEDIUM" : aiDifficulty(requestedDifficulty), marks });
+      const validationError = questionValidationError(item);
+      const key = aiQuestionKey(item.question);
+      if (!validationError && item.explanation && item.topic && !generatedKeys.has(key)) {
+        generatedKeys.add(key);
+        prepared.push(item);
+      }
     }
-    await audit(
-      req,
-      "AI_QUESTIONS_GENERATED",
-      "question_bank_batch",
-      null,
-      null,
-      {
-        count: saved.length,
-        domainId: domainId || null,
-        topic,
-        difficulty,
-        types: selected,
-      },
-    );
-    res.status(201).json(saved);
+    if (!prepared.length)
+      throw Object.assign(new Error("No valid MCQs were generated. Try refining your prompt."), { status: 502 });
+    await audit(req, "AI_QUESTIONS_GENERATED", "question_preview", null, null, { count: prepared.length, requested: n, domainId: domainId || null, difficulty: requestedDifficulty });
+    res.json({ questions: prepared, requestedCount: n, validCount: prepared.length });
   } catch (e) {
-    res
-      .status(e.status || 500)
-      .json({ error: e.message || "AI generation failed" });
+    res.status(e.status || 500).json({ error: e.message || "AI generation failed", ...(e.retryAfter ? { retryAfter: e.retryAfter } : {}) });
+  } finally {
+    aiGenerationInFlight.delete(requestKey);
+  }
+});
+r.post("/questions/ai-save", async (req, res) => {
+  const input = Array.isArray(req.body?.questions) ? req.body.questions : [];
+  const maximum = aiMaximumQuestions();
+  if (!input.length || input.length > maximum)
+    return res.status(400).json({ error: `Save between 1 and ${maximum} generated MCQs.` });
+  const questions = input.map((value) => normalizeGeneratedMcq(value, { domainId: value.domainId, difficulty: "MEDIUM", marks: 1 }));
+  const invalid = questions.find((question) => questionValidationError(question) || !question.explanation || !question.topic);
+  if (invalid) return res.status(400).json({ error: "Provide four unique options, one correct answer, a topic, and an explanation for every MCQ." });
+  const keys = questions.map((question) => aiQuestionKey(question.question));
+  if (new Set(keys).size !== keys.length)
+    return res.status(409).json({ error: "Remove duplicate questions before saving." });
+  try {
+    const saved = await tx(async (client) => {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('ai-question-save'))");
+      const existing = (await client.query("SELECT lower(regexp_replace(trim(question),'\\s+',' ','g')) question_key FROM question_bank WHERE lower(regexp_replace(trim(question),'\\s+',' ','g'))=ANY($1::text[])", [keys])).rows;
+      if (existing.length) throw Object.assign(new Error("One or more questions already exist in the Question Bank."), { status: 409 });
+      const domainIds = [...new Set(questions.map((question) => question.domainId).filter(Boolean))];
+      if (domainIds.length) {
+        const activeDomains = (await client.query("SELECT id FROM domains WHERE id=ANY($1::uuid[]) AND active=true", [domainIds])).rows;
+        if (activeDomains.length !== domainIds.length) throw Object.assign(new Error("Select an active domain for every question."), { status: 400 });
+      }
+      const rows = [];
+      for (const question of questions) {
+        rows.push((await client.query(
+          `INSERT INTO question_bank(domain_id,topic,difficulty,type,question,options,correct_answer,marking_guide,marks,explanation,status,source) VALUES($1,$2,$3,'MCQ',$4,$5,$6,NULL,$7,$8,'ACTIVE','AI') RETURNING *`,
+          [question.domainId, question.topic, question.difficulty, question.question, questionJsonb(question.options), questionJsonb(question.correctAnswer), question.marks, question.explanation],
+        )).rows[0]);
+      }
+      return rows;
+    });
+    await audit(req, "AI_QUESTIONS_SAVED", "question_bank_batch", null, null, { count: saved.length, ids: saved.map((question) => question.id) });
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.status ? error.message : "Unable to save questions. Please try again." });
   }
 });
 r.post("/questions/:id/review", async (req, res) => {
@@ -2182,8 +2238,8 @@ r.post("/questions/:id/review", async (req, res) => {
           changes.difficulty || null,
           changes.type || null,
           changes.question || null,
-          changes.options || null,
-          changes.correctAnswer ?? null,
+          questionJsonb(changes.options),
+          questionJsonb(changes.correctAnswer),
           changes.markingGuide || null,
           changes.marks || null,
           changes.explanation || null,
@@ -2252,8 +2308,8 @@ r.post("/questions", async (req, res) => {
         difficulty,
         type,
         b.question.trim(),
-        b.options || null,
-        b.correctAnswer ?? null,
+        questionJsonb(b.options),
+        questionJsonb(b.correctAnswer),
         b.markingGuide || null,
         Number(b.marks || 1),
         b.explanation || null,
@@ -2292,8 +2348,8 @@ r.patch("/questions/:id", async (req, res) => {
         b.difficulty,
         b.type,
         b.question,
-        b.options || null,
-        b.correctAnswer ?? b.correct_answer ?? null,
+        questionJsonb(b.options),
+        questionJsonb(b.correctAnswer ?? b.correct_answer),
         b.markingGuide ?? b.marking_guide ?? null,
         Number(b.marks || 1),
         b.explanation || null,
