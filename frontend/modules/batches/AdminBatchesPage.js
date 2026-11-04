@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/shared/api/client";
 import BatchAllotmentOrders from "./BatchAllotmentOrders";
 import BatchSettings from "./BatchSettings";
@@ -237,6 +238,7 @@ export default function AdminBatchesPage() {
         </p>
         {interns.map((i) => {
           const a = allocations.find((x) => x.intern_id === i.id);
+          const eligible = i.is_active && i.account_status === "ACTIVE";
           return (
             <div className="workflow-row" key={i.id}>
               <div>
@@ -244,6 +246,11 @@ export default function AdminBatchesPage() {
                 <div className="muted">
                   {i.college_name || "—"} · {i.roll_number || "—"}
                 </div>
+                {!eligible && (
+                  <div className="muted">
+                    Cannot be allotted until approved{i.proof_reason ? ". Admin note: " + i.proof_reason : "."}
+                  </div>
+                )}
                 {a && (
                   <div className="allocation-summary">
                     {a.batch_name} · {String(a.intern_start).slice(0, 10)} →{" "}
@@ -261,7 +268,7 @@ export default function AdminBatchesPage() {
                   </div>
                 )}
               </div>
-              <div className="action-row"><button className="btn secondary" onClick={()=>startAllocation(i)}>{a?"Review Allotment":"Allot Internship"}</button>{a&&<button className="btn secondary" onClick={()=>setEarly({id:a.id,name:i.full_name,startDate:String(a.intern_start).slice(0,10),currentEnd:String(a.intern_end).slice(0,10),endDate:String(a.intern_end).slice(0,10),reason:""})}>Early End</button>}</div>
+              <div className="action-row">{!eligible&&<><span className="status-pill status-reupload_requested">{i.proof_status==="REJECTED"?"PROOF REJECTED":"NOT APPROVED"}</span><Link className="btn secondary" href="/admin/verification">Open Student Verification</Link></>}{eligible&&<button className="btn secondary" onClick={()=>startAllocation(i)}>{a?"Review Allotment":"Allot Internship"}</button>}{eligible&&a&&<button className="btn secondary" onClick={()=>setEarly({id:a.id,name:i.full_name,startDate:String(a.intern_start).slice(0,10),currentEnd:String(a.intern_end).slice(0,10),endDate:String(a.intern_end).slice(0,10),reason:""})}>Early End</button>}</div>
             </div>
           );
         })}

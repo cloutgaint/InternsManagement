@@ -708,12 +708,21 @@ r.post("/allocate", async (req, res) => {
     req.body;
   const info = (
     await q(
-      `SELECT b.*,ip.full_name,ip.college_id intern_college,cp.id proof_id,cp.status proof_status,cp.approved_from,cp.approved_to,cp.reference_number FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT * FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN' AND u.is_active=true AND u.status='ACTIVE'`,
+      `SELECT b.*,u.is_active,u.status account_status,ip.full_name,ip.college_id intern_college,cp.id proof_id,cp.status proof_status,cp.approved_from,cp.approved_to,cp.reference_number FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT * FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN'`,
       [batchId, internId],
     )
   ).rows[0];
-  if (!info)
-    return res.status(404).json({ error: "Batch or intern not found" });
+  if (!info) {
+    const batchExists = (await q("SELECT 1 FROM batches WHERE id=$1", [batchId])).rowCount;
+    return res.status(404).json({ error: batchExists ? "Intern not found" : "Batch not found" });
+  }
+  if (!info.is_active || info.account_status !== "ACTIVE")
+    return res.status(409).json({
+      error:
+        info.proof_status === "REJECTED"
+          ? "This intern's college proof was rejected. Resolve it in Student Verification before allotting."
+          : "This intern's account has not been approved yet. Approve it in Student Verification before allotting.",
+    });
   if (!info.proof_id || !["VERIFIED", "OVERRIDE"].includes(info.proof_status))
     return res.status(409).json({
       error:
@@ -1699,7 +1708,7 @@ r.get("/interns", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT ip.*,u.email,u.status account_status,u.is_active,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE u.status<>'DELETED' ORDER BY ip.created_at DESC`,
+        `SELECT ip.*,u.email,u.status account_status,u.is_active,cp.status proof_status,cp.reason proof_reason,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT status,reason FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE u.status<>'DELETED' ORDER BY ip.created_at DESC`,
       )
     ).rows,
   ),

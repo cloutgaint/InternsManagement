@@ -167,6 +167,10 @@ test("Blueprint v1.2 lifecycle from registration to certificate", { skip: !enabl
       assert.equal(linked.linked, 2);
       second = ok(await call(null, "POST", "/auth/register", registration(2, { preferredDomains: JSON.stringify([domainB.name]) })), 201);
       assert.equal(second.coveredByBatchOrder, true);
+      const unapproved = await A("POST", "/allocate", { batchId: batch.id, internId: second.internId });
+      assert.equal(unapproved.status, 409);
+      assert.match(unapproved.data.error, /not been approved/);
+      assert.equal((await A("POST", "/allocate", { batchId: second.internId, internId: second.internId })).data.error, "Batch not found");
       ok(await A("POST", "/interns/" + second.id + "/approve", {}));
       ok(await A("POST", "/allocate", { batchId: batch.id, internId: second.internId }), 201);
     });
