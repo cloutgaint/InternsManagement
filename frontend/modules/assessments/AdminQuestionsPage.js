@@ -36,6 +36,7 @@ export default function AdminQuestionsPage() {
     }),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("save"),
     [busy, setBusy] = useState(false),
     [ai, setAi] = useState(aiEmpty),
     [aiBusy, setAiBusy] = useState(false);
@@ -88,7 +89,7 @@ export default function AdminQuestionsPage() {
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  async function save(e) {
+  async function save(e) {setFeedbackArea("save");
     e.preventDefault();
     setErr("");
     const objective = ["MCQ", "MULTI_SELECT", "TRUE_FALSE"].includes(form.type);
@@ -129,7 +130,7 @@ export default function AdminQuestionsPage() {
       setBusy(false);
     }
   }
-  async function generateAI(e) {
+  async function generateAI(e) {setFeedbackArea("generateAI");
     e.preventDefault();
     setErr("");
     try {
@@ -149,7 +150,7 @@ export default function AdminQuestionsPage() {
       setAiBusy(false);
     }
   }
-  async function reviewAI(x, decision) {
+  async function reviewAI(x, decision) {setFeedbackArea("reviewAI");
     let reason = "";
     if (decision === "REJECT") {
       reason = window.prompt("Reason for rejection:") || "";
@@ -198,13 +199,11 @@ export default function AdminQuestionsPage() {
           {rows.length} total
         </span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card ai-question-panel">
         <div className="verification-title">
           <div>
             <span className="eyebrow">AI ASSISTED</span>
-            <h2>Generate Assessment Questions</h2>
+            <h2>Generate Assessment Questions</h2>{feedbackArea==="generateAI"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
             <p className="muted">
               Generated questions are saved as drafts and require Admin review.
             </p>
@@ -528,7 +527,7 @@ export default function AdminQuestionsPage() {
       <section className="card workflow-section">
         <div className="verification-title">
           <div>
-            <h2>Question Library</h2>
+            <h2>Question Library</h2>{feedbackArea==="reviewAI"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
             <p className="muted">
               Search and filter without removing historical questions.
             </p>
