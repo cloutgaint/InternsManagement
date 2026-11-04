@@ -15,6 +15,7 @@ export default function AdminOffersPage() {
     }),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
+    [feedbackArea,setFeedbackArea]=useState("createTemplate"),
     [busy, setBusy] = useState(false),
     [issueAt, setIssueAt] = useState(""),
     [dates, setDates] = useState({});
@@ -33,7 +34,7 @@ export default function AdminOffersPage() {
   useEffect(() => {
     load();
   }, []);
-  async function createTemplate(e) {
+  async function createTemplate(e) {setFeedbackArea("createTemplate");
     e.preventDefault();
     try {
       setBusy(true);
@@ -49,7 +50,7 @@ export default function AdminOffersPage() {
       setBusy(false);
     }
   }
-  async function draft(a) {
+  async function draft(a) {setFeedbackArea("draft");
     if (!templates.length)
       return setErr("Create an active offer letter template first.");
     try {
@@ -85,7 +86,7 @@ export default function AdminOffersPage() {
       setErr(e.message);
     }
   }
-  async function action(l, type) {
+  async function action(l, type) {setFeedbackArea("action");
     let body = {};
     if (type === "reissue" || type === "revoke") {
       const reason = prompt("Reason is required:");
@@ -125,11 +126,9 @@ export default function AdminOffersPage() {
           {letters.filter((x) => ["ISSUED", "REISSUED"].includes(x.status)).length} issued
         </span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       {!templates.length && (
         <section className="card">
-          <h2>Create Offer Letter Template</h2>
+          <h2>Create Offer Letter Template</h2>{feedbackArea==="createTemplate"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           <form onSubmit={createTemplate}>
             <div className="form-grid">
               <div className="form-field">
@@ -175,7 +174,7 @@ export default function AdminOffersPage() {
         </section>
       )}
       <section className="card workflow-section">
-        <h2>Eligible Internship Allotments</h2>
+        <h2>Eligible Internship Allotments</h2>{feedbackArea==="action"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}{feedbackArea==="draft"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {alloc
           .filter((a) =>
             ["ALLOTMENT_VERIFIED", "ALLOTTED_WITH_OVERRIDE"].includes(a.status),
