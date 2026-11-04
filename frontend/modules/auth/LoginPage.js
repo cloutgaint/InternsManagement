@@ -6,6 +6,7 @@ import { api } from "@/shared/api/client";
 export default function LoginPage() {
   const router=useRouter();
   const adminMode=router.query.role==="admin";
+  const collegeMode=router.query.role==="college";
   const [e, setE] = useState(""),
     [p, setP] = useState(""),
     [show, setShow] = useState(false),
@@ -40,6 +41,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ email, password: p }),
       });
+      if(collegeMode&&d.user?.role!=="COLLEGE_COORDINATOR")return setErr("This account does not have college coordinator access.");
       if (d.mfaRequired) {
         setMfa(d);
         if (d.mfaSetupRequired)
@@ -52,6 +54,7 @@ export default function LoginPage() {
         return;
       }
       if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
+      if(collegeMode&&d.user?.role!=="COLLEGE_COORDINATOR")return setErr("This account does not have college coordinator access.");
       finish(d);
     } catch (x) {
       const isPending=/pending Admin verification|pending.*approval|not approved\/active/i.test(x.message);
@@ -81,12 +84,12 @@ export default function LoginPage() {
     <main className="auth-shell auth-login-shell">
       <section className="auth-panel auth-login-panel">
         <div className="auth-brand">
-          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":"GAINT STUDENT PORTAL"}</span>
-          <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : "Welcome back"}</h1>
+          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":collegeMode?"COLLEGE COORDINATOR PORTAL":"GAINT STUDENT PORTAL"}</span>
+          <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : collegeMode ? "College coordinator sign in" : "Welcome back"}</h1>
           <p>
             {mfa
               ? "Admin and Mentor accounts require multi-factor authentication."
-              : adminMode ? "Access the administrative workspace using your authorized account." : "Sign in to continue to your internship workspace."}
+              : adminMode ? "Access the administrative workspace using your authorized account." : collegeMode ? "View your college interns and semester batches." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
         {router.query.registered==="1"&&!adminMode&&<p className="success" role="status">Registration submitted successfully. Your college permission proof is awaiting Admin verification and approval. You can sign in after your account is activated.</p>}
@@ -130,7 +133,7 @@ export default function LoginPage() {
             <button className="btn auth-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign in"}
             </button>
-            <p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link></>}</p>
+            <p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link> · College coordinator? <Link href="/login?role=college">Coordinator Login</Link></>}</p>
           </form>
         ) : (
           <form onSubmit={verify}>
