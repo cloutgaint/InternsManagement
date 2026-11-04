@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/shared/api/client";
-import BatchAllotmentOrders from "./BatchAllotmentOrders";
 import BatchSettings from "./BatchSettings";
 export default function AdminBatchesPage() {
   const [interns, setInterns] = useState([]),
@@ -136,7 +135,6 @@ export default function AdminBatchesPage() {
         <span className="badge">{allocations.length} allocations</span>
       </div>
 
-      <BatchAllotmentOrders batches={batches} />
       <section className="card">
         <h2>Create Batch</h2>
         {feedbackArea==="batch"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
