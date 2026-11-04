@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
+function formatTimeTaken(startedAt, submittedAt) {
+  if (!startedAt || !submittedAt) return null;
+  const start = new Date(startedAt).getTime();
+  const end = new Date(submittedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  const seconds = Math.floor((end - start) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes} min ${seconds % 60} sec` : `${seconds} sec`;
+}
 export default function InternAssessmentsPage() {
   const submittingRef=useRef(false);
   const [list, setList] = useState([]),
@@ -298,7 +307,7 @@ export default function InternAssessmentsPage() {
               {!!a.attempt_history?.length && <div className="assessment-history">
                 <b>Assessment History</b>
                 {a.attempt_history.map((attempt, index) => <div className="attempt-result" key={attempt.id}>
-                  <div className="attempt-result-head"><span>Attempt {a.attempt_history.length - index} · {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : "In progress"}</span><span className={attempt.passed === true ? "result-pass" : attempt.passed === false ? "result-fail" : "muted"}>{attempt.passed === true ? "PASSED" : attempt.passed === false ? "NOT PASSED" : attempt.status}</span></div>
+                  <div className="attempt-result-head"><span>Attempt {a.attempt_history.length - index} · {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : "In progress"}{formatTimeTaken(attempt.started_at, attempt.submitted_at) && <> · Time taken: {formatTimeTaken(attempt.started_at, attempt.submitted_at)}</>}</span><span className={attempt.passed === true ? "result-pass" : attempt.passed === false ? "result-fail" : "muted"}>{attempt.passed === true ? "PASSED" : attempt.passed === false ? "NOT PASSED" : attempt.status}</span></div>
                   {attempt.status === "EVALUATED" && <><div className="overall-result"><b>{attempt.earned}/{attempt.possible} marks</b><span>{attempt.percentage}% overall</span></div><div className="section-results">{attempt.sectionResults.map((section) => <span key={section.sectionId}>{section.name}: {section.earned}/{section.possible} ({section.percentage}%) · {section.passed ? "Pass" : `Below ${section.passScore}%`}</span>)}</div></>}
                 </div>)}
               </div>}
