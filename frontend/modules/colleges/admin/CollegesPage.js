@@ -282,10 +282,8 @@ export default function Page() {
           {rows.filter((x) => x.active).length} active
         </span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
-        <h2>Add College</h2>
+        <h2>Add College</h2>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
         <form className="form-grid" onSubmit={add}>
           <CollegeFields value={form} onChange={setForm} required />
           <div className="form-actions">
