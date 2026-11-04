@@ -105,8 +105,6 @@ export default function AdminReportsPage() {
           </button>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <input
         className="input"
         placeholder="Search student, roll, college or batch"
@@ -170,7 +168,7 @@ export default function AdminReportsPage() {
           </div>
         ))}
       </section>
-    <h2>Operational Reports</h2>
+    <h2>Operational Reports</h2>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
       <OperationsReport />
     </main>
   );
