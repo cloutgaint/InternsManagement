@@ -260,7 +260,7 @@ export default function AdminQuestionsPage() {
         body: JSON.stringify({ status }),
       });
       setMsg("Question status changed to " + status + ".");
-      load();
+      await load();
     } catch (e) {
       setErr(e.message);
     }
