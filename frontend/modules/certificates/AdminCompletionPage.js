@@ -4,7 +4,8 @@ import { api, apiBlob } from "@/shared/api/client";
 export default function AdminCompletionPage() {
   const [rows, setRows] = useState([]),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [feedbackId,setFeedbackId]=useState(null);
   const load = () =>
     api("/admin/completions")
       .then(setRows)
@@ -12,7 +13,7 @@ export default function AdminCompletionPage() {
   useEffect(() => {
     load();
   }, []);
-  async function approve(x) {
+  async function approve(x) {setFeedbackId(x.intern_id);setErr("");setMsg("");
     try {
       await api("/admin/completions/" + x.intern_id + "/decision", {
         method: "POST",
@@ -24,7 +25,7 @@ export default function AdminCompletionPage() {
       setErr(e.message);
     }
   }
-  async function outcome(x, status) {
+  async function outcome(x, status) {setFeedbackId(x.intern_id);setErr("");setMsg("");
     const reason = prompt("Reason for marking " + (status === "EXTENDED" ? "extended" : "incomplete") + ":");
     if (!reason?.trim()) return;
     const extendedTo = status === "EXTENDED" ? prompt("New internship end date (YYYY-MM-DD):") : undefined;
@@ -38,7 +39,7 @@ export default function AdminCompletionPage() {
       setErr(e.message);
     }
   }
-  async function recordOffline(x) {
+  async function recordOffline(x) {setFeedbackId(x.intern_id);setErr("");setMsg("");
     const serialNumber = prompt("Offline certificate serial / reference number:");
     if (!serialNumber?.trim()) return;
     try {
@@ -51,13 +52,13 @@ export default function AdminCompletionPage() {
     }
   }
   async function recordExit(x,type){const reason=prompt("Reason for "+type.toLowerCase()+":");if(!reason?.trim())return;if(!confirm("Confirm "+type.toLowerCase()+" for "+x.full_name+"? This prevents completion certification."))return;try{await api("/admin/completions/"+x.intern_id+"/exit",{method:"POST",body:JSON.stringify({type,reason:reason.trim()})});setMsg("Internship marked "+type.toLowerCase()+".");setErr("");load()}catch(e){setErr(e.message)}}
-  async function removeStudent(x) {
+  async function removeStudent(x) {setFeedbackId(x.intern_id);
     if(!window.confirm(`Remove "${x.full_name}" from active student and completion records? Login will be disabled, but historical records are retained.`))return;
     setErr("");setMsg("");
     try{await api("/admin/interns/"+x.user_id,{method:"DELETE"});setMsg("Student removed from active records.");await load();}
     catch(e){setErr(e.message);}
   }
-  async function cert(x) {
+  async function cert(x) {setFeedbackId(x.intern_id);setErr("");setMsg("");
     try {
       await api("/admin/certificates/" + x.intern_id + "/issue", {
         method: "POST",
@@ -73,10 +74,8 @@ export default function AdminCompletionPage() {
   return (
     <main className="wrap">
       <h1>Completion & Certificates</h1>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       {rows.map((x) => (
-        <section className="card admin-completion-row" key={x.intern_id}>
+        <section className="card admin-completion-row" key={x.intern_id}>{feedbackId===x.intern_id&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           <div className="admin-completion-info">
             <b>{x.full_name}</b>
             <div className="muted">
