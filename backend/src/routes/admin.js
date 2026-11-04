@@ -1089,7 +1089,7 @@ r.post("/mentors", async (req, res) => {
   const b=req.body||{},fullName=String(b.fullName||"").trim(),email=String(b.email||"").trim().toLowerCase(),password=String(b.password||"");
   const expertise=Array.isArray(b.expertise)?b.expertise.map(x=>String(x).trim()).filter(Boolean):[];
   const maxGroups=Number(b.maxGroups),maxInterns=Number(b.maxInterns);
-  if(fullName.length<2||fullName.length>150||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||password.length<12||!/[A-Z]/.test(password)||!/[a-z]/.test(password)||!/[0-9]/.test(password)||!(/[^A-Za-z0-9]/.test(password))||!Number.isInteger(maxGroups)||maxGroups<1||maxGroups>100||!Number.isInteger(maxInterns)||maxInterns<1||maxInterns>1000||expertise.length>20||expertise.some(x=>x.length>100))return res.status(400).json({error:"Provide name, valid email, strong password (12+ characters, upper/lowercase, number, symbol), valid capacities and expertise"});
+  if(fullName.length<2||fullName.length>150||!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email)||password.length<12||!/[A-Z]/.test(password)||!/[a-z]/.test(password)||!/[0-9]/.test(password)||!(/[^A-Za-z0-9]/.test(password))||!Number.isInteger(maxGroups)||maxGroups<1||maxGroups>100||!Number.isInteger(maxInterns)||maxInterns<1||maxInterns>1000||expertise.length>20||expertise.some(x=>x.length>100))return res.status(400).json({error:"Provide name, valid email, strong password (12+ characters, upper/lowercase, number, symbol), valid capacities and expertise"});
   if((await q("SELECT 1 FROM users WHERE lower(email)=$1",[email])).rowCount)return res.status(409).json({error:"Email is already registered"});
   const passwordHash=await bcrypt.hash(password,12);
   let created;
