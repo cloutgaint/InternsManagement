@@ -1,5 +1,5 @@
-import Link from "next/link";
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createCollege, getColleges, updateCollege, deleteCollege } from "../api/colleges.api";
 import {api} from "@/shared/api/client";
