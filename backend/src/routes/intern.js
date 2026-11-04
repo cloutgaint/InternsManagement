@@ -736,7 +736,7 @@ r.post("/assessments/:id/submit", async (req, res) => {
       if (questionMap.size !== ids.length) return { error: "Assessment question unavailable", code: 409 };
       const allQuestions=validIds.size?(await client.query("SELECT id,type FROM question_bank WHERE id=ANY($1::uuid[])",[[...validIds]])).rows:[];
       const submittedIds=new Set(ids);
-      let total=0,manualPending=allQuestions.some(question=>["SHORT_TEXT","DESCRIPTIVE"].includes(question.type)&&!submittedIds.has(question.id));
+      let total=0,manualPending=false;
       for (const answer of answers) {
         const question = questionMap.get(answer.questionId);
         let score = null;
@@ -744,11 +744,14 @@ r.post("/assessments/:id/submit", async (req, res) => {
           const norm = (value) => Array.isArray(value) ? value.map((v) => String(v).trim().toLowerCase()).sort() : String(value ?? "").trim().toLowerCase();
           score = JSON.stringify(norm(question.correct_answer)) === JSON.stringify(norm(answer.answer)) ? Number(question.marks || 0) : 0;
           total += score;
-        } else manualPending = true;
+        } else if(answer.answer!==null&&answer.answer!==undefined&&String(answer.answer).trim()!=="") manualPending = true;
         await client.query(
           "INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,$3,$4,'SUBMITTED')",
           [at.id, answer.questionId, answer.answer === undefined ? null : JSON.stringify(answer.answer), score],
         );
+      }
+      for(const question of allQuestions.filter(x=>!submittedIds.has(x.id))){
+        await client.query("INSERT INTO assessment_answers(attempt_id,question_id,answer,auto_score,status) VALUES($1,$2,NULL,0,'SUBMITTED')",[at.id,question.id]);
       }
       const updated = (await client.query(
         "UPDATE assessment_attempts SET total_score=$1,status=$2,submitted_at=now() WHERE id=$3 AND status='IN_PROGRESS' RETURNING *",
