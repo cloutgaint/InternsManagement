@@ -2409,10 +2409,24 @@ r.get("/assessments/:id", async (req, res) => {
   ).rows;
   res.json(x);
 });
+function developmentSectionError(sections) {
+  const names = sections.map(s => String(s.name || "").trim().toLowerCase());
+  const isDevelopment = names.some(n => n === "frontend" || n === "backend");
+  if (!isDevelopment) return null;
+  if (sections.length !== 2 || names.filter(n => n === "frontend").length !== 1 || names.filter(n => n === "backend").length !== 1)
+    return "Development assessment requires exactly two sections: Frontend and Backend.";
+  if (sections.some(s => (s.questionIds || s.question_ids || []).length !== 30))
+    return "Select exactly 30 MCQs for Frontend and 30 MCQs for Backend.";
+  if (sections.some(s => !s.domainId && !s.domain_id))
+    return "Assign the corresponding domain to each Development assessment section.";
+  return null;
+}
 async function assessmentPublishError(assessmentId) {
   const sections = (
     await q("SELECT id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
   ).rows;
+  const developmentError = developmentSectionError(sections);
+  if (developmentError) return developmentError;
   const ids = sections.flatMap((section) => section.question_ids);
   const shapeError = questionSelectionError(sections);
   if (shapeError) return shapeError;
@@ -2458,6 +2472,8 @@ r.post("/assessments", async (req, res) => {
   )
     return res.status(400).json({ error: "Invalid assessment status" });
   const sections = Array.isArray(b.sections) ? b.sections : [];
+  const developmentError = developmentSectionError(sections);
+  if (developmentError) return res.status(400).json({ error: developmentError });
   if (!sections.length)
     return res
       .status(400)
