@@ -84,15 +84,15 @@ export default function AdminAssessmentsPage() {
     setSectionErrors({});
     setFeedbackArea("create");
     setErr("");
-    setMsg("Frontend and Backend sections created. Select 30 eligible MCQs for each section before publishing.");
+    setMsg("Frontend and Backend sections created. Select equal numbers of eligible MCQs (for 20 total, select 10 in each section).");
   }
   async function create(e) {setFeedbackArea("create");
     e.preventDefault();setErr("");setMsg("");setSectionErrors({});
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
     const developmentNames = form.sections.map(s => s.name.trim().toLowerCase());
     if (developmentNames.includes("frontend") || developmentNames.includes("backend")) {
-      if (form.sections.length !== 2 || !developmentNames.includes("frontend") || !developmentNames.includes("backend") || form.sections.some(s => s.questionIds.length !== 30 || !s.domainId))
-        return setErr("Development assessment requires 30 Frontend and 30 Backend MCQs with their domains selected.");
+      if (form.sections.length !== 2 || !developmentNames.includes("frontend") || !developmentNames.includes("backend") || form.sections.some(s => !s.questionIds.length || !s.domainId) || Math.abs(form.sections[0].questionIds.length - form.sections[1].questionIds.length) > 1)
+        return setErr("Select balanced Frontend and Backend MCQs (for 20 questions, select 10 in each section).");
     }
     const emptySections = form.sections.reduce((out, section, index) => (!section.questionIds.length ? { ...out, [index]: "Add at least one eligible question to this section." } : out), {});
     if(Object.keys(emptySections).length){setSectionErrors(emptySections);return;}
@@ -269,7 +269,7 @@ export default function AdminAssessmentsPage() {
             />{" "}
             Randomize question order for each attempt
           </label>
-          <div className="form-actions"><button type="button" className="btn secondary" onClick={setupDevelopmentAssessment}>Set up Development Assessment (30 Frontend + 30 Backend)</button></div>
+          <div className="form-actions"><button type="button" className="btn secondary" onClick={setupDevelopmentAssessment}>Set up Full Stack Assessment (Frontend + Backend)</button></div>
           {form.sections.map((s, i) => (
             <div className="assessment-section-builder" key={i}>
               <div className="verification-title">
