@@ -704,12 +704,13 @@ r.post("/assessments/:id/start", async (req, res) => {
   const p = await me(req.user.id);
   const a = (
     await q(
-      `SELECT a.* FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id WHERE a.id=$1 AND ba.intern_id=$2 AND a.status IN ('PUBLISHED','ACTIVE')`,
+      `SELECT a.* FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id WHERE a.id=$1 AND ba.intern_id=$2 AND a.status IN ('PUBLISHED','ACTIVE','CLOSED')`,
       [req.params.id, p.id],
     )
   ).rows[0];
   if (!a) return res.status(404).json({ error: "Assessment not available" });
   const approvedRetry = (await q("SELECT id FROM assessment_retry_requests WHERE assessment_id=$1 AND intern_id=$2 AND status='APPROVED' AND approved_attempt_id IS NULL LIMIT 1",[a.id,p.id])).rows[0];
+  if (a.status === "CLOSED" && !approvedRetry) return res.status(409).json({error:"Assessment is closed. Admin approval is required to retake it."});
   const now = new Date();
   if (!approvedRetry && a.window_start && now < new Date(a.window_start))
     return res.status(409).json({ error: "Assessment has not opened yet" });
