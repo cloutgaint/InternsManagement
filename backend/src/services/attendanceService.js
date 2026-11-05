@@ -73,7 +73,7 @@ export async function decideLeave(req, id, status, reason, canDecide = null) {
 
 // An approved exception changes the attendance record; nothing is ever edited silently.
 export async function decideAttendanceException(req, id, status, reason, canDecide = null) {
-  if (!["APPROVED", "REJECTED"].includes(status)) throw badRequest("Decision must be APPROVED or REJECTED");
+  if (!["APPROVED", "REJECTED", "CLOSED"].includes(status)) throw badRequest("Decision must be APPROVED, REJECTED or CLOSED");
   const decisionReason = String(reason || "").trim();
   if (!decisionReason) throw badRequest("An attendance exception decision reason is required");
   const outcome = await tx(async (client) => {
@@ -105,6 +105,6 @@ export async function decideAttendanceException(req, id, status, reason, canDeci
   });
   await audit(req, "ATTENDANCE_EXCEPTION_" + status, "attendance_exception", id, outcome.before, { ...outcome.after, record: outcome.record });
   const intern = await internUser(outcome.after.intern_id);
-  await notify(intern?.user_id, "ATTENDANCE_CORRECTION_" + status, "Attendance correction " + status.toLowerCase(), "Your attendance request for " + outcome.after.day + " was " + status.toLowerCase() + ". " + decisionReason, "/intern/attendance");
+  if (status !== "CLOSED") await notify(intern?.user_id, "ATTENDANCE_CORRECTION_" + status, "Attendance correction " + status.toLowerCase(), "Your attendance request for " + outcome.after.day + " was " + status.toLowerCase() + ". " + decisionReason, "/intern/attendance");
   return outcome.after;
 }
