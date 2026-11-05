@@ -67,6 +67,25 @@ export default function AdminAssessmentsPage() {
       sections: x.sections.map((s, n) => (n === i ? { ...s, [k]: v } : s)),
     }));
   }
+  function setupDevelopmentAssessment() {
+    const frontend = domains.find(d => /^front[ -]?end$/i.test(d.name?.trim() || ""));
+    const backend = domains.find(d => /^back[ -]?end$/i.test(d.name?.trim() || ""));
+    const fullStack = domains.find(d => /full[ -]?stack/i.test(d.name || ""));
+    const frontendId = frontend?.id || fullStack?.id || "";
+    const backendId = backend?.id || fullStack?.id || "";
+    setForm(current => ({
+      ...current,
+      name: current.name || "Full Stack Development Initial Assessment",
+      sections: [
+        { name: "Frontend", domainId: frontendId, passScore: 50, questionIds: [] },
+        { name: "Backend", domainId: backendId, passScore: 50, questionIds: [] },
+      ],
+    }));
+    setSectionErrors({});
+    setFeedbackArea("create");
+    setErr("");
+    setMsg("Frontend and Backend sections created. Select 30 eligible MCQs for each section before publishing.");
+  }
   async function create(e) {setFeedbackArea("create");
     e.preventDefault();setErr("");setMsg("");setSectionErrors({});
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
