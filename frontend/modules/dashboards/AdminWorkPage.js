@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+import Link from "next/link";
 export default function AdminWorkPage() {
   const [groups, setGroups] = useState([]),
     [mentors, setMentors] = useState([]),
@@ -35,19 +36,6 @@ export default function AdminWorkPage() {
     setMsg("Project created.");
     load();
   }
-  async function task() {
-    const title = prompt("Task title:");
-    if (!title || !batches.length) return;
-    await api("/admin/tasks", {
-      method: "POST",
-      body: JSON.stringify({
-        batchId: batches[0].id,
-        title,
-        status: "RELEASED",
-      }),
-    });
-    setMsg("Weekly task released.");
-  }
   async function mentor(g) {
     if (!mentors.length) return setErr("No active mentors found.");
     await api("/admin/mentor-assignments", {
@@ -72,7 +60,7 @@ export default function AdminWorkPage() {
     <main className="wrap">
       <h1>Internship Management</h1>
       <p className="muted">
-        Manage groups, mentors, projects and weekly tasks.
+        Manage groups, mentors and projects. Prepare all internship weeks in the Weekly Task Scheduler; each task releases on its configured date.
       </p>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
@@ -80,9 +68,9 @@ export default function AdminWorkPage() {
         <button className="btn" onClick={project}>
           Create Project
         </button>
-        <button className="btn secondary" onClick={task}>
-          Release Weekly Task
-        </button>
+        <Link className="btn secondary" href="/admin/tasks">
+          Plan & Schedule Weekly Tasks
+        </Link>
       </div>
       {groups.map((g) => (
         <section className="card workflow-row" key={g.id}>
