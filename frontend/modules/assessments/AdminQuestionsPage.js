@@ -66,14 +66,16 @@ export default function AdminQuestionsPage() {
     FRONTEND: domains.find(d => /^front[ -]?end$/i.test(d.name.trim()))?.id || null,
     BACKEND: domains.find(d => /^back[ -]?end$/i.test(d.name.trim()))?.id || null,
   }), [domains]);
-  const fullStackFilter = domains.some(domain => domain.id === filter.domain && isFullStackDomain(domain));
+  const fullStackIds = domains.filter(isFullStackDomain).map(domain => domain.id);
+  const fullStackFilter = !filter.domain || fullStackIds.includes(filter.domain);
   const selectQuestionTab = (tab) => {
     setQuestionTab(tab);
     const domainId = fullStackFilter ? filter.domain : tab === "ALL" ? "" : questionDomains[tab] || "";
     setFilter(current => ({ ...current, domain: domainId }));
-    if (domainId) {
-      setAi(current => ({ ...current, domainId }));
-      if (!editId) setForm(current => ({ ...current, domainId }));
+    if (domainId || (fullStackFilter && tab !== "ALL")) {
+      const selectedDomain = domainId || fullStackIds[0] || "";
+      setAi(current => ({ ...current, domainId: selectedDomain }));
+      if (!editId) setForm(current => ({ ...current, domainId: selectedDomain }));
     }
   };
   const visible = useMemo(
@@ -83,13 +85,13 @@ export default function AdminQuestionsPage() {
           (!filter.q ||
             (x.question || "").toLowerCase().includes(filter.q.toLowerCase()) ||
             (x.topic || "").toLowerCase().includes(filter.q.toLowerCase())) &&
-          (questionTab === "ALL" || (fullStackFilter ? fullStackQuestionCategory(x) === questionTab : (questionDomains[questionTab] && x.domain_id === questionDomains[questionTab]))) &&
+          (questionTab === "ALL" || (fullStackFilter ? fullStackIds.includes(x.domain_id) && fullStackQuestionCategory(x) === questionTab : (questionDomains[questionTab] && x.domain_id === questionDomains[questionTab]))) &&
           (!filter.domain || x.domain_id === filter.domain) &&
           (!filter.difficulty || x.difficulty === filter.difficulty) &&
           (!filter.type || x.type === filter.type) &&
           (!filter.status || x.status === filter.status),
       ),
-    [rows, filter, questionTab, questionDomains, fullStackFilter],
+    [rows, filter, questionTab, questionDomains, fullStackFilter, domains],
   );
   const generatedRows = aiDrafts;
   const editingAiDraft = Boolean(editId && rows.find((question) => question.id === editId)?.source === "AI" && rows.find((question) => question.id === editId)?.status === "DRAFT");
@@ -637,7 +639,7 @@ export default function AdminQuestionsPage() {
         <nav aria-label="Question Library categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
           {(fullStackFilter ? [{key:"ALL",label:"All Full Stack"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"},{key:"UNCLASSIFIED",label:"Unclassified"}] : [{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}]).map(tab => (
             <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn "+(questionTab===tab.key?"":"secondary")} onClick={()=>selectQuestionTab(tab.key)} disabled={!fullStackFilter&&tab.key!=="ALL"&&!questionDomains[tab.key]}>
-              {tab.label} ({rows.filter(q=>(!filter.domain||q.domain_id===filter.domain)&&(tab.key==="ALL"||(fullStackFilter?fullStackQuestionCategory(q)===tab.key:q.domain_id===questionDomains[tab.key]))).length})
+              {tab.label} ({rows.filter(q=>(!filter.domain||q.domain_id===filter.domain)&&(tab.key==="ALL"||(fullStackFilter?fullStackIds.includes(q.domain_id)&&fullStackQuestionCategory(q)===tab.key:q.domain_id===questionDomains[tab.key]))).length})
             </button>
           ))}
         </nav>
