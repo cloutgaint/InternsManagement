@@ -268,7 +268,7 @@ export default function AdminQuestionsPage() {
   async function deleteQuestion(x) {
     setFeedbackArea("reviewAI");
     setErr(""); setMsg("");
-    if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
+    if (!window.confirm("Permanently delete this question? If used in assessments, its answers and section references will also be removed, changing historical scores. This cannot be undone.")) return;
     try {
       await api("/admin/questions/" + x.id, { method: "DELETE" });
       setRows(items => items.filter(item => item.id !== x.id));
