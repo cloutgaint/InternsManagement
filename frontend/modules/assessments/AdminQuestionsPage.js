@@ -266,31 +266,19 @@ export default function AdminQuestionsPage() {
     }
   }
   async function deleteQuestion(x) {
-    if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
     setFeedbackArea("reviewAI");
-    setErr("");
-    setMsg("");
+    setErr(""); setMsg("");
+    if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
     try {
       await api("/admin/questions/" + x.id, { method: "DELETE" });
-      setRows((items) => items.filter((item) => item.id !== x.id));
+      setRows(items => items.filter(item => item.id !== x.id));
       if (editId === x.id) reset();
       setMsg("Question deleted successfully.");
     } catch (e) {
-      setErr(e.message);
-    }
-  }
-  async function deleteQuestion(x) {
-    if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
-    setFeedbackArea("reviewAI");
-    setErr("");
-    setMsg("");
-    try {
-      await api("/admin/questions/" + x.id, { method: "DELETE" });
-      setRows((items) => items.filter((item) => item.id !== x.id));
-      if (editId === x.id) reset();
-      setMsg("Question deleted successfully.");
-    } catch (e) {
-      setErr(e.message);
+      const message = String(e.message || "");
+      if (/409|conflict|used in an assessment|referenced/i.test(message)) {
+        setErr("This question is already used in an assessment and cannot be permanently deleted. Use Deactivate to remove it from future assessments while preserving existing results.");
+      } else setErr(message);
     }
   }
   const domainName = (id) => domains.find((x) => x.id === id)?.name || "Common";
