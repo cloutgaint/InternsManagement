@@ -73,7 +73,7 @@ export default function InternAssessmentsPage() {
     } catch(e) { setErr(e.message); } finally { setBusy(false); }
   }
   function canStart(assessment) {
-    if (!["PUBLISHED", "ACTIVE"].includes(assessment.status)) return false;
+    if (!["PUBLISHED", "ACTIVE"].includes(assessment.status) && !assessment.approved_retry_available) return false;
     const history = assessment.attempt_history || [];
     const inProgress = history.some((attempt) => attempt.status === "IN_PROGRESS");
     const withinWindow =
@@ -312,7 +312,7 @@ export default function InternAssessmentsPage() {
                 <div><b>{a.name}</b><div className="muted">{a.duration_minutes} minutes · {a.attempt_count} attempt(s){a.window_end ? " · closes " + new Date(a.window_end).toLocaleString() : ""}</div></div>
                 <div className="action-row">
                   <span className="status-pill">{a.attempt_status || "AVAILABLE"}</span>
-                  {canStart(a) && <button className="btn" disabled={busy} onClick={() => start(a)}>{a.attempt_status === "IN_PROGRESS" ? "Resume Assessment" : (a.attempt_history || []).length ? "Start Next Attempt" : "Start Assessment"}</button>}
+                  {canStart(a) && !a.approved_retry_available && <button className="btn" disabled={busy} onClick={() => start(a)}>{a.attempt_status === "IN_PROGRESS" ? "Resume Assessment" : (a.attempt_history || []).length ? "Start Next Attempt" : "Start Assessment"}</button>}
                   {a.attempt_status === "PENDING_EVALUATION" && <span className="muted">Evaluation pending</span>}
                   {a.attempt_status === "EVALUATED" && <b>Recorded score: {a.total_score ?? "Unavailable"}</b>}
                 </div>
@@ -326,7 +326,7 @@ export default function InternAssessmentsPage() {
                   {(a.attempt_history || []).length >= Number(a.attempt_count || 1) && <button className="btn secondary" type="button" disabled={busy} onClick={()=>requestRetry(a)}>Request Retry</button>}
                 </>}
               </div>}
-              {a.approved_retry_available && <p className="success">Admin approved your retry. You may start another attempt.</p>}
+              {a.approved_retry_available && <div className="success" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><span>Admin approved your retry. You may start another attempt.</span><button type="button" className="btn" disabled={busy} onClick={()=>start(a)}>Start Approved Retake</button></div>}
               {!!a.attempt_history?.length && <div className="assessment-history">
                 <b>Assessment History</b>
                 {a.attempt_history.map((attempt, index) => <div className="attempt-result" key={attempt.id}>
