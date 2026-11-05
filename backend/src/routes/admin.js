@@ -2512,8 +2512,8 @@ function developmentSectionError(sections) {
   if (sections.length !== 2 || names.filter(n => n === "frontend").length !== 1 || names.filter(n => n === "backend").length !== 1)
     return "Development assessment requires exactly two sections: Frontend and Backend.";
   const counts = sections.map(s => (s.questionIds || s.question_ids || []).length);
-  if (counts.some(count => count < 1) || Math.abs(counts[0] - counts[1]) > 1)
-    return "Development assessment needs Frontend and Backend sections with balanced, non-empty MCQ counts.";
+  if (counts.some(count => count < 1))
+    return "Development assessment needs at least one MCQ in each Frontend and Backend section; question counts may differ.";
   if (sections.some(s => !s.domainId && !s.domain_id))
     return "Assign the corresponding domain to each Development assessment section.";
   return null;
