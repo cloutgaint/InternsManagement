@@ -19,7 +19,8 @@ export default function InternAssessmentsPage() {
     [left, setLeft] = useState(0),
     [err, setErr] = useState(""),
     [msg, setMsg] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [retryReasons, setRetryReasons] = useState({});
   const load = () =>
     api("/intern/assessments")
       .then(setList)
@@ -59,6 +60,18 @@ export default function InternAssessmentsPage() {
       setBusy(false);
     }
   }
+  async function requestRetry(assessment) {
+    const reason = String(retryReasons[assessment.id] || "").trim();
+    if (!reason) return setErr("Enter a reason for requesting a retry.");
+    setErr(""); setMsg("");
+    try {
+      setBusy(true);
+      await api("/intern/assessments/" + assessment.id + "/retry-request", {method:"POST",body:JSON.stringify({reason})});
+      setMsg("Retry request submitted. Wait for Admin approval before rewriting the assessment.");
+      setRetryReasons(current => ({...current,[assessment.id]:""}));
+      await load();
+    } catch(e) { setErr(e.message); } finally { setBusy(false); }
+  }
   function canStart(assessment) {
     if (!["PUBLISHED", "ACTIVE"].includes(assessment.status)) return false;
     const history = assessment.attempt_history || [];
@@ -66,7 +79,7 @@ export default function InternAssessmentsPage() {
     const withinWindow =
       (!assessment.window_start || new Date(assessment.window_start) <= new Date()) &&
       (!assessment.window_end || new Date(assessment.window_end) > new Date());
-    return withinWindow && (inProgress || history.length < Number(assessment.attempt_count || 1));
+    return withinWindow && (inProgress || (history.length < Number(assessment.attempt_count || 1) || assessment.approved_retry_available));
   }
   // Optional integrity signal (Blueprint 7.1): leaving the tab is logged, never blocked.
   useEffect(() => {
@@ -304,6 +317,15 @@ export default function InternAssessmentsPage() {
                   {a.attempt_status === "EVALUATED" && <b>Recorded score: {a.total_score ?? "Unavailable"}</b>}
                 </div>
               </div>
+              {(a.attempt_history || []).length >= Number(a.attempt_count || 1) && !a.approved_retry_available && !a.attempt_history?.some(attempt=>attempt.status==="IN_PROGRESS") && <div className="card" style={{padding:12,marginTop:12}}>
+                <b>Request another attempt</b>
+                {a.retry_requests?.some(request=>request.status==="PENDING") ? <p className="muted">Retry request pending Admin approval.</p> : <>
+                  {a.retry_requests?.[0]?.status==="REJECTED" && <p className="muted">Previous request rejected: {a.retry_requests[0].admin_note || "No reason provided"}</p>}
+                  <textarea aria-label="Reason for assessment retry" rows={2} placeholder="Why do you need to retake this assessment?" value={retryReasons[a.id] || ""} onChange={e=>setRetryReasons(current=>({...current,[a.id]:e.target.value}))}/>
+                  <button className="btn secondary" type="button" disabled={busy} onClick={()=>requestRetry(a)}>Request Retry</button>
+                </>}
+              </div>}
+              {a.approved_retry_available && <p className="success">Admin approved your retry. You may start another attempt.</p>}
               {!!a.attempt_history?.length && <div className="assessment-history">
                 <b>Assessment History</b>
                 {a.attempt_history.map((attempt, index) => <div className="attempt-result" key={attempt.id}>
