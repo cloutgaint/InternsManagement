@@ -61,16 +61,6 @@ export default function AdminAssessmentsPage() {
   useEffect(() => {
     load();
   }, []);
-  function setupDevelopmentAssessment() {
-    const frontend = domains.find(d => /^front[ -]?end$/i.test(d.name.trim()));
-    const backend = domains.find(d => /^back[ -]?end$/i.test(d.name.trim()));
-    setFeedbackArea("create"); setErr(""); setMsg("");
-    if (!frontend || !backend) return setErr("Create active Frontend and Backend domains before setting up this assessment.");
-    setForm(current => ({ ...current, name:"Development Initial Assessment", sections:[
-      {name:"Frontend",domainId:frontend.id,passScore:50,questionIds:[]},
-      {name:"Backend",domainId:backend.id,passScore:50,questionIds:[]}
-    ] }));
-  }
   function sec(i, k, v) {
     setForm((x) => ({
       ...x,
