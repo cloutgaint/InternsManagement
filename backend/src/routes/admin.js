@@ -1860,8 +1860,7 @@ r.put("/interns/:internId/mentor", async(req,res)=>{
   if(mentorId){
     const mentor=(await q("SELECT id,max_interns FROM mentors WHERE id=$1 AND active",[mentorId])).rows[0];
     if(!mentor)return res.status(404).json({error:"Active mentor not found"});
-    const load=(await q("SELECT count(*)::int n FROM intern_mentor_assignments WHERE mentor_id=$1 AND active AND intern_id<>$2",[mentorId,intern.id])).rows[0].n;
-    if(load>=Number(mentor.max_interns))return res.status(409).json({error:"Mentor has reached the maximum number of interns"});
+
   }
   const result=await tx(async client=>{
     const previous=(await client.query("SELECT * FROM intern_mentor_assignments WHERE intern_id=$1 AND active FOR UPDATE",[intern.id])).rows[0]||null;
@@ -2016,38 +2015,6 @@ r.post("/groups/:id/mentor", async (req, res) => {
     ).rows[0];
   if (!g || !m)
     return res.status(404).json({ error: "Group or mentor not found" });
-  const load = (
-    await q(
-      `SELECT COUNT(DISTINCT ma.group_id)::int groups,COUNT(DISTINCT gm.intern_id)::int interns FROM mentor_assignments ma LEFT JOIN group_members gm ON gm.group_id=ma.group_id AND gm.active WHERE ma.mentor_id=$1 AND ma.active AND ma.group_id<>$2`,
-      [m.id, g.id],
-    )
-  ).rows[0];
-  const groupCount = Number(
-    (
-      await q(
-        "SELECT count(*) n FROM group_members WHERE group_id=$1 AND active",
-        [g.id],
-      )
-    ).rows[0].n,
-  );
-  if (Number(load.groups) >= Number(m.max_groups))
-    return res.status(409).json({
-      error:
-        m.full_name +
-        " has reached the maximum group capacity (" +
-        m.max_groups +
-        ")",
-    });
-  if (Number(load.interns) + groupCount > Number(m.max_interns))
-    return res.status(409).json({
-      error:
-        m.full_name +
-        " would exceed intern capacity (" +
-        (Number(load.interns) + groupCount) +
-        "/" +
-        m.max_interns +
-        ")",
-    });
   if (
     domainId &&
     Array.isArray(m.expertise) &&
@@ -2111,32 +2078,6 @@ r.post("/groups/:id/mentor/reassign", async (req, res) => {
     ).rows[0];
   if (!g || !m)
     return res.status(404).json({ error: "Group or mentor not found" });
-  const load = (
-      await q(
-        `SELECT COUNT(DISTINCT ma.group_id)::int groups,COUNT(DISTINCT gm.intern_id)::int interns FROM mentor_assignments ma LEFT JOIN group_members gm ON gm.group_id=ma.group_id AND gm.active WHERE ma.mentor_id=$1 AND ma.active`,
-        [m.id],
-      )
-    ).rows[0],
-    gc = Number(
-      (
-        await q(
-          "SELECT count(*) n FROM group_members WHERE group_id=$1 AND active",
-          [g.id],
-        )
-      ).rows[0].n,
-    );
-  if (
-    Number(load.groups) >= Number(m.max_groups) ||
-    Number(load.interns) + gc > Number(m.max_interns)
-  ) {
-    if (old)
-      await q("UPDATE mentor_assignments SET active=true WHERE id=$1", [
-        old.id,
-      ]);
-    return res
-      .status(409)
-      .json({ error: "Selected mentor does not have enough capacity" });
-  }
   const x = (
     await q(
       "INSERT INTO mentor_assignments(mentor_id,group_id,domain_id,is_lead,active) VALUES($1,$2,$3,true,true) RETURNING *",
