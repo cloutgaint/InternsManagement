@@ -1930,6 +1930,34 @@ r.patch("/groups/:id/members", async (req, res) => {
   });
   res.json({ ok: true, count: ids.length });
 });
+r.get("/project-team-recommendations/:batchId", async (req,res) => {
+  const rows=(await q(`SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,d.name confirmed_domain,aa.result_snapshot,aa.submitted_at
+    FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$1
+    JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
+    LEFT JOIN domains d ON d.id=ip.final_domain_id
+    LEFT JOIN LATERAL(SELECT result_snapshot,submitted_at FROM assessment_attempts aa WHERE aa.intern_id=ip.id AND aa.status='EVALUATED' AND aa.result_snapshot IS NOT NULL ORDER BY aa.submitted_at DESC LIMIT 1) aa ON true
+    ORDER BY ip.full_name`,[req.params.batchId])).rows;
+  res.json(rows.map(x=>({intern_id:x.intern_id,full_name:x.full_name,confirmed_domain:x.confirmed_domain,recommendation:x.result_snapshot?.domainRecommendation||null,section_results:x.result_snapshot?.sectionResults||[]})));
+});
+r.post("/groups/:id/transfer", async(req,res)=>{
+  const internId=req.body?.internId;
+  if(!internId)return res.status(400).json({error:"Select an intern to transfer"});
+  const g=(await q("SELECT * FROM groups WHERE id=$1 AND status='ACTIVE'",[req.params.id])).rows[0];
+  if(!g)return res.status(404).json({error:"Destination group must be active"});
+  const person=(await q("SELECT ip.id,ip.final_domain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",[internId,g.batch_id])).rows[0];
+  if(!person)return res.status(409).json({error:"Intern must be allocated to the destination batch"});
+  if(!person.final_domain_id)return res.status(409).json({error:"Confirm intern domain before transfer"});
+  const result=await tx(async client=>{
+    const old=(await client.query("SELECT gm.group_id,g.name,gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.batch_id=$2 AND g.status='ACTIVE' FOR UPDATE OF gm",[internId,g.batch_id])).rows;
+    if(old.some(x=>x.group_id===g.id))throw conflict("Intern is already assigned to this team");
+    await client.query("UPDATE group_members gm SET active=false FROM groups other WHERE gm.group_id=other.id AND other.batch_id=$2 AND gm.intern_id=$1 AND gm.active",[internId,g.batch_id]);
+    await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,project_role,active) VALUES($1,$2,$3,NULL,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,project_role=NULL,active=true",[g.id,internId,person.final_domain_id]);
+    await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action,details) VALUES($1,$2,$3,'MEMBER_TRANSFER',$4)",[g.id,g.batch_id,req.user.id,JSON.stringify({internId,from:old.map(x=>x.group_id)})]);
+    return old;
+  });
+  await audit(req,"GROUP_MEMBER_TRANSFER","group",g.id,{from:result},{internId});
+  res.json({ok:true,from:result,to:g.id});
+});
 r.patch("/groups/:id/members/:internId/role", async (req, res) => {
   const role = String(req.body?.role || "").trim();
   if (!role || role.length > 100) return res.status(400).json({error:"Choose a project role (maximum 100 characters)"});
