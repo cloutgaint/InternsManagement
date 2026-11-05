@@ -1240,44 +1240,48 @@ r.post("/offer-letters/:id/revoke", async (req, res) => {
   res.json(x);
 });
 async function domainRecommendation(internId, batchId) {
-  const ip = (
-    await q("SELECT preferred_domains FROM intern_profiles WHERE id=$1", [
-      internId,
-    ])
-  ).rows[0];
+  const ip = (await q("SELECT preferred_domains FROM intern_profiles WHERE id=$1", [internId])).rows[0];
   if (!ip) throw Object.assign(new Error("Intern not found"), { status: 404 });
-  const rows = (
-    await q(
-      `SELECT s.domain_id,d.name domain_name,SUM(COALESCE(ans.manual_score,ans.auto_score,0)) earned,SUM(qb.marks) possible FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN assessment_sections s ON s.assessment_id=a.id JOIN domains d ON d.id=s.domain_id JOIN assessment_answers ans ON ans.attempt_id=aa.id AND s.question_ids ? ans.question_id::text JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.intern_id=$1 AND a.batch_id=$2 AND aa.status='EVALUATED' AND s.domain_id IS NOT NULL GROUP BY s.domain_id,d.name`,
-      [internId, batchId],
-    )
-  ).rows;
+  const rows = (await q(
+    `SELECT s.domain_id,d.name domain_name,qb.difficulty,qb.topic,
+      SUM(COALESCE(ans.manual_score,ans.auto_score,0)) earned,SUM(qb.marks) possible,
+      COUNT(*)::int question_count,
+      COUNT(*) FILTER (WHERE COALESCE(ans.manual_score,ans.auto_score,0) >= qb.marks)::int correct_count
+     FROM assessment_attempts aa
+     JOIN assessments a ON a.id=aa.assessment_id
+     JOIN assessment_sections s ON s.assessment_id=a.id
+     JOIN domains d ON d.id=s.domain_id
+     JOIN assessment_answers ans ON ans.attempt_id=aa.id AND s.question_ids ? ans.question_id::text
+     JOIN question_bank qb ON qb.id=ans.question_id
+     WHERE aa.intern_id=$1 AND a.batch_id=$2 AND aa.status='EVALUATED' AND s.domain_id IS NOT NULL AND qb.type='MCQ'
+     GROUP BY s.domain_id,d.name,qb.difficulty,qb.topic`,
+    [internId,batchId],
+  )).rows;
   const prefs = Array.isArray(ip.preferred_domains) ? ip.preferred_domains : [];
-  const recs = rows
-    .map((x) => {
-      const assessment =
-        Number(x.possible) > 0
-          ? (Number(x.earned) / Number(x.possible)) * 100
-          : 0;
-      const prefIndex = prefs.findIndex(
-        (p) =>
-          String(p).toLowerCase() === String(x.domain_name).toLowerCase() ||
-          String(p) === String(x.domain_id),
-      );
-      const preference = prefIndex < 0 ? 0 : Math.max(0, 10 - prefIndex * 3);
-      return {
-        domainId: x.domain_id,
-        domainName: x.domain_name,
-        assessmentScore: Number(assessment.toFixed(2)),
-        preferenceBonus: preference,
-        recommendationScore: Number(
-          Math.min(100, assessment * 0.9 + preference).toFixed(2),
-        ),
-        evidence: { earned: Number(x.earned), possible: Number(x.possible) },
-      };
-    })
-    .sort((x, y) => y.recommendationScore - x.recommendationScore);
-  return { preferences: prefs, recommendations: recs };
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = row.domain_id;
+    if (!grouped.has(key)) grouped.set(key, { domainId:key, domainName:row.domain_name, earned:0, possible:0, questionCount:0, correctCount:0, byDifficulty:{}, byTopic:{} });
+    const item = grouped.get(key);
+    const earned = Number(row.earned), possible = Number(row.possible);
+    item.earned += earned; item.possible += possible;
+    item.questionCount += Number(row.question_count); item.correctCount += Number(row.correct_count);
+    const difficulty = row.difficulty || "UNSPECIFIED", topic = row.topic || "General";
+    for (const [group,label] of [[item.byDifficulty,difficulty],[item.byTopic,topic]]) {
+      if (!group[label]) group[label] = { earned:0, possible:0, questionCount:0, correctCount:0 };
+      group[label].earned += earned; group[label].possible += possible;
+      group[label].questionCount += Number(row.question_count);
+      group[label].correctCount += Number(row.correct_count);
+    }
+  }
+  const recommendations = [...grouped.values()].map((item) => {
+    const assessmentScore = item.possible ? Number((100*item.earned/item.possible).toFixed(2)) : 0;
+    const breakdown = (group) => Object.fromEntries(Object.entries(group).map(([name,v]) => [name,{...v, percentage:v.possible?Number((100*v.earned/v.possible).toFixed(2)):0}]));
+    return { domainId:item.domainId, domainName:item.domainName, assessmentScore, preferenceBonus:0,
+      recommendationScore:assessmentScore, evidence:{earned:item.earned,possible:item.possible,questionCount:item.questionCount,correctCount:item.correctCount,
+        byDifficulty:breakdown(item.byDifficulty),byTopic:breakdown(item.byTopic)} };
+  }).sort((a,b) => b.recommendationScore-a.recommendationScore || b.evidence.questionCount-a.evidence.questionCount);
+  return { preferences:prefs, recommendations };
 }
 r.get("/domain-recommendations", async (req, res) => {
   const rows = (
@@ -2461,10 +2465,24 @@ r.get("/assessments/:id", async (req, res) => {
   ).rows;
   res.json(x);
 });
+function developmentSectionError(sections) {
+  const names = sections.map(s => String(s.name || "").trim().toLowerCase());
+  const isDevelopment = names.some(n => n === "frontend" || n === "backend");
+  if (!isDevelopment) return null;
+  if (sections.length !== 2 || names.filter(n => n === "frontend").length !== 1 || names.filter(n => n === "backend").length !== 1)
+    return "Development assessment requires exactly two sections: Frontend and Backend.";
+  if (sections.some(s => (s.questionIds || s.question_ids || []).length !== 30))
+    return "Select exactly 30 MCQs for Frontend and 30 MCQs for Backend.";
+  if (sections.some(s => !s.domainId && !s.domain_id))
+    return "Assign the corresponding domain to each Development assessment section.";
+  return null;
+}
 async function assessmentPublishError(assessmentId) {
   const sections = (
     await q("SELECT id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
   ).rows;
+  const developmentError = developmentSectionError(sections);
+  if (developmentError) return developmentError;
   const ids = sections.flatMap((section) => section.question_ids);
   const shapeError = questionSelectionError(sections);
   if (shapeError) return shapeError;
@@ -2510,6 +2528,8 @@ r.post("/assessments", async (req, res) => {
   )
     return res.status(400).json({ error: "Invalid assessment status" });
   const sections = Array.isArray(b.sections) ? b.sections : [];
+  const developmentError = developmentSectionError(sections);
+  if (developmentError) return res.status(400).json({ error: developmentError });
   if (!sections.length)
     return res
       .status(400)
