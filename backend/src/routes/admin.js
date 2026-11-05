@@ -1779,8 +1779,8 @@ r.post("/mentors", async (req, res) => {
   const expertise = Array.isArray(b.expertise)
     ? b.expertise.map((x) => String(x).trim()).filter(Boolean)
     : [];
-  const maxGroups = Number(b.maxGroups),
-    maxInterns = Number(b.maxInterns);
+  const maxGroups = 5,
+    maxInterns = 30;
   if (
     fullName.length < 2 ||
     fullName.length > 150 ||
@@ -1790,12 +1790,6 @@ r.post("/mentors", async (req, res) => {
     !/[a-z]/.test(password) ||
     !/[0-9]/.test(password) ||
     !/[^A-Za-z0-9]/.test(password) ||
-    !Number.isInteger(maxGroups) ||
-    maxGroups < 1 ||
-    maxGroups > 100 ||
-    !Number.isInteger(maxInterns) ||
-    maxInterns < 1 ||
-    maxInterns > 1000 ||
     expertise.length > 20 ||
     expertise.some((x) => x.length > 100)
   )
@@ -1803,7 +1797,7 @@ r.post("/mentors", async (req, res) => {
       .status(400)
       .json({
         error:
-          "Provide name, valid email, strong password (12+ characters, upper/lowercase, number, symbol), valid capacities and expertise",
+          "Provide name, valid email, strong password (12+ characters, upper/lowercase, number, symbol), valid expertise",
       });
   if ((await q("SELECT 1 FROM users WHERE lower(email)=$1", [email])).rowCount)
     return res.status(409).json({ error: "Email is already registered" });
