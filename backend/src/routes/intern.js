@@ -43,12 +43,14 @@ const shuffled = (items) => {
 };
 // An assessment is the common section plus sections for the intern's preferred domains (Section 6.5).
 async function sectionsForIntern(assessmentId, profile) {
-  const prefs = (Array.isArray(profile.preferred_domains) ? profile.preferred_domains : []).map((x) => String(x).toLowerCase());
-  const rows = (await q("SELECT s.*,d.name domain_name FROM assessment_sections s LEFT JOIN domains d ON d.id=s.domain_id WHERE s.assessment_id=$1 ORDER BY s.id", [assessmentId])).rows;
-  if (!prefs.length) return rows;
-  const matched = rows.filter((s) => !s.domain_id || prefs.includes(String(s.domain_id).toLowerCase()) || prefs.includes(String(s.domain_name).toLowerCase()));
-  return matched.length ? matched : rows;
+  // An assessment's published sections define the exam. Never silently remove
+  // sections based on preferences: doing so can turn a 20-question exam into 9.
+  return (await q(
+    "SELECT s.*,d.name domain_name FROM assessment_sections s LEFT JOIN domains d ON d.id=s.domain_id WHERE s.assessment_id=$1 ORDER BY s.id",
+    [assessmentId],
+  )).rows;
 }
+
 async function me(uid) {
   return (await q("SELECT * FROM intern_profiles WHERE user_id=$1", [uid]))
     .rows[0];
@@ -739,6 +741,9 @@ r.get("/assessments/:id/questions", async (req, res) => {
         )
       ).rows
     : [];
+  if (!ids.length) return res.status(409).json({ error: "No questions have been allocated to this assessment. Contact the Admin." });
+  if (new Set(ids).size !== ids.length) return res.status(409).json({ error: "Duplicate questions were allocated to this assessment. Contact the Admin." });
+  if (qs.length !== ids.length) return res.status(409).json({ error: `This assessment has ${ids.length} allocated questions, but only ${qs.length} are available. Ask the Admin to repair missing questions before continuing.` });
   const order = new Map(ids.map((id, i) => [id, i]));
   qs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   if (at.randomize) {
