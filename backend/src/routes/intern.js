@@ -655,7 +655,12 @@ r.get("/assessments", async (req, res) => {
   for (const assessment of assessments) {
     assessment.attempt_history = attempts.filter((attempt) => attempt.assessment_id === assessment.id).map((attempt) => {
       const sectionResults = scoresByAttempt.get(attempt.id) || [];
-      return { ...attempt, sectionResults, ...summarizeAssessmentAttempt(sectionResults, attempt.status) };
+      const front = sectionResults.find(s => s.name.trim().toLowerCase() === "frontend");
+      const back = sectionResults.find(s => s.name.trim().toLowerCase() === "backend");
+      const domainRecommendation = attempt.status === "EVALUATED" && front && back
+        ? front.percentage === back.percentage ? "ADMIN_REVIEW" : front.percentage > back.percentage ? "Frontend" : "Backend"
+        : null;
+      return { ...attempt, sectionResults, domainRecommendation, ...summarizeAssessmentAttempt(sectionResults, attempt.status) };
     });
   }
   res.json(assessments);
