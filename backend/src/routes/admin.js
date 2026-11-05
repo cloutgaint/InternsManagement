@@ -2477,15 +2477,16 @@ function developmentSectionError(sections) {
   if (!isDevelopment) return null;
   if (sections.length !== 2 || names.filter(n => n === "frontend").length !== 1 || names.filter(n => n === "backend").length !== 1)
     return "Development assessment requires exactly two sections: Frontend and Backend.";
-  if (sections.some(s => (s.questionIds || s.question_ids || []).length !== 30))
-    return "Select exactly 30 MCQs for Frontend and 30 MCQs for Backend.";
+  const counts = sections.map(s => (s.questionIds || s.question_ids || []).length);
+  if (counts.some(count => count < 1) || Math.abs(counts[0] - counts[1]) > 1)
+    return "Development assessment needs Frontend and Backend sections with balanced, non-empty MCQ counts.";
   if (sections.some(s => !s.domainId && !s.domain_id))
     return "Assign the corresponding domain to each Development assessment section.";
   return null;
 }
 async function assessmentPublishError(assessmentId) {
   const sections = (
-    await q("SELECT id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
+    await q("SELECT id,name,domain_id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
   ).rows;
   const developmentError = developmentSectionError(sections);
   if (developmentError) return developmentError;
