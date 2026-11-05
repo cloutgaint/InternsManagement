@@ -185,12 +185,13 @@ export default function AdminQuestionsPage() {
     if (aiBusy) return;
     setAiError(""); setAiMessage("");
     if (!ai.instructions.trim()) return setAiError("Describe the MCQs you want to generate.");
+    if (questionTab !== "ALL" && fullStackFilter && questionTab !== "UNCLASSIFIED" && ai.domainId !== filter.domain) return setAiError("Select Full Stack as the AI generation domain to add questions to this category.");
     if (aiDrafts.length && aiDirtyIds.length && !window.confirm("Replace the edited unsaved MCQs with a new generation?")) return;
     try {
       setAiBusy(true);
       const out = await api("/admin/questions/ai-generate", {
         method: "POST",
-        body: JSON.stringify({ ...ai, topic: "", types: ["MCQ"] }),
+        body: JSON.stringify({ ...ai, instructions: fullStackFilter && ["FRONTEND", "BACKEND"].includes(questionTab) ? `Generate only ${questionTab.toLowerCase()} development MCQs. Each question topic must begin with "${questionTab === "FRONTEND" ? "Frontend" : "Backend"} - ". ${ai.instructions}` : ai.instructions, topic: "", types: ["MCQ"] }),
       });
       if (!out.questions?.length) throw new Error("No valid MCQs were generated. Try refining your prompt.");
       const drafts = withClientIds(out.questions);
@@ -632,6 +633,7 @@ export default function AdminQuestionsPage() {
             </p>
           </div>
         </div>
+        {fullStackFilter && <p className="muted">Full Stack questions are grouped by their topic and question content. To add new questions to a category, select its tab, choose Full Stack as the AI or manual question domain, and use a topic beginning with Frontend or Backend. Questions without a recognizable category appear under Unclassified.</p>}
         <nav aria-label="Question Library categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
           {(fullStackFilter ? [{key:"ALL",label:"All Full Stack"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"},{key:"UNCLASSIFIED",label:"Unclassified"}] : [{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}]).map(tab => (
             <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn "+(questionTab===tab.key?"":"secondary")} onClick={()=>selectQuestionTab(tab.key)} disabled={!fullStackFilter&&tab.key!=="ALL"&&!questionDomains[tab.key]}>
