@@ -660,7 +660,20 @@ r.get("/assessments", async (req, res) => {
       const domainRecommendation = attempt.status === "EVALUATED" && front && back
         ? front.percentage === back.percentage ? "ADMIN_REVIEW" : front.percentage > back.percentage ? "Frontend" : "Backend"
         : null;
-      return { ...attempt, sectionResults, domainRecommendation, ...summarizeAssessmentAttempt(sectionResults, attempt.status) };
+      const summary = summarizeAssessmentAttempt(sectionResults, attempt.status);
+      const hasScorableSections = sectionResults.some(section => section.possible > 0);
+      const historicalScore = attempt.total_score == null ? null : Number(attempt.total_score);
+      return {
+        ...attempt,
+        sectionResults,
+        domainRecommendation: hasScorableSections ? domainRecommendation : null,
+        ...summary,
+        earned: hasScorableSections ? summary.earned : historicalScore,
+        possible: hasScorableSections ? summary.possible : null,
+        percentage: hasScorableSections ? summary.percentage : null,
+        passed: hasScorableSections ? summary.passed : null,
+        scoreUnavailable: attempt.status === "EVALUATED" && !hasScorableSections,
+      };
     });
   }
   res.json(assessments);
