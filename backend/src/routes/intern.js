@@ -709,10 +709,11 @@ r.post("/assessments/:id/start", async (req, res) => {
     )
   ).rows[0];
   if (!a) return res.status(404).json({ error: "Assessment not available" });
+  const approvedRetry = (await q("SELECT id FROM assessment_retry_requests WHERE assessment_id=$1 AND intern_id=$2 AND status='APPROVED' AND approved_attempt_id IS NULL LIMIT 1",[a.id,p.id])).rows[0];
   const now = new Date();
-  if (a.window_start && now < new Date(a.window_start))
+  if (!approvedRetry && a.window_start && now < new Date(a.window_start))
     return res.status(409).json({ error: "Assessment has not opened yet" });
-  if (a.window_end && now > new Date(a.window_end))
+  if (!approvedRetry && a.window_end && now > new Date(a.window_end))
     return res.status(409).json({ error: "Assessment window has closed" });
   const active = (await q("SELECT * FROM assessment_attempts WHERE assessment_id=$1 AND intern_id=$2 AND status='IN_PROGRESS' ORDER BY started_at DESC LIMIT 1", [a.id, p.id])).rows[0];
   if (active) return res.json(active);
