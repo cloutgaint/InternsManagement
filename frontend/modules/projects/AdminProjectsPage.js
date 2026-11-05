@@ -316,49 +316,6 @@ export default function AdminProjectsPage() {
           </div>
         ))}
       </section>
-      <section className="card workflow-section">
-        <h2>Project Assignment</h2>{["assign"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-        {groups.map((g) => {
-          const current = assignments.find(
-            (a) => a.group_id === g.id && a.status === "ASSIGNED",
-          );
-          return (
-            <div className="workflow-row" key={g.id}>
-              <div>
-                <b>{g.name}</b>
-                <div className="muted">
-                  Current: {current?.project_title || "Not assigned"}
-                </div>
-              </div>
-              <div className="action-row">
-                <select
-                  className="input"
-                  value={choice[g.id] || ""}
-                  onChange={(e) =>
-                    setChoice((x) => ({ ...x, [g.id]: e.target.value }))
-                  }
-                >
-                  <option value="">Select project</option>
-                  {projects
-                    .filter((p) => p.status === "ACTIVE")
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  className="btn"
-                  disabled={!choice[g.id]}
-                  onClick={() => assign(g)}
-                >
-                  {current ? "Replace Project" : "Assign Project"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </section>
     </main>
   );
 }
