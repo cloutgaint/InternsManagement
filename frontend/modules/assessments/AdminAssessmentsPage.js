@@ -88,15 +88,15 @@ export default function AdminAssessmentsPage() {
     setSectionErrors({});
     setFeedbackArea("create");
     setErr("");
-    setMsg("Frontend and Backend sections created. Select equal numbers of eligible MCQs (for 20 total, select 10 in each section).");
+    setMsg("Frontend and Backend sections created. Select eligible MCQs for both sections. Question counts may differ; recommendations compare score percentages.");
   }
   async function create(e) {setFeedbackArea("create");
     e.preventDefault();setErr("");setMsg("");setSectionErrors({});
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
     const developmentNames = form.sections.map(s => s.name.trim().toLowerCase());
     if (developmentNames.includes("frontend") || developmentNames.includes("backend")) {
-      if (form.sections.length !== 2 || !developmentNames.includes("frontend") || !developmentNames.includes("backend") || form.sections.some(s => !s.questionIds.length || !s.domainId) || Math.abs(form.sections[0].questionIds.length - form.sections[1].questionIds.length) > 1)
-        return setErr("Select balanced Frontend and Backend MCQs (for 20 questions, select 10 in each section).");
+      if (form.sections.length !== 2 || !developmentNames.includes("frontend") || !developmentNames.includes("backend") || form.sections.some(s => !s.questionIds.length || !s.domainId))
+        return setErr("Select at least one MCQ in each Frontend and Backend section and assign their domains. Counts may differ; recommendations use score percentages.");
     }
     const emptySections = form.sections.reduce((out, section, index) => (!section.questionIds.length ? { ...out, [index]: "Add at least one eligible question to this section." } : out), {});
     if(Object.keys(emptySections).length){setSectionErrors(emptySections);return;}
