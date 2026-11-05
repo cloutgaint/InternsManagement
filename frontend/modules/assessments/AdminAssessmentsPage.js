@@ -35,6 +35,8 @@ export default function AdminAssessmentsPage() {
     [domains, setDomains] = useState([]),
     [assessments, setAssessments] = useState([]),
     [subs, setSubs] = useState([]),
+    [retryRequests, setRetryRequests] = useState([]),
+    [retryNotes, setRetryNotes] = useState({}),
     [form, setForm] = useState(fresh()),
     [review, setReview] = useState(null),
     [msg, setMsg] = useState(""),
@@ -49,13 +51,15 @@ export default function AdminAssessmentsPage() {
       api("/admin/domains"),
       api("/admin/assessments"),
       api("/admin/assessment-submissions"),
+      api("/admin/assessment-retry-requests"),
     ])
-      .then(([b, q, d, a, s]) => {
+      .then(([b, q, d, a, s, retries]) => {
         setBatches(b);
         setQuestions(q);
         setDomains(d);
         setAssessments(a);
         setSubs(s);
+        setRetryRequests(retries);
       })
       .catch((e) => setErr(e.message));
   useEffect(() => {
@@ -135,6 +139,15 @@ export default function AdminAssessmentsPage() {
     } catch (e) {
       setErr(e.message);
     }
+  }
+  async function decideRetry(request, decision) {
+    setFeedbackArea("retry");setErr("");setMsg("");
+    try {
+      setBusy(true);
+      await api("/admin/assessment-retry-requests/" + request.id + "/decision",{method:"POST",body:JSON.stringify({decision,note:retryNotes[request.id] || ""})});
+      setMsg("Retry request " + decision.toLowerCase() + ".");
+      await load();
+    } catch(e) { setErr(e.message); } finally { setBusy(false); }
   }
   async function openReview(x) {
     try {
@@ -398,6 +411,14 @@ export default function AdminAssessmentsPage() {
             </div>
           </div>
         ))}
+      </section>
+      <section className="card workflow-section">
+        <h2>Assessment Retry Requests</h2>
+        {feedbackArea==="retry" && <>{err && <p className="error" role="alert">{err}</p>}{msg && <p className="success" role="status">{msg}</p>}</>}
+        {retryRequests.filter(request=>request.status==="PENDING").length ? retryRequests.filter(request=>request.status==="PENDING").map(request=><div className="workflow-row" key={request.id}>
+          <div><b>{request.full_name}</b><div className="muted">{request.assessment_name} · {new Date(request.created_at).toLocaleString()}</div><p>{request.reason}</p><input aria-label="Admin retry decision note" placeholder="Optional decision note" value={retryNotes[request.id] || ""} onChange={e=>setRetryNotes(current=>({...current,[request.id]:e.target.value}))}/></div>
+          <div className="action-row"><button type="button" className="btn" disabled={busy} onClick={()=>decideRetry(request,"APPROVED")}>Approve Retry</button><button type="button" className="btn secondary" disabled={busy} onClick={()=>decideRetry(request,"REJECTED")}>Reject</button></div>
+        </div>) : <p className="muted">No pending retry requests.</p>}
       </section>
       <section className="card workflow-section">
         <h2>Intern Assessment Results & Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
