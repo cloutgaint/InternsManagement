@@ -1889,13 +1889,9 @@ r.patch("/groups/:id/members", async (req, res) => {
     return res
       .status(400)
       .json({ error: "Every selected intern must belong to the same batch" });
-  if (people.some((x) => !x.final_domain_id))
-    return res
-      .status(409)
-      .json({ error: "Every member must have a confirmed domain" });
   if (
     g.type === "SINGLE_DOMAIN" &&
-    new Set(people.map((x) => x.final_domain_id)).size > 1
+    new Set(people.map((x) => x.final_domain_id).filter(Boolean)).size > 1
   )
     return res
       .status(409)
@@ -1946,7 +1942,7 @@ r.post("/groups/:id/transfer", async(req,res)=>{
   if(!g)return res.status(404).json({error:"Destination group must be active"});
   const person=(await q("SELECT ip.id,ip.final_domain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",[internId,g.batch_id])).rows[0];
   if(!person)return res.status(409).json({error:"Intern must be allocated to the destination batch"});
-  if(!person.final_domain_id)return res.status(409).json({error:"Confirm intern domain before transfer"});
+
   const result=await tx(async client=>{
     const old=(await client.query("SELECT gm.group_id,g.name,gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.batch_id=$2 AND g.status='ACTIVE' FOR UPDATE OF gm",[internId,g.batch_id])).rows;
     if(old.some(x=>x.group_id===g.id))throw conflict("Intern is already assigned to this team");
