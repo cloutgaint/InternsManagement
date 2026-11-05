@@ -12,9 +12,10 @@ export const QUESTION_TYPES = [
 ];
 
 export function fullStackQuestionCategory(question) {
-  const text = [question.topic, question.subject, question.question].filter(Boolean).join(" ").toLowerCase();
-  if (/\\b(html|css|javascript|typescript|react|angular|vue|dom|jsx|frontend|front.end|browser|responsive|flexbox|grid layout|web accessibility)\\b/.test(text)) return "FRONTEND";
-  if (/\\b(node\\.?js|express|backend|back.end|database|sql|nosql|mongodb|postgres|mysql|orm|rest api|api design|authentication|authorization|server|http status|jwt|middleware|redis|primary key|foreign key|query|schema)\\b/.test(text)) return "BACKEND";
+  const topic = String(question.topic || "").toLowerCase();
+  const text = [topic, question.subject, question.question].filter(Boolean).join(" ").toLowerCase();
+  if (/\b(html|css|javascript|typescript|react|angular|vue|dom|jsx|frontend|front.end|browser|responsive|flexbox|grid layout|web accessibility|forms?|web design|ui|ux)\b/i.test(text)) return "FRONTEND";
+  if (/\b(node\.?js|express|backend|back.end|database|databases|sql|nosql|mongodb|postgres|mysql|orm|rest|api|authentication|authorization|server|http|jwt|middleware|redis|primary key|foreign key|query|schema|data modeling|data model|dbms)\b/i.test(text)) return "BACKEND";
   return "UNCLASSIFIED";
 }
 export function isFullStackDomain(domain) { return /full[ -]?stack/i.test(domain?.name || ""); }
