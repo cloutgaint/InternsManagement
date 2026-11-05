@@ -641,6 +641,7 @@ r.get("/assessments", async (req, res) => {
       [p.id, assessmentIds],
     )
   ).rows;
+  const retryRequests = (await q("SELECT id,assessment_id,status,reason,admin_note,created_at,decided_at,approved_attempt_id FROM assessment_retry_requests WHERE intern_id=$1 AND assessment_id=ANY($2::uuid[]) ORDER BY created_at DESC", [p.id, assessmentIds])).rows;
   const sectionScores = sectionIds.length ? (
     await q(
       `SELECT aa.id attempt_id,s.id section_id,s.name,s.pass_score,COALESCE(SUM(COALESCE(ans.auto_score,0)),0) earned,COALESCE(SUM(qb.marks),0) possible FROM assessment_attempts aa JOIN assessment_sections s ON s.assessment_id=aa.assessment_id JOIN question_bank qb ON s.question_ids ? qb.id::text LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id AND ans.question_id=qb.id WHERE aa.intern_id=$1 AND aa.assessment_id=ANY($2::uuid[]) AND s.id=ANY($3::uuid[]) GROUP BY aa.id,s.id,s.name,s.pass_score ORDER BY s.name`,
@@ -655,6 +656,8 @@ r.get("/assessments", async (req, res) => {
     scoresByAttempt.set(row.attempt_id, [...(scoresByAttempt.get(row.attempt_id) || []), result]);
   }
   for (const assessment of assessments) {
+    assessment.retry_requests = retryRequests.filter(request => request.assessment_id === assessment.id);
+    assessment.approved_retry_available = assessment.retry_requests.some(request => request.status === "APPROVED" && !request.approved_attempt_id);
     assessment.attempt_history = attempts.filter((attempt) => attempt.assessment_id === assessment.id).map((attempt) => {
       const snapshot = attempt.result_snapshot;
       if (snapshot && attempt.status === "EVALUATED") {
@@ -684,6 +687,19 @@ r.get("/assessments", async (req, res) => {
   }
   res.json(assessments);
 });
+r.post("/assessments/:id/retry-request", async (req, res) => {
+  const p = await me(req.user.id);
+  const a = (await q("SELECT a.id,a.attempt_count FROM assessments a JOIN batch_allocations ba ON ba.batch_id=a.batch_id AND ba.intern_id=$1 WHERE a.id=$2", [p.id,req.params.id])).rows[0];
+  if (!a) return res.status(404).json({error:"Assessment not found"});
+  const attempts = Number((await q("SELECT count(*) n FROM assessment_attempts WHERE assessment_id=$1 AND intern_id=$2",[a.id,p.id])).rows[0].n);
+  if (attempts < Number(a.attempt_count || 1)) return res.status(409).json({error:"You still have an available attempt."});
+  const existing = (await q("SELECT id FROM assessment_retry_requests WHERE assessment_id=$1 AND intern_id=$2 AND status IN ('PENDING','APPROVED') AND (status='PENDING' OR approved_attempt_id IS NULL)",[a.id,p.id])).rows[0];
+  if (existing) return res.status(409).json({error:"A retry request is pending or an approved retry is already available."});
+  const reason = String(req.body?.reason || "").trim().slice(0,1000);
+  if (!reason) return res.status(400).json({error:"Please provide a reason for requesting a retry."});
+  const row=(await q("INSERT INTO assessment_retry_requests(assessment_id,intern_id,reason) VALUES($1,$2,$3) RETURNING *",[a.id,p.id,reason])).rows[0];
+  res.status(201).json(row);
+});
 r.post("/assessments/:id/start", async (req, res) => {
   const p = await me(req.user.id);
   const a = (
@@ -708,10 +724,17 @@ r.post("/assessments/:id/start", async (req, res) => {
       )
     ).rows[0].n,
   );
-  if (count >= Number(a.attempt_count || 1))
-    return res
-      .status(409)
-      .json({ error: "Maximum assessment attempts reached" });
+  if (count >= Number(a.attempt_count || 1)) {
+    const retry = await tx(async client => {
+      const approved=(await client.query("SELECT id FROM assessment_retry_requests WHERE assessment_id=$1 AND intern_id=$2 AND status='APPROVED' AND approved_attempt_id IS NULL ORDER BY decided_at FOR UPDATE SKIP LOCKED LIMIT 1",[a.id,p.id])).rows[0];
+      if (!approved) return null;
+      const attempt=(await client.query("INSERT INTO assessment_attempts(assessment_id,intern_id,status,started_at) VALUES($1,$2,'IN_PROGRESS',now()) RETURNING *",[a.id,p.id])).rows[0];
+      await client.query("UPDATE assessment_retry_requests SET approved_attempt_id=$1 WHERE id=$2",[attempt.id,approved.id]);
+      return attempt;
+    });
+    if (!retry) return res.status(409).json({error:"Maximum assessment attempts reached. Request a retry and wait for Admin approval."});
+    return res.status(201).json(retry);
+  }
   const at = (
     await q(
       "INSERT INTO assessment_attempts(assessment_id,intern_id,status,started_at) VALUES($1,$2,'IN_PROGRESS',now()) RETURNING *",
