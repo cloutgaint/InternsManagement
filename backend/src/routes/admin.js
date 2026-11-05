@@ -1848,6 +1848,23 @@ r.get("/mentors", async (req, res) =>
     ).rows,
   ),
 );
+r.delete("/groups/:id", async (req,res)=>{
+  const g=(await q("SELECT * FROM groups WHERE id=$1",[req.params.id])).rows[0];
+  if(!g)return res.status(404).json({error:"Group not found"});
+  const dependencies=(await q(`SELECT
+    (SELECT count(*)::int FROM project_assignments WHERE group_id=$1) projects,
+    (SELECT count(*)::int FROM weekly_tasks WHERE group_id=$1) tasks,
+    (SELECT count(*)::int FROM mentor_assignments WHERE group_id=$1) mentors`,[g.id])).rows[0];
+  if(dependencies.projects||dependencies.tasks||dependencies.mentors)return res.status(409).json({error:"This team has project, mentor or task records. Remove or reassign those records before deleting the team."});
+  const members=(await q("SELECT count(*)::int n FROM group_members WHERE group_id=$1 AND active",[g.id])).rows[0].n;
+  await tx(async client=>{
+    await client.query("DELETE FROM group_members WHERE group_id=$1",[g.id]);
+    await client.query("DELETE FROM group_history WHERE group_id=$1",[g.id]);
+    await client.query("DELETE FROM groups WHERE id=$1",[g.id]);
+  });
+  await audit(req,"GROUP_DELETED","group",g.id,{...g,activeMembers:members},null);
+  res.json({ok:true});
+});
 r.get("/groups/:id/manage", async (req, res) => {
   const g = (
     await q(
