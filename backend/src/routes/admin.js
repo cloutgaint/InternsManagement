@@ -2670,6 +2670,18 @@ r.patch("/assessments/:id/status", async (req, res) => {
   await audit(req, "ASSESSMENT_STATUS", "assessment", x.id, before, x);
   res.json(x);
 });
+r.get("/assessment-retry-requests", async (req,res) => {
+  res.json((await q(`SELECT rr.*,a.name assessment_name,ip.full_name FROM assessment_retry_requests rr JOIN assessments a ON a.id=rr.assessment_id JOIN intern_profiles ip ON ip.id=rr.intern_id ORDER BY CASE rr.status WHEN 'PENDING' THEN 0 ELSE 1 END,rr.created_at DESC`)).rows);
+});
+r.post("/assessment-retry-requests/:id/decision", async (req,res) => {
+  const decision=String(req.body?.decision || "").toUpperCase();
+  if (!["APPROVED","REJECTED"].includes(decision)) return res.status(400).json({error:"Decision must be APPROVED or REJECTED"});
+  const note=String(req.body?.note || "").trim().slice(0,1000);
+  const updated=(await q("UPDATE assessment_retry_requests SET status=$2,admin_note=$3,decided_at=now() WHERE id=$1 AND status='PENDING' RETURNING *",[req.params.id,decision,note])).rows[0];
+  if (!updated) return res.status(409).json({error:"Request was already decided or does not exist"});
+  await audit(req,"ASSESSMENT_RETRY_DECISION","assessment_retry_requests",updated.id,null,updated);
+  res.json(updated);
+});
 r.get("/assessment-submissions", async (req, res) =>
   res.json(
     (
