@@ -43,7 +43,8 @@ export default function AdminAssessmentsPage() {
     [err, setErr] = useState(""),
     [feedbackArea,setFeedbackArea]=useState("create"),
     [sectionErrors, setSectionErrors] = useState({}),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [activeView, setActiveView] = useState("create");
   const load = () =>
     Promise.all([
       api("/admin/batches"),
@@ -186,7 +187,10 @@ export default function AdminAssessmentsPage() {
         </div>
         <span className="badge">{assessments.length} assessments</span>
       </div>
-      <section className="card">
+      <nav aria-label="Assessment workspace" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(175px,1fr))",gap:10,marginBottom:20}}>
+        {[{id:"create",title:"Create Assessment",desc:"Build sections and allocate MCQs"},{id:"manage",title:"Manage Assessments",desc:assessments.length+" assessments"},{id:"retry",title:"Retry Requests",desc:retryRequests.filter(r=>r.status==="PENDING").length+" pending"},{id:"results",title:"Intern Results",desc:subs.length+" submissions"}].map(item=><button key={item.id} type="button" onClick={()=>{setActiveView(item.id);setErr("");setMsg("");}} aria-current={activeView===item.id?"page":undefined} className={"card "+(activeView===item.id?"":"secondary")} style={{cursor:"pointer",textAlign:"left",padding:16,border:activeView===item.id?"2px solid #047857":"1px solid #d9e1e7",background:activeView===item.id?"#ecfdf5":"#fff",color:"#172b38"}}><strong style={{display:"block",marginBottom:5}}>{item.title}</strong><small>{item.desc}</small></button>)}
+      </nav>
+      {activeView==="create" && <section className="card">
         <h2>Create Assessment</h2>{feedbackArea==="create"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={create}>
           <div className="form-grid">
@@ -382,8 +386,8 @@ export default function AdminAssessmentsPage() {
             </button>
           </div>
         </form>
-      </section>
-      <section className="card workflow-section">
+      </section>}
+      {activeView==="manage" && <section className="card workflow-section">
         <h2>Assessment Management</h2>{feedbackArea==="status"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {assessments.map((a) => (
           <div className="workflow-row" key={a.id}>
@@ -411,16 +415,16 @@ export default function AdminAssessmentsPage() {
             </div>
           </div>
         ))}
-      </section>
-      <section className="card workflow-section">
+      </section>}
+      {activeView==="retry" && <section className="card workflow-section">
         <h2>Assessment Retry Requests</h2>
         {feedbackArea==="retry" && <>{err && <p className="error" role="alert">{err}</p>}{msg && <p className="success" role="status">{msg}</p>}</>}
         {retryRequests.filter(request=>request.status==="PENDING").length ? retryRequests.filter(request=>request.status==="PENDING").map(request=><div className="workflow-row" key={request.id}>
           <div><b>{request.full_name}</b><div className="muted">{request.assessment_name} · {new Date(request.created_at).toLocaleString()}</div><p>{request.reason}</p><input aria-label="Admin retry decision note" placeholder="Optional decision note" value={retryNotes[request.id] || ""} onChange={e=>setRetryNotes(current=>({...current,[request.id]:e.target.value}))}/></div>
           <div className="action-row"><button type="button" className="btn" disabled={busy} onClick={()=>decideRetry(request,"APPROVED")}>Approve Retry</button><button type="button" className="btn secondary" disabled={busy} onClick={()=>decideRetry(request,"REJECTED")}>Reject</button></div>
         </div>) : <p className="muted">No pending retry requests.</p>}
-      </section>
-      <section className="card workflow-section">
+      </section>}
+      {activeView==="results" && <section className="card workflow-section">
         <h2>Intern Assessment Results & Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {subs.length ? (
           subs.map((x) => (
@@ -444,7 +448,7 @@ export default function AdminAssessmentsPage() {
         ) : (
           <p className="muted">No submissions yet.</p>
         )}
-      </section>
+      </section>}
       {review && (
         <div className="modal-backdrop" onMouseDown={() => setReview(null)}>
           <section
