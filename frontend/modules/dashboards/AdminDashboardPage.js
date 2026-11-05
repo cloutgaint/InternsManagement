@@ -34,16 +34,15 @@ const modules = [
   [
     "📁",
     "Project Master",
-    "Projects, milestones and deliverables",
+    "Create projects and allocate interns",
     "/admin/projects",
   ],
   [
     "👥",
     "Mentor Assignment",
-    "Mentor workload and assignments",
+    "Individual intern mentor assignments",
     "/admin/mentors",
   ],
-  ["🫂", "Group Proposals", "Review and approve groups", "/admin/groups"],
   [
     "🎯",
     "Domain Recommendations",
@@ -60,7 +59,7 @@ const modules = [
   [
     "🗂️",
     "Internship Management",
-    "Groups, projects and weekly tasks",
+    "Project roles, mentors and weekly tasks",
     "/admin/work",
   ],
   [
@@ -142,14 +141,12 @@ export default function AdminDashboardPage() {
   const pending = count(
     "leave_pending",
     "attendance_exceptions",
-    "groups_pending",
     "completions_pending",
     "task_evaluations_pending",
   );
   const pendingItems = [
     {label:"Leave requests",key:"leave_pending",href:"/admin/leave"},
     {label:"Attendance exceptions",key:"attendance_exceptions",href:"/admin/attendance"},
-    {label:"Group approvals",key:"groups_pending",href:"/admin/groups"},
     {label:"Completion reviews",key:"completions_pending",href:"/admin/completion"},
     {label:"Task evaluations",key:"task_evaluations_pending",href:"/admin/work"},
   ];
@@ -157,7 +154,6 @@ export default function AdminDashboardPage() {
     "/admin/verification": verification,
     "/admin/attendance": count("attendance_exceptions","faces_pending"),
     "/admin/leave": count("leave_pending"),
-    "/admin/groups": count("groups_pending"),
     "/admin/completion": count("completions_pending"),
     "/admin/work": count("task_evaluations_pending"),
   };
