@@ -15,6 +15,7 @@ const empty = () => ({
 export default function AdminProjectsPage() {
   const [projects, setProjects] = useState([]),
     [domains, setDomains] = useState([]),
+    [colleges,setColleges]=useState([]),[batches,setBatches]=useState([]),[interns,setInterns]=useState([]),[projectGroup,setProjectGroup]=useState({projectId:"",collegeId:"",batchId:"",internIds:[]}),
     [groups, setGroups] = useState([]),
     [assignments, setAssignments] = useState([]),
     [form, setForm] = useState(empty()),
@@ -29,8 +30,9 @@ export default function AdminProjectsPage() {
       api("/admin/domains"),
       api("/admin/groups"),
       api("/admin/project-assignments"),
+      api("/admin/colleges"),api("/admin/batches"),api("/admin/interns"),
     ])
-      .then(([p, d, g, a]) => {
+      .then(([p, d, g, a, co, ba, ins]) => {setColleges(co);setBatches(ba);setInterns(ins);
         setProjects(p);
         setDomains(d);
         setGroups(g.filter((x) => x.status === "ACTIVE"));
@@ -69,6 +71,14 @@ export default function AdminProjectsPage() {
     } catch (e) {
       setErr(e.message);
     }
+  }
+  async function createProjectGroup(e){
+    e.preventDefault();setErr("");setMsg("");setFeedbackArea("group");
+    try{
+      const result=await api("/admin/project-groups",{method:"POST",body:JSON.stringify({projectId:projectGroup.projectId,batchId:projectGroup.batchId,internIds:projectGroup.internIds})});
+      setMsg("Project group created with "+result.internCount+" intern(s). Assign their individual roles and mentors in Internship Management.");
+      setProjectGroup({projectId:"",collegeId:"",batchId:"",internIds:[]});await load();
+    }catch(e){setErr(e.message);}
   }
   function edit(p) {
     setEditId(p.id);
@@ -112,6 +122,7 @@ export default function AdminProjectsPage() {
           </p>
         </div>
       </div>
+      <section className="card workflow-section"><h2>Project → College → Batch → Interns</h2><p className="muted">The project itself forms the group. Interns already assigned to an active project cannot be selected again.</p>{feedbackArea==="group"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}<form onSubmit={createProjectGroup} className="form-grid"><label>Project<select className="input" required value={projectGroup.projectId} onChange={e=>setProjectGroup(x=>({...x,projectId:e.target.value}))}><option value="">Select existing project</option>{projects.filter(p=>p.status==="ACTIVE").map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>College<select className="input" required value={projectGroup.collegeId} onChange={e=>setProjectGroup(x=>({...x,collegeId:e.target.value,batchId:"",internIds:[]}))}><option value="">Select college</option>{colleges.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Batch<select className="input" required value={projectGroup.batchId} onChange={e=>setProjectGroup(x=>({...x,batchId:e.target.value,internIds:[]}))}><option value="">Select batch</option>{batches.filter(b=>b.college_id===projectGroup.collegeId).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label><div style={{gridColumn:"1 / -1"}}><b>Available interns</b>{interns.filter(i=>i.batch_id===projectGroup.batchId&&!groups.some(g=>g.batch_id===projectGroup.batchId&&g.status==="ACTIVE"&&false)).map(i=><label key={i.id} style={{display:"flex",gap:8,marginTop:8}}><input type="checkbox" checked={projectGroup.internIds.includes(i.id)} onChange={e=>setProjectGroup(x=>({...x,internIds:e.target.checked?[...x.internIds,i.id]:x.internIds.filter(id=>id!==i.id)}))}/>{i.full_name}</label>)}</div><div className="form-actions"><button className="btn" disabled={!projectGroup.internIds.length}>Create Project Group</button></div></form></section>
       <section className="card">
         <h2>{editId ? "Edit Project" : "Create Project"}</h2>{["save"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form onSubmit={save}>
