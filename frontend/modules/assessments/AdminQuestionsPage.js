@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
-import { QUESTION_TYPES } from "./AssessmentQuestionWorkspace";
+import { QUESTION_TYPES, fullStackQuestionCategory, isFullStackDomain } from "./AssessmentQuestionWorkspace";
 const aiEmpty = {
   instructions: "",
   domainId: "",
@@ -66,9 +66,10 @@ export default function AdminQuestionsPage() {
     FRONTEND: domains.find(d => /^front[ -]?end$/i.test(d.name.trim()))?.id || null,
     BACKEND: domains.find(d => /^back[ -]?end$/i.test(d.name.trim()))?.id || null,
   }), [domains]);
+  const fullStackFilter = domains.some(domain => domain.id === filter.domain && isFullStackDomain(domain));
   const selectQuestionTab = (tab) => {
     setQuestionTab(tab);
-    const domainId = tab === "ALL" ? "" : questionDomains[tab] || "";
+    const domainId = fullStackFilter ? filter.domain : tab === "ALL" ? "" : questionDomains[tab] || "";
     setFilter(current => ({ ...current, domain: domainId }));
     if (domainId) {
       setAi(current => ({ ...current, domainId }));
@@ -82,13 +83,13 @@ export default function AdminQuestionsPage() {
           (!filter.q ||
             (x.question || "").toLowerCase().includes(filter.q.toLowerCase()) ||
             (x.topic || "").toLowerCase().includes(filter.q.toLowerCase())) &&
-          (questionTab === "ALL" || (questionDomains[questionTab] && x.domain_id === questionDomains[questionTab])) &&
+          (questionTab === "ALL" || (fullStackFilter ? fullStackQuestionCategory(x) === questionTab : (questionDomains[questionTab] && x.domain_id === questionDomains[questionTab]))) &&
           (!filter.domain || x.domain_id === filter.domain) &&
           (!filter.difficulty || x.difficulty === filter.difficulty) &&
           (!filter.type || x.type === filter.type) &&
           (!filter.status || x.status === filter.status),
       ),
-    [rows, filter, questionTab, questionDomains],
+    [rows, filter, questionTab, questionDomains, fullStackFilter],
   );
   const generatedRows = aiDrafts;
   const editingAiDraft = Boolean(editId && rows.find((question) => question.id === editId)?.source === "AI" && rows.find((question) => question.id === editId)?.status === "DRAFT");
@@ -312,14 +313,6 @@ export default function AdminQuestionsPage() {
           {rows.length} total
         </span>
       </div>
-      <nav aria-label="Question Bank categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-        {[{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}].map(tab => (
-          <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn " + (questionTab===tab.key?"":"secondary")} onClick={() => selectQuestionTab(tab.key)} disabled={tab.key!=="ALL"&&!questionDomains[tab.key]}>
-            {tab.label} ({tab.key==="ALL"?rows.length:rows.filter(q=>q.domain_id===questionDomains[tab.key]&&questionDomains[tab.key]).length})
-          </button>
-        ))}
-      </nav>
-      {questionTab!=="ALL"&&!questionDomains[questionTab]&&<p className="error" role="alert">This domain is not configured. Create the domain before adding questions.</p>}
       <section className="card ai-question-panel">
         <div className="verification-title">
           <div>
@@ -639,6 +632,13 @@ export default function AdminQuestionsPage() {
             </p>
           </div>
         </div>
+        <nav aria-label="Question Library categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+          {(fullStackFilter ? [{key:"ALL",label:"All Full Stack"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"},{key:"UNCLASSIFIED",label:"Unclassified"}] : [{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}]).map(tab => (
+            <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn "+(questionTab===tab.key?"":"secondary")} onClick={()=>selectQuestionTab(tab.key)} disabled={!fullStackFilter&&tab.key!=="ALL"&&!questionDomains[tab.key]}>
+              {tab.label} ({rows.filter(q=>(!filter.domain||q.domain_id===filter.domain)&&(tab.key==="ALL"||(fullStackFilter?fullStackQuestionCategory(q)===tab.key:q.domain_id===questionDomains[tab.key]))).length})
+            </button>
+          ))}
+        </nav>
         <div className="question-filters">
           <input
             className="input"
@@ -650,7 +650,7 @@ export default function AdminQuestionsPage() {
             className="input"
             value={filter.domain}
             onChange={(e) =>
-              setFilter((x) => ({ ...x, domain: e.target.value }))
+              setFilter((x) => ({ ...x, domain: e.target.value })); setQuestionTab("ALL")
             }
           >
             <option value="">All domains</option>
