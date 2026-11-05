@@ -13,6 +13,8 @@ export const QUESTION_TYPES = [
 
 export function fullStackQuestionCategory(question) {
   const topic = String(question.topic || "").toLowerCase();
+  const assigned = topic.match(/^\[(frontend|backend)\]\s*/i);
+  if (assigned) return assigned[1].toUpperCase();
   const text = [topic, question.subject, question.question].filter(Boolean).join(" ").toLowerCase();
   if (/\b(html|css|javascript|typescript|react|angular|vue|dom|jsx|frontend|front.end|browser|responsive|flexbox|grid layout|web accessibility|forms?|web design|ui|ux)\b/i.test(text)) return "FRONTEND";
   if (/\b(node\.?js|express|backend|back.end|database|databases|sql|nosql|mongodb|postgres|mysql|orm|rest|api|authentication|authorization|server|http|jwt|middleware|redis|primary key|foreign key|query|schema|data modeling|data model|dbms)\b/i.test(text)) return "BACKEND";
