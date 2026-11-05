@@ -79,7 +79,7 @@ export default function InternAssessmentsPage() {
     const withinWindow =
       (!assessment.window_start || new Date(assessment.window_start) <= new Date()) &&
       (!assessment.window_end || new Date(assessment.window_end) > new Date());
-    return withinWindow && (inProgress || (history.length < Number(assessment.attempt_count || 1) || assessment.approved_retry_available));
+    return assessment.approved_retry_available || (withinWindow && (inProgress || history.length < Number(assessment.attempt_count || 1)));
   }
   // Optional integrity signal (Blueprint 7.1): leaving the tab is logged, never blocked.
   useEffect(() => {
