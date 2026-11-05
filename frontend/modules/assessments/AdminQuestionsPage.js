@@ -29,6 +29,7 @@ export default function AdminQuestionsPage() {
     [domains, setDomains] = useState([]),
     [form, setForm] = useState(empty),
     [editId, setEditId] = useState(null),
+    [questionTab, setQuestionTab] = useState("ALL"),
     [filter, setFilter] = useState({
       q: "",
       domain: "",
@@ -61,6 +62,19 @@ export default function AdminQuestionsPage() {
     if (aiDrafts.length)
       aiPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [aiDrafts.length]);
+  const questionDomains = useMemo(() => ({
+    FRONTEND: domains.find(d => /^front[ -]?end$/i.test(d.name.trim()))?.id || null,
+    BACKEND: domains.find(d => /^back[ -]?end$/i.test(d.name.trim()))?.id || null,
+  }), [domains]);
+  const selectQuestionTab = (tab) => {
+    setQuestionTab(tab);
+    const domainId = tab === "ALL" ? "" : questionDomains[tab] || "";
+    setFilter(current => ({ ...current, domain: domainId }));
+    if (domainId) {
+      setAi(current => ({ ...current, domainId }));
+      if (!editId) setForm(current => ({ ...current, domainId }));
+    }
+  };
   const visible = useMemo(
     () =>
       rows.filter(
@@ -68,12 +82,13 @@ export default function AdminQuestionsPage() {
           (!filter.q ||
             (x.question || "").toLowerCase().includes(filter.q.toLowerCase()) ||
             (x.topic || "").toLowerCase().includes(filter.q.toLowerCase())) &&
+          (questionTab === "ALL" || (questionDomains[questionTab] && x.domain_id === questionDomains[questionTab])) &&
           (!filter.domain || x.domain_id === filter.domain) &&
           (!filter.difficulty || x.difficulty === filter.difficulty) &&
           (!filter.type || x.type === filter.type) &&
           (!filter.status || x.status === filter.status),
       ),
-    [rows, filter],
+    [rows, filter, questionTab, questionDomains],
   );
   const generatedRows = aiDrafts;
   const editingAiDraft = Boolean(editId && rows.find((question) => question.id === editId)?.source === "AI" && rows.find((question) => question.id === editId)?.status === "DRAFT");
@@ -297,6 +312,14 @@ export default function AdminQuestionsPage() {
           {rows.length} total
         </span>
       </div>
+      <nav aria-label="Question Bank categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+        {[{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}].map(tab => (
+          <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn " + (questionTab===tab.key?"":"secondary")} onClick={() => selectQuestionTab(tab.key)} disabled={tab.key!=="ALL"&&!questionDomains[tab.key]}>
+            {tab.label} ({tab.key==="ALL"?rows.length:rows.filter(q=>q.domain_id===questionDomains[tab.key]&&questionDomains[tab.key]).length})
+          </button>
+        ))}
+      </nav>
+      {questionTab!=="ALL"&&!questionDomains[questionTab]&&<p className="error" role="alert">This domain is not configured. Create the domain before adding questions.</p>}
       <section className="card ai-question-panel">
         <div className="verification-title">
           <div>
