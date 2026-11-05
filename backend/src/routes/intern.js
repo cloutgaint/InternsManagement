@@ -637,7 +637,7 @@ r.get("/assessments", async (req, res) => {
   const sectionIds = [...sectionsByAssessment.values()].flat().map((section) => section.id);
   const attempts = (
     await q(
-      "SELECT id,assessment_id,status,total_score,started_at,submitted_at FROM assessment_attempts WHERE intern_id=$1 AND assessment_id=ANY($2::uuid[]) ORDER BY started_at DESC",
+      "SELECT id,assessment_id,status,total_score,started_at,submitted_at,result_snapshot FROM assessment_attempts WHERE intern_id=$1 AND assessment_id=ANY($2::uuid[]) ORDER BY started_at DESC",
       [p.id, assessmentIds],
     )
   ).rows;
@@ -656,6 +656,10 @@ r.get("/assessments", async (req, res) => {
   }
   for (const assessment of assessments) {
     assessment.attempt_history = attempts.filter((attempt) => attempt.assessment_id === assessment.id).map((attempt) => {
+      const snapshot = attempt.result_snapshot;
+      if (snapshot && attempt.status === "EVALUATED") {
+        return { ...attempt, ...snapshot, sectionResults: snapshot.sectionResults || [], scoreUnavailable: false };
+      }
       const sectionResults = scoresByAttempt.get(attempt.id) || [];
       const front = sectionResults.find(s => s.name.trim().toLowerCase() === "frontend");
       const back = sectionResults.find(s => s.name.trim().toLowerCase() === "backend");
@@ -821,6 +825,29 @@ r.post("/assessments/:id/submit", async (req, res) => {
         [total, manualPending ? "PENDING_EVALUATION" : "EVALUATED", at.id],
       )).rows[0];
       if (!updated) throw new Error("Assessment state changed during submission");
+      if (!manualPending) {
+        const snapshotRows = (await client.query(
+          `SELECT s.id section_id,s.name,s.pass_score,
+            COALESCE(SUM(COALESCE(ans.manual_score,ans.auto_score,0)),0) earned,
+            COALESCE(SUM(qb.marks),0) possible
+            FROM assessment_sections s
+            JOIN question_bank qb ON s.question_ids ? qb.id::text
+            LEFT JOIN assessment_answers ans ON ans.attempt_id=$1 AND ans.question_id=qb.id
+            WHERE s.assessment_id=$2 GROUP BY s.id,s.name,s.pass_score ORDER BY s.name`,
+          [at.id, req.params.id],
+        )).rows;
+        const sectionResults = snapshotRows.map(row => {
+          const earned = Number(row.earned), possible = Number(row.possible);
+          const percentage = possible ? Number((earned / possible * 100).toFixed(2)) : 0;
+          return { sectionId: row.section_id, name: row.name, earned, possible, percentage, passScore: Number(row.pass_score), passed: possible > 0 && percentage >= Number(row.pass_score) };
+        });
+        const summary = summarizeAssessmentAttempt(sectionResults, "EVALUATED");
+        const front = sectionResults.find(s => s.name.trim().toLowerCase() === "frontend");
+        const back = sectionResults.find(s => s.name.trim().toLowerCase() === "backend");
+        const domainRecommendation = front && back ? front.percentage === back.percentage ? "ADMIN_REVIEW" : front.percentage > back.percentage ? "Frontend" : "Backend" : null;
+        const snapshot = { ...summary, sectionResults, domainRecommendation, capturedAt: new Date().toISOString() };
+        await client.query("UPDATE assessment_attempts SET result_snapshot=$1::jsonb WHERE id=$2", [JSON.stringify(snapshot), at.id]);
+      }
       return { attempt: updated, manualPending };
     });
     if (result.error) return res.status(result.code).json({ error: result.error });
