@@ -184,20 +184,6 @@ export default function AdminQuestionsPage() {
       setErr(e.message);
     }
   }
-  async function deleteQuestion(x) {
-    if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
-    setFeedbackArea("reviewAI");
-    setErr("");
-    setMsg("");
-    try {
-      await api("/admin/questions/" + x.id, { method: "DELETE" });
-      setRows((items) => items.filter((item) => item.id !== x.id));
-      if (editId === x.id) reset();
-      setMsg("Question deleted successfully.");
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
   const domainName = (id) => domains.find((x) => x.id === id)?.name || "Common";
   return (
     <main className="wrap">
@@ -635,7 +621,20 @@ export default function AdminQuestionsPage() {
                     </button>
                   </>
                 )}
-                <button className="btn danger" onClick={() => deleteQuestion(x)}>Delete</button>
+                <button className="btn danger" onClick={async () => {
+                  if (!window.confirm("Delete this question permanently? This cannot be undone.")) return;
+                  setFeedbackArea("reviewAI");
+                  setErr("");
+                  setMsg("");
+                  try {
+                    await api("/admin/questions/" + x.id, { method: "DELETE" });
+                    setRows((items) => items.filter((item) => item.id !== x.id));
+                    if (editId === x.id) reset();
+                    setMsg("Question deleted successfully.");
+                  } catch (error) {
+                    setErr(error.message);
+                  }
+                }}>Delete</button>
                 <button className="btn secondary" onClick={() => edit(x)}>
                   Edit
                 </button>
