@@ -2674,7 +2674,7 @@ r.get("/assessment-submissions", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT aa.id attempt_id,aa.status,aa.total_score,aa.started_at,aa.submitted_at,a.name assessment_name,ip.full_name,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id LEFT JOIN question_bank qb ON qb.id=ans.question_id GROUP BY aa.id,a.name,ip.full_name ORDER BY aa.submitted_at DESC NULLS LAST`,
+        `SELECT aa.id attempt_id,aa.status,aa.total_score,aa.result_snapshot,aa.started_at,aa.submitted_at,a.name assessment_name,ip.full_name,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id LEFT JOIN question_bank qb ON qb.id=ans.question_id GROUP BY aa.id,a.name,ip.full_name ORDER BY aa.submitted_at DESC NULLS LAST`,
       )
     ).rows,
   ),
