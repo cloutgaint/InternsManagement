@@ -1858,7 +1858,7 @@ r.get("/groups/:id/manage", async (req, res) => {
   if (!g) return res.status(404).json({ error: "Group not found" });
   g.members = (
     await q(
-      `SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,d.name domain_name FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id WHERE gm.group_id=$1 AND gm.active ORDER BY ip.full_name`,
+      `SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,gm.project_role,d.name domain_name FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id WHERE gm.group_id=$1 AND gm.active ORDER BY ip.full_name`,
       [g.id],
     )
   ).rows;
@@ -1929,6 +1929,15 @@ r.patch("/groups/:id/members", async (req, res) => {
     internIds: ids,
   });
   res.json({ ok: true, count: ids.length });
+});
+r.patch("/groups/:id/members/:internId/role", async (req, res) => {
+  const role = String(req.body?.role || "").trim();
+  if (!role || role.length > 100) return res.status(400).json({error:"Choose a project role (maximum 100 characters)"});
+  const before = (await q("SELECT gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.group_id=$1 AND gm.intern_id=$2 AND gm.active AND g.status='ACTIVE'",[req.params.id,req.params.internId])).rows[0];
+  if (!before) return res.status(404).json({error:"Active group membership not found"});
+  const updated = (await q("UPDATE group_members SET project_role=$1 WHERE group_id=$2 AND intern_id=$3 RETURNING *",[role,req.params.id,req.params.internId])).rows[0];
+  await audit(req,"GROUP_MEMBER_ROLE_CHANGED","group",req.params.id,before,updated);
+  res.json(updated);
 });
 r.post("/groups/:id/mentor", async (req, res) => {
   const { mentorId, domainId, isLead = true } = req.body;
