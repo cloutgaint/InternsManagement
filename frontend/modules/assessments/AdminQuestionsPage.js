@@ -121,6 +121,17 @@ export default function AdminQuestionsPage() {
     });
     document.querySelector(".question-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  async function moveQuestion(x, target) {
+    setFeedbackArea("library");setErr("");setMsg("");
+    const baseTopic = String(x.topic || "").replace(/^\[(?:frontend|backend)\]\s*/i, "").trim();
+    const topic = "[" + target + "] " + (baseTopic || "General");
+    try {
+      setBusy(true);
+      await api("/admin/questions/" + x.id, {method:"PATCH",body:JSON.stringify({topic})});
+      setMsg("Question moved to " + target + ". It will appear in the " + target + " tab.");
+      await load();
+    } catch(e) {setErr(e.message);} finally {setBusy(false);}
+  }
   async function save(e) {setFeedbackArea("save");
     e.preventDefault();
     setErr("");
@@ -629,13 +640,13 @@ export default function AdminQuestionsPage() {
       <section className="card workflow-section">
         <div className="verification-title">
           <div>
-            <h2>Question Library</h2>{feedbackArea==="reviewAI"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+            <h2>Question Library</h2>{(feedbackArea==="reviewAI"||feedbackArea==="library")&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
             <p className="muted">
               Search and filter without removing historical questions.
             </p>
           </div>
         </div>
-        {fullStackFilter && <p className="muted">Full Stack questions are grouped by their topic and question content. To add new questions to a category, select its tab, choose Full Stack as the AI or manual question domain, and use a topic beginning with Frontend or Backend. Questions without a recognizable category appear under Unclassified.</p>}
+        {fullStackFilter && <p className="muted">Full Stack questions can be moved between Frontend and Backend using the Move to menu on each question. Automatic topic detection still applies to questions without an assigned category.</p>}
         <nav aria-label="Question Library categories" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
           {(fullStackFilter ? [{key:"ALL",label:"All Full Stack"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"},{key:"UNCLASSIFIED",label:"Unclassified"}] : [{key:"ALL",label:"All Questions"},{key:"FRONTEND",label:"Frontend"},{key:"BACKEND",label:"Backend"}]).map(tab => (
             <button key={tab.key} type="button" aria-pressed={questionTab===tab.key} className={"btn "+(questionTab===tab.key?"":"secondary")} onClick={()=>selectQuestionTab(tab.key)} disabled={!fullStackFilter&&tab.key!=="ALL"&&!questionDomains[tab.key]}>
@@ -738,6 +749,11 @@ export default function AdminQuestionsPage() {
                     </button>
                   </>
                 )}
+                {fullStackIds.includes(x.domain_id) && <select className="input" aria-label="Move question to section" value="" disabled={busy} onChange={e=>{if(e.target.value)moveQuestion(x,e.target.value);}}>
+                  <option value="">Move to…</option>
+                  {fullStackQuestionCategory(x)!=="FRONTEND" && <option value="FRONTEND">Frontend</option>}
+                  {fullStackQuestionCategory(x)!=="BACKEND" && <option value="BACKEND">Backend</option>}
+                </select>}
                 <button className="btn danger" onClick={() => deleteQuestion(x)}>Delete</button>
                 <button className="btn secondary" onClick={() => edit(x)}>
                   Edit
