@@ -1,5 +1,2 @@
-import AdminGroupsPage from "@/modules/groups/AdminGroupsPage";
-
-export default function Page() {
-  return <AdminGroupsPage />;
-}
+export async function getServerSideProps(){return {redirect:{destination:"/admin/projects",permanent:false}};}
+export default function Page(){return null;}
