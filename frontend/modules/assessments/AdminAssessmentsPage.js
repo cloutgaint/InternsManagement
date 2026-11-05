@@ -457,21 +457,23 @@ export default function AdminAssessmentsPage() {
           >
             <div className="verification-title">
               <div>
-                <h2>{review.assessment_name}</h2>
+                <h2>{review.assessment_name} — Answer Review</h2>
                 <p className="muted">{review.full_name}</p>
               </div>
               <button className="icon-close" onClick={() => setReview(null)}>
                 ×
               </button>
             </div>
-            {review.answers.map((a) => (
+            <p className="muted">Review each submitted answer alongside the correct answer and awarded marks.</p>
+            {!review.answers?.length && <p className="muted">No answer records are available for this attempt.</p>}
+            {review.answers.map((a, index) => (
               <div className="review-answer" key={a.id}>
-                <b>{a.question}</b>
-                <p>
-                  {typeof a.answer === "string"
-                    ? a.answer
-                    : JSON.stringify(a.answer)}
-                </p>
+                <b>Q{index+1}. {a.question || "Question no longer available"}</b>
+                <div style={{display:"grid",gap:6,marginTop:8}}>
+                  <div><strong>Intern answer: </strong>{a.answer == null || a.answer === "" ? "Not answered" : typeof a.answer === "string" ? a.answer : JSON.stringify(a.answer)}</div>
+                  {["MCQ","MULTI_SELECT","TRUE_FALSE"].includes(a.type) && <div><strong>Correct answer: </strong>{a.correct_answer == null ? "Unavailable (question removed)" : typeof a.correct_answer === "string" ? a.correct_answer : JSON.stringify(a.correct_answer)}</div>}
+                  {["MCQ","MULTI_SELECT","TRUE_FALSE"].includes(a.type) && <div style={{fontWeight:600,color:Number(a.auto_score)>0?"#047857":"#b45309"}}>{Number(a.auto_score)>0?"Correct":"Incorrect / unanswered"} · {a.auto_score ?? 0}/{a.marks} marks</div>}
+                </div>
                 <small>
                   Marks: {a.marks} · Auto: {a.auto_score ?? "—"} · Manual:{" "}
                   {a.manual_score ?? "Pending"}
