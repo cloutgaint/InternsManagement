@@ -317,12 +317,13 @@ export default function InternAssessmentsPage() {
                   {a.attempt_status === "EVALUATED" && <b>Recorded score: {a.total_score ?? "Unavailable"}</b>}
                 </div>
               </div>
-              {(a.attempt_history || []).length >= Number(a.attempt_count || 1) && !a.approved_retry_available && !a.attempt_history?.some(attempt=>attempt.status==="IN_PROGRESS") && <div className="card" style={{padding:12,marginTop:12}}>
-                <b>Request another attempt</b>
+              {(a.attempt_history || []).some(attempt=>["SUBMITTED","EVALUATED"].includes(attempt.status)) && !a.approved_retry_available && !a.attempt_history?.some(attempt=>attempt.status==="IN_PROGRESS") && <div className="card" style={{padding:12,marginTop:12}}>
+                <b>Assessment Retake</b>
                 {a.retry_requests?.some(request=>request.status==="PENDING") ? <p className="muted">Retry request pending Admin approval.</p> : <>
                   {a.retry_requests?.[0]?.status==="REJECTED" && <p className="muted">Previous request rejected: {a.retry_requests[0].admin_note || "No reason provided"}</p>}
-                  <textarea aria-label="Reason for assessment retry" rows={2} placeholder="Why do you need to retake this assessment?" value={retryReasons[a.id] || ""} onChange={e=>setRetryReasons(current=>({...current,[a.id]:e.target.value}))}/>
-                  <button className="btn secondary" type="button" disabled={busy} onClick={()=>requestRetry(a)}>Request Retry</button>
+                  {(a.attempt_history || []).length < Number(a.attempt_count || 1) && <p className="muted">You still have an unused attempt. You can start it without requesting Admin approval.</p>}
+                  {(a.attempt_history || []).length >= Number(a.attempt_count || 1) && <textarea aria-label="Reason for assessment retry" rows={2} placeholder="Why do you need to retake this assessment?" value={retryReasons[a.id] || ""} onChange={e=>setRetryReasons(current=>({...current,[a.id]:e.target.value}))}/>}
+                  {(a.attempt_history || []).length >= Number(a.attempt_count || 1) && <button className="btn secondary" type="button" disabled={busy} onClick={()=>requestRetry(a)}>Request Retry</button>}
                 </>}
               </div>}
               {a.approved_retry_available && <p className="success">Admin approved your retry. You may start another attempt.</p>}
