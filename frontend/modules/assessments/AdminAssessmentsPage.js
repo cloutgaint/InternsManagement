@@ -61,6 +61,16 @@ export default function AdminAssessmentsPage() {
   useEffect(() => {
     load();
   }, []);
+  function setupDevelopmentAssessment() {
+    const frontend = domains.find((d) => /^frontend|front.end$/i.test(d.name.trim()));
+    const backend = domains.find((d) => /^backend|back.end$/i.test(d.name.trim()));
+    setFeedbackArea("create"); setErr(""); setMsg("");
+    if (!frontend || !backend) return setErr("Create active Frontend and Backend domains before setting up this assessment.");
+    setForm((current) => ({ ...current, name:"Development Initial Assessment", sections:[
+      {name:"Frontend",domainId:frontend.id,passScore:50,questionIds:[]},
+      {name:"Backend",domainId:backend.id,passScore:50,questionIds:[]},
+    ] }));
+  }
   function sec(i, k, v) {
     setForm((x) => ({
       ...x,
@@ -70,6 +80,11 @@ export default function AdminAssessmentsPage() {
   async function create(e) {setFeedbackArea("create");
     e.preventDefault();setErr("");setMsg("");setSectionErrors({});
     if(form.windowStart&&form.windowEnd&&new Date(form.windowEnd)<=new Date(form.windowStart))return setErr("Assessment closing time must be after opening time.");
+    const developmentNames = form.sections.map(s => s.name.trim().toLowerCase());
+    if (developmentNames.includes("frontend") || developmentNames.includes("backend")) {
+      if (form.sections.length !== 2 || !developmentNames.includes("frontend") || !developmentNames.includes("backend") || form.sections.some(s => s.questionIds.length !== 30 || !s.domainId))
+        return setErr("Development assessment requires 30 Frontend and 30 Backend MCQs with their domains selected.");
+    }
     const emptySections = form.sections.reduce((out, section, index) => (!section.questionIds.length ? { ...out, [index]: "Add at least one eligible question to this section." } : out), {});
     if(Object.keys(emptySections).length){setSectionErrors(emptySections);return;}
     const ineligibleSections = form.sections.reduce((out, section, index) => section.questionIds.some((id) => { const question = questions.find((row) => row.id === id); return question?.status !== "ACTIVE" || question?.type !== "MCQ"; }) ? { ...out, [index]: "Every selected question must be an approved, active MCQ." } : out, {});
@@ -245,6 +260,7 @@ export default function AdminAssessmentsPage() {
             />{" "}
             Randomize question order for each attempt
           </label>
+          <div className="form-actions"><button type="button" className="btn secondary" onClick={setupDevelopmentAssessment}>Set up Development Assessment (30 Frontend + 30 Backend)</button></div>
           {form.sections.map((s, i) => (
             <div className="assessment-section-builder" key={i}>
               <div className="verification-title">
