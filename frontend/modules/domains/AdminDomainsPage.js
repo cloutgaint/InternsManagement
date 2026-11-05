@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+import Link from "next/link";
 export default function AdminDomainsPage() {
   const [rows, setRows] = useState([]),
     [msg, setMsg] = useState(""),
@@ -97,6 +98,7 @@ export default function AdminDomainsPage() {
                   CONFIRMED: {x.final_domain_name}
                 </span>
               ) : null}
+              {x.final_domain_id && <Link className="btn secondary" href="/admin/work" title="Change this intern's Frontend, Backend or custom project role">Change Project Role</Link>}
               {(
 
                 <button
@@ -139,10 +141,10 @@ export default function AdminDomainsPage() {
                 ))}
                 <div className="action-row">
                   <select className="input" aria-label={"Choose a different domain for " + x.full_name} value={other[x.intern_id] || ""} onChange={(e) => setOther((o) => ({ ...o, [x.intern_id]: e.target.value }))}>
-                    <option value="">Assign a different domain…</option>
+                    <option value="">{x.final_domain_id?"Change confirmed domain…":"Assign a domain…"}</option>
                     {domains.filter((d) => d.id !== x.final_domain_id && !x.recommendations.some((r) => r.domainId === d.id)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <button className="btn secondary" disabled={!other[x.intern_id]} onClick={() => confirm(x, { domainId: other[x.intern_id], domainName: domains.find((d) => d.id === other[x.intern_id])?.name })}>Assign</button>
+                  <button className="btn secondary" disabled={!other[x.intern_id]} onClick={() => confirm(x, { domainId: other[x.intern_id], domainName: domains.find((d) => d.id === other[x.intern_id])?.name })}>{x.final_domain_id?"Change Domain":"Assign"}</button>
                 </div>
               </div>
             )}
