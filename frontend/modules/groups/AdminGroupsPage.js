@@ -124,6 +124,17 @@ export default function AdminGroupsPage() {
       setErr(e.message);
     }
   }
+  async function deleteGroup(g) {
+    if(!window.confirm("Delete team "+g.name+"? This cannot be undone. Assigned projects, mentors or tasks must be removed first."))return;
+    setErr("");setMsg("");setBusy(true);
+    try{
+      await api("/admin/groups/"+g.id,{method:"DELETE"});
+      setMsg(g.name+" deleted.");
+      if(manage?.id===g.id)setManage(null);
+      await loadBase();
+      if(batchId)setGroups(await api("/admin/group-proposals/"+batchId));
+    }catch(e){setErr(e.message);}finally{setBusy(false);}
+  }
   async function saveMembers() {
     try {
       await api("/admin/groups/" + manage.id + "/members", {
@@ -217,7 +228,7 @@ export default function AdminGroupsPage() {
         </button>
       </section>
       <section className="card workflow-section">
-        <h2>Active Groups — Member Rebalancing</h2>
+        <h2>Active Groups — Member Rebalancing</h2>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
         {activeGroups
           .filter((g) => !batchId || g.batch_id === batchId)
           .map((g) => (
@@ -238,6 +249,7 @@ export default function AdminGroupsPage() {
                 <button className="btn secondary" disabled={busy} onClick={() => splitGroup(g)}>
                   Split…
                 </button>
+                <button className="btn secondary" disabled={busy} onClick={() => deleteGroup(g)}>Delete Team</button>
               </div>
             </div>
           ))}
@@ -335,8 +347,7 @@ export default function AdminGroupsPage() {
               <div>
                 <h2>Rebalance {manage.name}</h2>
                 <p className="muted">
-                  Add/remove eligible interns. Batch, confirmed-domain and
-                  active-group conflicts are validated by the server.
+                  Add/remove eligible interns. Batch and active-group conflicts are validated by the server.
                 </p>
               </div>
               <button className="icon-close" onClick={() => setManage(null)}>
@@ -348,7 +359,6 @@ export default function AdminGroupsPage() {
                 .filter(
                   (i) =>
                     i.batch_id === manage.batch_id &&
-                    i.final_domain_id &&
                     (manage.type !== "SINGLE_DOMAIN" ||
                       !manage.members.length ||
                       i.final_domain_id === manage.members[0].final_domain_id),
