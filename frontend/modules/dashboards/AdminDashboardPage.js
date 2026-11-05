@@ -146,6 +146,22 @@ export default function AdminDashboardPage() {
     "completions_pending",
     "task_evaluations_pending",
   );
+  const pendingItems = [
+    {label:"Leave requests",key:"leave_pending",href:"/admin/leave"},
+    {label:"Attendance exceptions",key:"attendance_exceptions",href:"/admin/attendance"},
+    {label:"Group approvals",key:"groups_pending",href:"/admin/groups"},
+    {label:"Completion reviews",key:"completions_pending",href:"/admin/completion"},
+    {label:"Task evaluations",key:"task_evaluations_pending",href:"/admin/work"},
+  ];
+  const modulePending = {
+    "/admin/verification": verification,
+    "/admin/attendance": count("attendance_exceptions","faces_pending"),
+    "/admin/leave": count("leave_pending"),
+    "/admin/groups": count("groups_pending"),
+    "/admin/completion": count("completions_pending"),
+    "/admin/work": count("task_evaluations_pending"),
+  };
+  const pendingBadge = (value) => !loading && value > 0 ? <span aria-label={value+" pending items"} title={value+" pending items"} style={{position:"absolute",right:12,top:10,minWidth:22,height:22,padding:"0 6px",display:"inline-flex",alignItems:"center",justifyContent:"center",borderRadius:999,background:"#dc2626",color:"#fff",fontWeight:700,fontSize:11,lineHeight:1}}>{value}</span> : null;
   const overview = [
     {
       icon: "🧑‍🎓",
@@ -167,7 +183,7 @@ export default function AdminDashboardPage() {
       icon: "📋",
       title: "Pending Operations",
       value: pending,
-      sub: "Leaves, tasks, groups and completion",
+      sub: pendingItems.filter(item=>count(item.key)>0).map(item=>count(item.key)+" "+item.label.toLowerCase()).join(" · ") || "No pending operations",
       href: "/admin/work",
       tone: "blue",
     },
@@ -206,7 +222,10 @@ export default function AdminDashboardPage() {
             key={x.title}
             href={x.href}
             className={"admin-overview-card tone-" + x.tone}
+            style={{position:"relative"}}
           >
+            {x.title==="Pending Operations" && pendingBadge(pending)}
+            {x.title==="Student Verification" && pendingBadge(verification)}
             <div className="admin-overview-top">
               <span className="admin-overview-icon" aria-hidden="true">
                 {x.icon}
@@ -221,6 +240,10 @@ export default function AdminDashboardPage() {
           </Link>
         ))}
       </section>
+      {!loading && pending>0 && <section className="card" aria-label="Pending operations breakdown" style={{marginTop:14,padding:16}}>
+        <h2 style={{margin:"0 0 10px",fontSize:16}}>Pending Operations Breakdown</h2>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{pendingItems.filter(item=>count(item.key)>0).map(item=><Link key={item.key} href={item.href} style={{display:"inline-flex",alignItems:"center",gap:8,border:"1px solid #dce6e0",borderRadius:10,padding:"9px 12px",color:"inherit",textDecoration:"none"}}><strong style={{color:"#b91c1c"}}>{count(item.key)}</strong><span>{item.label}</span><span aria-hidden="true">↗</span></Link>)}</div>
+      </section>}
       <section className="admin-queue-section">
         <div className="admin-section-heading">
           <div>
@@ -292,7 +315,7 @@ export default function AdminDashboardPage() {
         </div>
         <div className="admin-workspace-grid">
           {modules.map(([icon, title, description, href]) => (
-            <Link key={href} href={href} className="admin-workspace-card">
+            <Link key={href} href={href} className="admin-workspace-card" style={{position:"relative",paddingRight:modulePending[href]>0?45:undefined}}>
               <span className="admin-workspace-icon" aria-hidden="true">
                 {icon}
               </span>
@@ -300,7 +323,8 @@ export default function AdminDashboardPage() {
                 <b>{title}</b>
                 <small>{description}</small>
               </span>
-              <span className="admin-card-chevron" aria-hidden="true">
+              {pendingBadge(modulePending[href] || 0)}
+              <span className="admin-card-chevron" aria-hidden="true" style={modulePending[href]>0?{marginRight:25}:undefined}>
                 ↗
               </span>
             </Link>
