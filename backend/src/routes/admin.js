@@ -1848,6 +1848,31 @@ r.get("/mentors", async (req, res) =>
     ).rows,
   ),
 );
+r.get("/intern-mentor-assignments", async(req,res)=>{
+  res.json((await q(`SELECT ima.id,ima.intern_id,ima.mentor_id,ima.assigned_at,ip.full_name intern_name,m.full_name mentor_name
+  FROM intern_mentor_assignments ima JOIN intern_profiles ip ON ip.id=ima.intern_id
+  JOIN mentors m ON m.id=ima.mentor_id WHERE ima.active ORDER BY ip.full_name`)).rows);
+});
+r.put("/interns/:internId/mentor", async(req,res)=>{
+  const mentorId=req.body?.mentorId||null;
+  const intern=(await q("SELECT ip.id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED' WHERE ip.id=$1",[req.params.internId])).rows[0];
+  if(!intern)return res.status(404).json({error:"Intern not found"});
+  if(mentorId){
+    const mentor=(await q("SELECT id,max_interns FROM mentors WHERE id=$1 AND active",[mentorId])).rows[0];
+    if(!mentor)return res.status(404).json({error:"Active mentor not found"});
+    const load=(await q("SELECT count(*)::int n FROM intern_mentor_assignments WHERE mentor_id=$1 AND active AND intern_id<>$2",[mentorId,intern.id])).rows[0].n;
+    if(load>=Number(mentor.max_interns))return res.status(409).json({error:"Mentor has reached the maximum number of interns"});
+  }
+  const result=await tx(async client=>{
+    const previous=(await client.query("SELECT * FROM intern_mentor_assignments WHERE intern_id=$1 AND active FOR UPDATE",[intern.id])).rows[0]||null;
+    if(previous?.mentor_id===mentorId)return {previous,current:previous,unchanged:true};
+    await client.query("UPDATE intern_mentor_assignments SET active=false WHERE intern_id=$1 AND active",[intern.id]);
+    const current=mentorId?(await client.query("INSERT INTO intern_mentor_assignments(intern_id,mentor_id,assigned_by) VALUES($1,$2,$3) RETURNING *",[intern.id,mentorId,req.user.id])).rows[0]:null;
+    return {previous,current};
+  });
+  if(!result.unchanged)await audit(req,"INTERN_MENTOR_CHANGED","intern",intern.id,result.previous,result.current);
+  res.json({ok:true,assignment:result.current});
+});
 r.delete("/groups/:id", async (req,res)=>{
   const g=(await q("SELECT * FROM groups WHERE id=$1",[req.params.id])).rows[0];
   if(!g)return res.status(404).json({error:"Group not found"});
