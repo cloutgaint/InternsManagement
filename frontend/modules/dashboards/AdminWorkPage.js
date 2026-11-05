@@ -1,93 +1,27 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/shared/api/client";
+import {useEffect,useState} from "react";
 import Link from "next/link";
-export default function AdminWorkPage() {
-  const [groups, setGroups] = useState([]),
-    [mentors, setMentors] = useState([]),
-    [projects, setProjects] = useState([]),
-    [batches, setBatches] = useState([]),
-    [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
-  const load = () =>
-    Promise.all([
-      api("/admin/groups"),
-      api("/admin/mentors"),
-      api("/admin/projects"),
-      api("/admin/batches"),
-    ])
-      .then(([g, m, p, b]) => {
-        setGroups(g);
-        setMentors(m);
-        setProjects(p);
-        setBatches(b);
-      })
-      .catch((e) => setErr(e.message));
-  useEffect(() => {
-    load();
-  }, []);
-  async function project() {
-    const title = prompt("Project title:");
-    if (!title) return;
-    await api("/admin/projects", {
-      method: "POST",
-      body: JSON.stringify({ title }),
-    });
-    setMsg("Project created.");
-    load();
-  }
-  async function mentor(g) {
-    if (!mentors.length) return setErr("No active mentors found.");
-    await api("/admin/mentor-assignments", {
-      method: "POST",
-      body: JSON.stringify({
-        mentorId: mentors[0].id,
-        groupId: g.id,
-        isLead: true,
-      }),
-    });
-    setMsg("Mentor assigned.");
-  }
-  async function assignProject(g) {
-    if (!projects.length) return setErr("Create a project first.");
-    await api("/admin/project-assignments", {
-      method: "POST",
-      body: JSON.stringify({ projectId: projects[0].id, groupId: g.id }),
-    });
-    setMsg("Project assigned.");
-  }
-  return (
-    <main className="wrap">
-      <h1>Internship Management</h1>
-      <p className="muted">
-        Manage groups, mentors and projects. Prepare all internship weeks in the Weekly Task Scheduler; each task releases on its configured date.
-      </p>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
-      <div className="action-row">
-        <button className="btn" onClick={project}>
-          Create Project
-        </button>
-        <Link className="btn secondary" href="/admin/tasks">
-          Plan & Schedule Weekly Tasks
-        </Link>
-      </div>
-      {groups.map((g) => (
-        <section className="card workflow-row" key={g.id}>
-          <div>
-            <b>{g.name}</b>
-            <div className="muted">{g.status}</div>
-          </div>
-          <div className="action-row">
-            <button className="btn" onClick={() => mentor(g)}>
-              Assign Mentor
-            </button>
-            <button className="btn secondary" onClick={() => assignProject(g)}>
-              Assign Project
-            </button>
-          </div>
-        </section>
-      ))}
-    </main>
-  );
+import {api} from "@/shared/api/client";
+const roles=["Frontend Developer","Backend Developer","Full Stack Developer","UI/UX Designer","QA Tester","DevOps Engineer","Database Developer","Team Lead"];
+export default function AdminWorkPage(){
+  const [groups,setGroups]=useState([]),[mentors,setMentors]=useState([]),[projects,setProjects]=useState([]),[batches,setBatches]=useState([]),[interns,setInterns]=useState([]),[assignments,setAssignments]=useState([]),[details,setDetails]=useState({}),[batchId,setBatchId]=useState(""),[name,setName]=useState(""),[members,setMembers]=useState([]),[selected,setSelected]=useState(""),[err,setErr]=useState(""),[msg,setMsg]=useState(""),[busy,setBusy]=useState(false);
+  const load=async()=>{try{const [g,m,p,b,i,a]=await Promise.all(["groups","mentors","projects","batches","interns","project-assignments"].map(x=>api("/admin/"+x)));setGroups(g);setMentors(m);setProjects(p);setBatches(b);setInterns(i);setAssignments(a);setBatchId(v=>v||b[0]?.id||"");}catch(e){setErr(e.message);}};
+  useEffect(()=>{load();},[]);
+  async function run(action,success){setErr("");setMsg("");setBusy(true);try{await action();setMsg(success);await load();}catch(e){setErr(e.message);}finally{setBusy(false);}}
+  async function openGroup(id){setSelected(id);setErr("");try{setDetails(d=>({...d,[id]:null}));const result=await api("/admin/groups/"+id+"/manage");setDetails(d=>({...d,[id]:result}));}catch(e){setErr(e.message);}}
+  const batchInterns=interns.filter(x=>x.batch_id===batchId);
+  const activeGroups=groups.filter(x=>x.batch_id===batchId);
+  async function createGroup(){if(!name.trim()||!members.length)return setErr("Enter a team name and select at least one intern.");await run(async()=>{const g=await api("/admin/groups",{method:"POST",body:JSON.stringify({batchId,name:name.trim(),type:"MULTI_DOMAIN"})});await api("/admin/groups/"+g.id+"/members",{method:"PATCH",body:JSON.stringify({internIds:members})});setName("");setMembers([]);},"Team created. Approve the group to activate project and mentor allocation.");}
+  async function setRole(g,p,role){await run(()=>api("/admin/groups/"+g.id+"/members/"+p.intern_id+"/role",{method:"PATCH",body:JSON.stringify({role})}),"Project role saved.");await openGroup(g.id);}
+  async function approve(g){await run(()=>api("/admin/group-proposals/"+g.id+"/approve",{method:"POST",body:"{}"}),"Team activated.");await openGroup(g.id);}
+  async function assignProject(g,id){if(!id)return;await run(()=>api("/admin/project-assignments",{method:"POST",body:JSON.stringify({projectId:id,groupId:g.id})}),"Project assigned.");}
+  async function assignMentor(g,id){if(!id)return;await run(()=>api("/admin/groups/"+g.id+"/mentor",{method:"POST",body:JSON.stringify({mentorId:id,isLead:true})}),"Mentor assigned.");await openGroup(g.id);}
+  return <main className="wrap">
+    <div className="intern-head"><div><h1>Project Teams & Role Allocation</h1><p className="muted">Form batch teams, assign a project, confirm each intern's responsibility and appoint a mentor before scheduling weekly tasks.</p></div></div>
+    <section className="card workflow-section"><h2>1. Select Internship Batch</h2><select className="input" value={batchId} onChange={e=>{setBatchId(e.target.value);setSelected("");setMembers([]);}}><option value="">Select batch</option>{batches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></section>
+    <section className="card workflow-section"><h2>2. Create Project Team</h2><div className="form-grid"><label>Team name<input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. GAINT Academy Team Alpha"/></label></div><p className="muted">Select interns from this batch. A member already in an active team must be transferred before joining another.</p><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{batchInterns.map(p=><label key={p.id} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={members.includes(p.id)} onChange={e=>setMembers(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))}/><span>{p.full_name}<small className="muted" style={{display:"block"}}>{p.final_domain||"Domain pending"}</small></span></label>)}</div>{!batchInterns.length&&<p className="muted">No interns allocated to this batch.</p>}<div className="action-row"><button className="btn" disabled={busy||!batchId} onClick={createGroup}>Create Team</button></div></section>
+    <section className="card workflow-section"><h2>3. Assign Project, Roles & Mentor</h2>{activeGroups.map(g=><div key={g.id} className="workflow-row" style={{display:"block"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}><div><b>{g.name}</b><div className="muted">{g.status}</div></div><button className="btn secondary" onClick={()=>openGroup(g.id)}>Manage Team</button></div>{selected===g.id&&<div style={{marginTop:16,display:"grid",gap:12}}>{!details[g.id]?<p className="muted">Loading team…</p>:<>{g.status==="SYSTEM_DRAFT"&&<button className="btn" disabled={busy} onClick={()=>approve(g)}>Approve & Activate Team</button>}{g.status==="ACTIVE"&&<><label>Assigned project<select className="input" value={assignments.find(a=>a.group_id===g.id&&a.status==="ASSIGNED")?.project_id||""} onChange={e=>assignProject(g,e.target.value)} disabled={busy}><option value="">Select project</option>{projects.filter(p=>p.status==="ACTIVE").map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>Lead mentor<select className="input" value={details[g.id].lead_mentor_id||""} onChange={e=>assignMentor(g,e.target.value)} disabled={busy}><option value="">Select mentor</option>{mentors.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}</select></label></>}{details[g.id].members?.map(p=><div key={p.intern_id} style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",justifyContent:"space-between"}}><div><b>{p.full_name}</b><small className="muted" style={{display:"block"}}>{p.domain_name||"Domain not confirmed"}</small></div><select aria-label={"Project role for "+p.full_name} className="input" style={{maxWidth:230}} value={p.project_role||""} disabled={busy||g.status!=="ACTIVE"} onChange={e=>setRole(g,p,e.target.value)}><option value="">Assign project role</option>{roles.map(role=><option key={role} value={role}>{role}</option>)}</select></div>)}</>}</div>}</div>)}{!activeGroups.length&&<p className="muted">Create a team to begin project allocation.</p>}</section>
+    <section className="card workflow-section"><h2>4. Plan Weekly Project Tasks</h2><p className="muted">Once the team, project, roles and mentor are confirmed, prepare tasks for every internship week. Tasks release automatically on their scheduled dates.</p><Link href="/admin/tasks" className="btn secondary">Open Weekly Task Scheduler</Link></section>
+    {err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
+  </main>;
 }
