@@ -2992,6 +2992,32 @@ r.post("/mentor-assignments", async (req, res) => {
   await notifyMentorAssigned(b.mentorId, b.groupId);
   res.status(201).json(x);
 });
+r.post("/project-groups", async(req,res)=>{
+ const {projectId,batchId,internIds}=req.body||{};
+ const ids=[...new Set(Array.isArray(internIds)?internIds:[])];
+ if(!projectId||!batchId||!ids.length)return res.status(400).json({error:"Select a project, batch and at least one intern"});
+ const result=await tx(async client=>{
+   const project=(await client.query("SELECT id,title FROM projects WHERE id=$1 AND status='ACTIVE'",[projectId])).rows[0];
+   const batch=(await client.query("SELECT id,college_id FROM batches WHERE id=$1",[batchId])).rows[0];
+   if(!project||!batch)throw conflict("Active project and valid batch required");
+   await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[String(batchId)]);
+   const members=(await client.query(`SELECT ip.id,ip.college_id,ip.final_domain_id FROM intern_profiles ip
+    JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
+    JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$1
+    WHERE ip.id=ANY($2::uuid[])`,[batchId,ids])).rows;
+   if(members.length!==ids.length||members.some(x=>x.college_id!==batch.college_id))throw conflict("All interns must belong to the selected college and batch");
+   const duplicates=(await client.query(`SELECT gm.intern_id,g.name FROM group_members gm JOIN groups g ON g.id=gm.group_id
+     WHERE gm.intern_id=ANY($1::uuid[]) AND gm.active AND g.status='ACTIVE'`,[ids])).rows;
+   if(duplicates.length)throw conflict("One or more selected interns already belong to an active project: "+duplicates.map(x=>x.name).join(", "));
+   const g=(await client.query("INSERT INTO groups(batch_id,name,type,status) VALUES($1,$2,'MULTI_DOMAIN','ACTIVE') RETURNING *",[batchId,project.title])).rows[0];
+   for(const m of members)await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true)",[g.id,m.id,m.final_domain_id]);
+   await client.query("INSERT INTO project_assignments(project_id,group_id,assigned_by,status) VALUES($1,$2,$3,'ASSIGNED')",[projectId,g.id,req.user.id]);
+   await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action) VALUES($1,$2,$3,'APPROVED')",[g.id,batchId,req.user.id]);
+   return {group:g,internCount:members.length};
+ });
+ await audit(req,"PROJECT_GROUP_CREATED","group",result.group.id,null,{projectId,batchId,internIds:ids});
+ res.status(201).json(result);
+});
 r.post("/projects", async (req, res) => {
   const b = req.body;
   if (!String(b.title || "").trim())
