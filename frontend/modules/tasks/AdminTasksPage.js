@@ -20,6 +20,7 @@ export default function AdminTasksPage() {
       batchId: "",
       domainId: "",
       groupId: "",
+      projectRole: "",
       title: "",
       description: "",
       expectedOutput: "",
@@ -171,6 +172,7 @@ export default function AdminTasksPage() {
                   ))}
               </select>
             </label>
+            <label>Project role (optional)<select className="input" value={f.projectRole} onChange={e=>setF(x=>({...x,projectRole:e.target.value}))} disabled={!f.groupId}><option value="">All team members</option>{["Frontend Developer","Backend Developer","Full Stack Developer","UI/UX Designer","QA Tester","DevOps Engineer","Database Developer","Team Lead"].map(role=><option key={role} value={role}>{role}</option>)}</select><small className="muted">Choose a team above to target a specific project role.</small></label>
             <label>
               Marks
               <input
