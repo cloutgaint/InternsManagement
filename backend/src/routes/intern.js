@@ -709,6 +709,13 @@ r.post("/assessments/:id/start", async (req, res) => {
     )
   ).rows[0];
   if (!a) return res.status(404).json({ error: "Assessment not available" });
+  if (/full[ -]?stack|development/i.test(a.name || "")) {
+    const sections = await sectionsForIntern(a.id, p);
+    const frontend = sections.find(s => /^frontend$/i.test(String(s.name).trim()));
+    const backend = sections.find(s => /^backend$/i.test(String(s.name).trim()));
+    if (!frontend?.question_ids?.length || !backend?.question_ids?.length)
+      return res.status(409).json({ error: "This Full Stack assessment is incomplete: both Frontend and Backend questions must be allocated by Admin before the test can start." });
+  }
   const approvedRetry = (await q("SELECT id FROM assessment_retry_requests WHERE assessment_id=$1 AND intern_id=$2 AND status='APPROVED' AND approved_attempt_id IS NULL LIMIT 1",[a.id,p.id])).rows[0];
   if (a.status === "CLOSED" && !approvedRetry) return res.status(409).json({error:"Assessment is closed. Admin approval is required to retake it."});
   const now = new Date();
