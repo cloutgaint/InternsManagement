@@ -829,7 +829,11 @@ r.post("/assessments/:id/submit", async (req, res) => {
         const snapshotRows = (await client.query(
           `SELECT s.id section_id,s.name,s.pass_score,
             COALESCE(SUM(COALESCE(ans.manual_score,ans.auto_score,0)),0) earned,
-            COALESCE(SUM(qb.marks),0) possible
+            COALESCE(SUM(qb.marks),0) possible,
+            COUNT(qb.id)::int total_questions,
+            COUNT(qb.id) FILTER (WHERE ans.answer IS NOT NULL AND ans.answer::text NOT IN ('null','""','[]'))::int attempted,
+            COUNT(qb.id) FILTER (WHERE ans.answer IS NOT NULL AND ans.answer::text NOT IN ('null','""','[]') AND COALESCE(ans.manual_score,ans.auto_score,0) >= qb.marks)::int correct,
+            COUNT(qb.id) FILTER (WHERE ans.answer IS NOT NULL AND ans.answer::text NOT IN ('null','""','[]') AND COALESCE(ans.manual_score,ans.auto_score,0) < qb.marks)::int wrong
             FROM assessment_sections s
             JOIN question_bank qb ON s.question_ids ? qb.id::text
             LEFT JOIN assessment_answers ans ON ans.attempt_id=$1 AND ans.question_id=qb.id
@@ -839,7 +843,7 @@ r.post("/assessments/:id/submit", async (req, res) => {
         const sectionResults = snapshotRows.map(row => {
           const earned = Number(row.earned), possible = Number(row.possible);
           const percentage = possible ? Number((earned / possible * 100).toFixed(2)) : 0;
-          return { sectionId: row.section_id, name: row.name, earned, possible, percentage, passScore: Number(row.pass_score), passed: possible > 0 && percentage >= Number(row.pass_score) };
+          return { sectionId: row.section_id, name: row.name, earned, possible, percentage, passScore: Number(row.pass_score), passed: possible > 0 && percentage >= Number(row.pass_score), totalQuestions: Number(row.total_questions), correct: Number(row.correct), wrong: Number(row.wrong), unanswered: Number(row.total_questions) - Number(row.attempted) };
         });
         const summary = summarizeAssessmentAttempt(sectionResults, "EVALUATED");
         const front = sectionResults.find(s => s.name.trim().toLowerCase() === "frontend");
