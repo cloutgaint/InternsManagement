@@ -2958,10 +2958,16 @@ r.post("/group-proposals/:groupId/approve", async (req, res) => {
       .status(409)
       .json({ error: "Only system draft groups can be approved" });
   const x = (
-    await q("UPDATE groups SET status='ACTIVE' WHERE id=$1 RETURNING *", [
-      before.id,
-    ])
+    await q(`UPDATE groups SET status='ACTIVE' WHERE id=$1 AND status='SYSTEM_DRAFT'
+      AND EXISTS (
+        SELECT 1 FROM group_members gm
+        JOIN intern_profiles ip ON ip.id=gm.intern_id
+        JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
+        JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=groups.batch_id
+        WHERE gm.group_id=groups.id AND gm.active
+      ) RETURNING *`, [before.id])
   ).rows[0];
+  if (!x) return res.status(409).json({error:"Add at least one active, batch-allocated intern before activating this team"});
   await audit(req, "GROUP_PROPOSAL_APPROVED", "group", x.id, before, x);
   await q(
     "INSERT INTO group_history(group_id,batch_id,actor_id,action) VALUES($1,$2,$3,'APPROVED')",
