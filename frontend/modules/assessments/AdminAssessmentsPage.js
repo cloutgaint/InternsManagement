@@ -400,14 +400,16 @@ export default function AdminAssessmentsPage() {
         ))}
       </section>
       <section className="card workflow-section">
-        <h2>Written Answer Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        <h2>Intern Assessment Results & Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {subs.length ? (
           subs.map((x) => (
             <div className="workflow-row" key={x.attempt_id}>
               <div>
                 <b>{x.full_name}</b>
                 <div className="muted">
-                  {x.assessment_name} · Score {x.total_score ?? 0} · {x.status}{formatTimeTaken(x.started_at, x.submitted_at) && <> · Time taken: {formatTimeTaken(x.started_at, x.submitted_at)}</>}
+                  {x.assessment_name} · Score {x.result_snapshot?.earned ?? x.total_score ?? 0}{x.result_snapshot?.possible != null && <>/{x.result_snapshot.possible} ({x.result_snapshot.percentage}%)</>} · {x.status}{formatTimeTaken(x.started_at, x.submitted_at) && <> · Time taken: {formatTimeTaken(x.started_at, x.submitted_at)}</>}
+                  {x.result_snapshot?.sectionResults?.length > 0 && <div className="section-results" style={{display:"flex",flexWrap:"wrap",gap:12,marginTop:8}}>{x.result_snapshot.sectionResults.map(s=><span key={s.sectionId}><b>{s.name}</b>: {s.earned}/{s.possible} ({s.percentage}%) {s.totalQuestions!=null && <>· Correct {s.correct} · Wrong {s.wrong} · Unanswered {s.unanswered}</>}</span>)}</div>}
+                  {x.result_snapshot?.domainRecommendation && <div style={{marginTop:6}}><b>Suggested domain: {x.result_snapshot.domainRecommendation==="ADMIN_REVIEW"?"Balanced performance — Admin review":x.result_snapshot.domainRecommendation+" Development"}</b><span className="muted"> · Recommendation only; Admin confirms allocation</span></div>}
                 </div>
               </div>
               <div className="action-row">
