@@ -3165,6 +3165,7 @@ r.post("/tasks", async (req, res) => {
     return res
       .status(400)
       .json({ error: "Task marks must be between 1 and 1000" });
+  if (b.projectRole && !b.groupId) return res.status(400).json({error:"Select a project team for role-specific tasks"});
   if (b.groupId) {
     const group = (
       await q("SELECT 1 FROM groups WHERE id=$1 AND batch_id=$2", [
@@ -3185,7 +3186,7 @@ r.post("/tasks", async (req, res) => {
   }
   const x = (
     await q(
-      `INSERT INTO weekly_tasks(batch_id,domain_id,group_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,rubric_id,status,release_weekday,release_time,release_timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'SCHEDULED',$13,$14,'Asia/Kolkata') RETURNING *`,
+      `INSERT INTO weekly_tasks(batch_id,domain_id,group_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,rubric_id,status,release_weekday,release_time,release_timezone,project_role) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'SCHEDULED',$13,$14,'Asia/Kolkata',$15) RETURNING *`,
       [
         b.batchId,
         b.domainId || null,
@@ -3201,6 +3202,7 @@ r.post("/tasks", async (req, res) => {
         b.rubricId || null,
         release.getDay(),
         String(b.releaseAt).slice(11, 16) || null,
+        b.projectRole || null,
       ],
     )
   ).rows[0];
