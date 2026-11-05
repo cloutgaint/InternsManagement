@@ -2396,6 +2396,40 @@ r.delete("/questions/:id", async (req, res) => {
   const before = (await q("SELECT * FROM question_bank WHERE id=$1", [req.params.id])).rows[0];
   if (!before) return res.status(404).json({ error: "Question not found" });
   const result = await tx(async (client) => {
+    // Capture still-reconstructable evaluated results before destructive question removal.
+    const affected = (await client.query(
+      `SELECT DISTINCT aa.id,aa.total_score FROM assessment_attempts aa
+       JOIN assessment_sections s ON s.assessment_id=aa.assessment_id
+       WHERE s.question_ids ? $1 AND aa.status='EVALUATED' AND aa.result_snapshot IS NULL`,
+      [req.params.id],
+    )).rows;
+    for (const attempt of affected) {
+      const rows = (await client.query(
+        `SELECT s.id section_id,s.name,s.pass_score,
+         COALESCE(SUM(COALESCE(ans.manual_score,ans.auto_score,0)),0) earned,
+         COALESCE(SUM(qb.marks),0) possible
+         FROM assessment_sections s
+         JOIN assessment_attempts aa ON aa.assessment_id=s.assessment_id
+         JOIN question_bank qb ON s.question_ids ? qb.id::text
+         LEFT JOIN assessment_answers ans ON ans.attempt_id=aa.id AND ans.question_id=qb.id
+         WHERE aa.id=$1 GROUP BY s.id,s.name,s.pass_score ORDER BY s.name`,
+        [attempt.id],
+      )).rows;
+      const sectionResults = rows.map(row => {
+        const earned = Number(row.earned), possible = Number(row.possible);
+        const percentage = possible ? Number((earned / possible * 100).toFixed(2)) : 0;
+        return { sectionId: row.section_id, name: row.name, earned, possible, percentage, passScore: Number(row.pass_score), passed: possible > 0 && percentage >= Number(row.pass_score) };
+      });
+      const possible = sectionResults.reduce((sum, row) => sum + row.possible, 0);
+      const earned = Number(attempt.total_score || 0);
+      const front = sectionResults.find(row => row.name.trim().toLowerCase() === "frontend");
+      const back = sectionResults.find(row => row.name.trim().toLowerCase() === "backend");
+      const snapshot = { earned, possible, percentage: possible ? Number((earned / possible * 100).toFixed(2)) : null,
+        passed: possible ? sectionResults.every(row => row.passed) : null,
+        sectionResults, domainRecommendation: front && back ? front.percentage === back.percentage ? "ADMIN_REVIEW" : front.percentage > back.percentage ? "Frontend" : "Backend" : null,
+        capturedAt: new Date().toISOString() };
+      if (possible) await client.query("UPDATE assessment_attempts SET result_snapshot=$1::jsonb WHERE id=$2 AND result_snapshot IS NULL", [JSON.stringify(snapshot), attempt.id]);
+    }
     const sections = await client.query(
       "UPDATE assessment_sections SET question_ids=(SELECT COALESCE(jsonb_agg(value), '[]'::jsonb) FROM jsonb_array_elements(question_ids) AS value WHERE value #>> '{}' <> $1) WHERE question_ids ? $1 RETURNING id",
       [req.params.id],
