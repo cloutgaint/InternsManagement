@@ -2522,6 +2522,11 @@ async function assessmentPublishError(assessmentId) {
   const sections = (
     await q("SELECT id,name,domain_id,question_ids FROM assessment_sections WHERE assessment_id=$1", [assessmentId])
   ).rows;
+  const assessment = (await q("SELECT name FROM assessments WHERE id=$1", [assessmentId])).rows[0];
+  if (/full[ -]?stack|development/i.test(assessment?.name || "") && !sections.some(section => /^frontend$/i.test(String(section.name).trim())) )
+    return "Full Stack assessment must contain a Frontend section with allocated questions before publishing.";
+  if (/full[ -]?stack|development/i.test(assessment?.name || "") && !sections.some(section => /^backend$/i.test(String(section.name).trim())) )
+    return "Full Stack assessment must contain a Backend section with allocated questions before publishing.";
   const developmentError = developmentSectionError(sections);
   if (developmentError) return developmentError;
   const ids = sections.flatMap((section) => section.question_ids);
