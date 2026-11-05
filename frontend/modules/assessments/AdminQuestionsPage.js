@@ -649,9 +649,7 @@ export default function AdminQuestionsPage() {
           <select
             className="input"
             value={filter.domain}
-            onChange={(e) =>
-              setFilter((x) => ({ ...x, domain: e.target.value })); setQuestionTab("ALL")
-            }
+            onChange={(e) => { setFilter((x) => ({ ...x, domain: e.target.value })); setQuestionTab("ALL"); }}
           >
             <option value="">All domains</option>
             {domains.map((d) => (
