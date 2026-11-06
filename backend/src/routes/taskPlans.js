@@ -38,8 +38,8 @@ r.put("/task-plans/:id/weeks",async(req,res)=>{
  if(!Array.isArray(weeks)||!weeks.length||weeks.length>52)return res.status(400).json({error:"Provide 1 to 52 weekly tasks"});
  const numbers=new Set();
  for(const w of weeks){
-  const week=Number(w.week),release=new Date(w.releaseAt),due=new Date(w.dueAt);
-  if(!Number.isInteger(week)||week<1||week>52||numbers.has(week)||!String(w.title||"").trim()||!String(w.description||"").trim()||!Number.isFinite(release.getTime())||!Number.isFinite(due.getTime())||due<=release||!Number.isFinite(Number(w.marks??100))||Number(w.marks??100)<=0||Number(w.marks??100)>1000)return res.status(400).json({error:"Every week needs a unique number, title, instructions, valid release/deadline and marks"});
+  const week=Number(w.week),release=new Date(w.releaseAt);
+  if(!Number.isInteger(week)||week<1||week>52||numbers.has(week)||!String(w.title||"").trim()||!String(w.description||"").trim()||!Number.isFinite(release.getTime())||!Number.isFinite(Number(w.marks??100))||Number(w.marks??100)<=0||Number(w.marks??100)>1000)return res.status(400).json({error:"Every week needs a unique number, title, instructions, valid release date and marks"});
   numbers.add(week);
  }
  const outcome=await tx(async(client)=>{
@@ -50,14 +50,14 @@ r.put("/task-plans/:id/weeks",async(req,res)=>{
   const allocation=(await client.query("SELECT * FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
   if(!allocation)return {code:409,error:"Internship allocation not found"};
   const start=new Date(new Date(allocation.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(allocation.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
-  for(const w of weeks){if(new Date(w.releaseAt)<start||new Date(w.dueAt)>end)return {code:400,error:"Task dates must be within the Admin-approved internship dates"};}
+  for(const w of weeks){if(new Date(w.releaseAt)<start)return {code:400,error:"Task dates must be within the Admin-approved internship dates"};}
   await client.query("DELETE FROM weekly_tasks WHERE task_plan_id=$1",[p.id]);
   const mentor=isAdmin(req)?null:(await client.query("SELECT id FROM mentors WHERE user_id=$1",[req.user.id])).rows[0]?.id;
   if(!isAdmin(req)&&!mentor)return {code:403,error:"Mentor profile not found"};
   for(const w of weeks){
    const types=Array.isArray(w.submissionTypes)?w.submissionTypes.filter(x=>allowed.includes(x)):["REPOSITORY"];
    if(!types.length)return {code:400,error:"Select a submission type for every week"};
-   await client.query("INSERT INTO weekly_tasks(batch_id,title,description,expected_output,submission_types,release_at,due_at,marks,status,release_timezone,target_intern_id,assigning_mentor_id,task_plan_id,plan_week) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'DRAFT','Asia/Kolkata',$9,$10,$11,$12)",[allocation.batch_id,String(w.title).trim(),String(w.description).trim(),w.expectedOutput||null,JSON.stringify(types),w.releaseAt,w.dueAt,Number(w.marks??100),p.intern_id,mentor,p.id,Number(w.week)]);
+   await client.query("INSERT INTO weekly_tasks(batch_id,title,description,expected_output,submission_types,release_at,due_at,marks,status,release_timezone,target_intern_id,assigning_mentor_id,task_plan_id,plan_week) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'DRAFT','Asia/Kolkata',$9,$10,$11,$12)",[allocation.batch_id,String(w.title).trim(),String(w.description).trim(),w.expectedOutput||null,JSON.stringify(types),w.releaseAt,null,Number(w.marks??100),p.intern_id,mentor,p.id,Number(w.week)]);
   }
   return {count:weeks.length};
  });
@@ -76,7 +76,7 @@ r.post("/task-plans/:id/confirm",async(req,res)=>{
   const alloc=(await client.query("SELECT intern_start,intern_end FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
   if(!alloc)return {code:409,error:"Internship allocation is no longer active"};
   const start=new Date(new Date(alloc.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(alloc.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
-  if(tasks.some(t=>new Date(t.release_at)<start||new Date(t.due_at)>end))return {code:409,error:"Task dates are outside internship dates"};
+  if(tasks.some(t=>new Date(t.release_at)<start))return {code:409,error:"Task dates are outside internship dates"};
   await client.query("UPDATE weekly_tasks SET status='SCHEDULED' WHERE task_plan_id=$1",[p.id]);
   await client.query("UPDATE weekly_task_plans SET status='CONFIRMED',confirmed_by=$2,confirmed_at=now() WHERE id=$1",[p.id,req.user.id]);
   return {count:tasks.length};
