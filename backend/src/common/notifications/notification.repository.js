@@ -25,7 +25,13 @@ export async function findActiveGroupUserIds(groupId) {
        SELECT DISTINCT m.user_id
        FROM mentor_assignments ma
        JOIN mentors m ON m.id=ma.mentor_id
-       WHERE ma.group_id=$1 AND ma.active`,
+       WHERE ma.group_id=$1 AND ma.active
+       UNION
+       SELECT m.user_id
+       FROM group_members gm
+       JOIN intern_mentor_assignments ima ON ima.intern_id=gm.intern_id AND ima.active
+       JOIN mentors m ON m.id=ima.mentor_id
+       WHERE gm.group_id=$1 AND gm.active`,
       [groupId],
     )
   ).rows;

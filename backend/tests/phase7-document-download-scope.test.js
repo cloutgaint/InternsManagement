@@ -11,6 +11,6 @@ test("intern document downloads require active group membership",()=>{
 });
 test("mentor document downloads require active group assignment",()=>{
  const route=mentor.slice(mentor.indexOf('r.get("/documents/:id/file"'),mentor.indexOf('r.post("/groups/:id/chat"'));
- assert.match(route,/ma\.mentor_id=\$1 AND ma\.active/);
+ assert.match(route,/mentorHasInternInGroup\("d\.group_id", "\$1"\)/);
  assert.match(route,/d\.id=\$2 AND d\.active/);
 });

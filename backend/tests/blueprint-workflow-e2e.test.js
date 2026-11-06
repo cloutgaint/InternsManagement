@@ -207,35 +207,29 @@ test("Blueprint v1.2 lifecycle from registration to certificate", { skip: !enabl
     });
 
     // Steps 7-11
-    await t.test("assessment: common + preferred sections, no key leak, manual marks, recommendation is advisory", async () => {
-      const question = async (domainId, type, extra) => (await one("INSERT INTO question_bank(domain_id,type,question,correct_answer,marks,status,options) VALUES($1,$2,$3,$4,$5,'ACTIVE',$6) RETURNING id", [domainId, type, "Q " + type, extra.answer ? JSON.stringify(extra.answer) : null, 10, extra.options ? JSON.stringify(extra.options) : null])).id;
-      const common = await question(null, "MCQ", { answer: "a", options: ["a", "b"] });
-      const qA = await question(domainA.id, "DESCRIPTIVE", {});
-      const qB = await question(domainB.id, "MCQ", { answer: "x", options: ["x", "y"] });
-      const created = ok(await A("POST", "/assessments", {
-        batchId: batch.id, name: "Pre-joining " + suffix, durationMinutes: 60, attemptCount: 1, randomize: true,
-        sections: [
-          { name: "Common", domainId: null, passScore: 1, questionIds: [common] },
-          { name: "Backend", domainId: domainA.id, passScore: 1, questionIds: [qA] },
-          { name: "Marketing", domainId: domainB.id, passScore: 1, questionIds: [qB] },
-        ],
-      }), 201);
+    await t.test("assessment: MCQ-only Backend and Frontend sections, no key leak, recommendation is advisory", async () => {
+      const question = async (domainId, label) => (await one("INSERT INTO question_bank(domain_id,type,question,correct_answer,marks,status,options) VALUES($1,'MCQ',$2,$3,10,'ACTIVE',$4) RETURNING id", [domainId, "Q " + label + suffix, JSON.stringify("a"), JSON.stringify(["a", "b", "c", "d"])])).id;
+      const qA = await question(domainA.id, "backend");
+      const qB = await question(domainB.id, "frontend");
+      const essay = (await one("INSERT INTO question_bank(domain_id,type,question,marks,status) VALUES($1,'DESCRIPTIVE',$2,10,'ACTIVE') RETURNING id", [domainA.id, "Essay " + suffix])).id;
+      const sections = (backendQuestions) => [
+        { name: "Backend", domainId: domainA.id, passScore: 1, questionIds: backendQuestions },
+        { name: "Frontend", domainId: domainB.id, passScore: 1, questionIds: [qB] },
+      ];
+      const assessment = { batchId: batch.id, name: "Pre-joining " + suffix, durationMinutes: 60, attemptCount: 1, randomize: true };
+      ok(await A("POST", "/assessments", { ...assessment, sections: sections([essay]) }), 400);
+      const created = ok(await A("POST", "/assessments", { ...assessment, sections: sections([qA]) }), 201);
       ok(await A("PATCH", "/assessments/" + created.id + "/status", { status: "PUBLISHED" }));
       const attempt = ok(await I1("POST", "/assessments/" + created.id + "/start", {}), 201);
       const resumed = ok(await I1("POST", "/assessments/" + created.id + "/start", {}));
       assert.equal(resumed.id, attempt.id, "starting again resumes the open attempt");
       const paper = ok(await I1("GET", "/assessments/" + created.id + "/questions"));
-      const ids = paper.questions.map((x) => x.id).sort();
-      assert.deepEqual(ids, [common, qA].sort(), "intern sees the common section and preferred domain only");
+      assert.deepEqual(paper.questions.map((x) => x.id).sort(), [qA, qB].sort(), "intern sees every published section");
       assert.ok(!JSON.stringify(paper).includes("correct_answer"), "answer keys are never sent to interns");
       ok(await I1("POST", "/assessments/" + created.id + "/tab-switch", {}));
-      ok(await I1("POST", "/assessments/" + created.id + "/submit", { attemptId: attempt.id, answers: [{ questionId: qB, answer: "x" }] }), 400);
-      const submitted = ok(await I1("POST", "/assessments/" + created.id + "/submit", { attemptId: attempt.id, answers: [{ questionId: common, answer: "a" }, { questionId: qA, answer: "essay" }] }), 201);
-      assert.equal(submitted.status, "PENDING_EVALUATION");
+      ok(await I1("POST", "/assessments/" + created.id + "/submit", { attemptId: attempt.id, answers: [{ questionId: essay, answer: "a" }] }), 400);
+      ok(await I1("POST", "/assessments/" + created.id + "/submit", { attemptId: attempt.id, answers: [{ questionId: qA, answer: "a" }, { questionId: qB, answer: "b" }] }), 201);
       assert.equal((await one("SELECT tab_switches FROM assessment_attempts WHERE id=$1", [attempt.id])).tab_switches, 1);
-      ok(await A("POST", "/domain-recommendations/" + first.internId + "/calculate", { batchId: batch.id }), 409);
-      const manual = await one("SELECT id FROM assessment_answers WHERE attempt_id=$1 AND question_id=$2", [attempt.id, qA]);
-      ok(await A("POST", "/assessment-answers/" + manual.id + "/evaluate", { score: 8, marks: 8, manualScore: 8, feedback: "Good" }), 200);
       const rec = ok(await A("POST", "/domain-recommendations/" + first.internId + "/calculate", { batchId: batch.id }));
       assert.equal(rec.recommendations[0].domainId, domainA.id);
       ok(await A("POST", "/domain-confirm", { internId: first.internId, batchId: batch.id, domainId: domainC.id, reason: "Not offered" }), 409);
@@ -244,9 +238,8 @@ test("Blueprint v1.2 lifecycle from registration to certificate", { skip: !enabl
       ok(await A("POST", "/domain-confirm", { internId: first.internId, batchId: batch.id, domainId: domainA.id, reason: "Reverted after review" }));
       ok(await A("POST", "/domain-confirm", { internId: first.internId, batchId: batch.id, domainId: domainA.id }), 409);
       assert.equal((await one("SELECT final_domain_id FROM intern_profiles WHERE id=$1", [first.internId])).final_domain_id, domainA.id);
-      // Second intern: objective paper only, confirmed directly on the recommendation.
       const a2 = ok(await I2("POST", "/assessments/" + created.id + "/start", {}), 201);
-      ok(await I2("POST", "/assessments/" + created.id + "/submit", { attemptId: a2.id, answers: [{ questionId: common, answer: "a" }, { questionId: qB, answer: "x" }] }), 201);
+      ok(await I2("POST", "/assessments/" + created.id + "/submit", { attemptId: a2.id, answers: [{ questionId: qA, answer: "b" }, { questionId: qB, answer: "a" }] }), 201);
       ok(await A("POST", "/domain-recommendations/" + second.internId + "/calculate", { batchId: batch.id }));
       ok(await A("POST", "/domain-confirm", { internId: second.internId, batchId: batch.id, domainId: domainB.id }));
     });

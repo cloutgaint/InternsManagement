@@ -1,4 +1,5 @@
 import taskPlans from "./taskPlans.js";
+import { mentorHasInternInGroup, mentorOwnsIntern } from "../services/mentorScope.js";
 import { Router } from "express";
 import { q, tx } from "../common/database/index.js";
 import { audit } from "../common/audit/audit.service.js";
@@ -12,6 +13,11 @@ const r = Router();
 const REVIEW_STATUSES = ["SCHEDULED", "CONDUCTED", "MARKS_ENTERED", "PUBLISHED"];
 r.use(auth, permit("MENTOR"));
 r.use(taskPlans);
+const SUBMISSION_INTERN_IS_MINE = mentorOwnsIntern("ts.intern_id", "$1");
+const INTERN_IS_MINE = mentorOwnsIntern("ip.id", "$1");
+const MY_GROUP = mentorHasInternInGroup("g.id", "$1");
+// $1 is the mentor and $2 the group.
+const HAS_GROUP_ACCESS = "SELECT 1 WHERE " + mentorHasInternInGroup("$2::uuid", "$1::uuid");
 async function mid(uid) {
   return (await q("SELECT id FROM mentors WHERE user_id=$1", [uid])).rows[0]
     ?.id;
@@ -20,7 +26,7 @@ r.get("/groups/:id/collaboration", async (req, res) => {
   const m = await mid(req.user.id);
   const ok = (
     await q(
-      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      HAS_GROUP_ACCESS,
       [m, req.params.id],
     )
   ).rowCount;
@@ -46,7 +52,7 @@ r.post(
     const m = await mid(req.user.id);
     const ok = (
       await q(
-        "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+        HAS_GROUP_ACCESS,
         [m, req.params.id],
       )
     ).rowCount;
@@ -92,7 +98,7 @@ r.get("/documents/:id/file", async (req, res) => {
   const m = await mid(req.user.id);
   const d = (
     await q(
-      "SELECT d.* FROM documents d JOIN mentor_assignments ma ON ma.group_id=d.group_id AND ma.mentor_id=$1 AND ma.active WHERE d.id=$2 AND d.active",
+      "SELECT d.* FROM documents d WHERE d.id=$2 AND d.active AND " + mentorHasInternInGroup("d.group_id", "$1"),
       [m, req.params.id],
     )
   ).rows[0];
@@ -107,7 +113,7 @@ r.post("/groups/:id/chat", async (req, res) => {
   const m = await mid(req.user.id),
     ok = (
       await q(
-        "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+        HAS_GROUP_ACCESS,
         [m, req.params.id],
       )
     ).rowCount;
@@ -160,7 +166,7 @@ r.get("/operations", async (req, res) => {
   const m = await mid(req.user.id);
   const groups = (
     await q(
-      "SELECT g.id,g.name FROM groups g JOIN mentor_assignments ma ON ma.group_id=g.id WHERE ma.mentor_id=$1 AND ma.active",
+      "SELECT g.id,g.name FROM groups g WHERE " + MY_GROUP,
       [m],
     )
   ).rows;
@@ -176,31 +182,31 @@ r.get("/operations", async (req, res) => {
     });
   const interns = (
     await q(
-      `SELECT ip.id,ip.full_name,ip.roll_number,g.id group_id,g.name group_name FROM intern_profiles ip JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY ip.full_name`,
+      `SELECT ip.id,ip.full_name,ip.roll_number,g.id group_id,g.name group_name FROM intern_profiles ip LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id WHERE ${INTERN_IS_MINE} ORDER BY ip.full_name`,
       [m],
     )
   ).rows;
   const attendance = (
     await q(
-      `SELECT ad.*,ip.full_name,g.name group_name FROM attendance_daily ad JOIN intern_profiles ip ON ip.id=ad.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY ad.day DESC LIMIT 100`,
+      `SELECT ad.*,ip.full_name,g.name group_name FROM attendance_daily ad JOIN intern_profiles ip ON ip.id=ad.intern_id AND ${INTERN_IS_MINE} LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id ORDER BY ad.day DESC LIMIT 100`,
       [m],
     )
   ).rows;
   const leave = (
     await q(
-      `SELECT lr.*,ip.full_name,g.name group_name FROM leave_requests lr JOIN intern_profiles ip ON ip.id=lr.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY lr.created_at DESC LIMIT 100`,
+      `SELECT lr.*,ip.full_name,g.name group_name FROM leave_requests lr JOIN intern_profiles ip ON ip.id=lr.intern_id AND ${INTERN_IS_MINE} LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id ORDER BY lr.created_at DESC LIMIT 100`,
       [m],
     )
   ).rows;
   const dailyReports = (
     await q(
-      `SELECT dr.*,ip.full_name,g.name group_name FROM daily_reports dr JOIN intern_profiles ip ON ip.id=dr.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY dr.day DESC LIMIT 100`,
+      `SELECT dr.*,ip.full_name,g.name group_name FROM daily_reports dr JOIN intern_profiles ip ON ip.id=dr.intern_id AND ${INTERN_IS_MINE} LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id ORDER BY dr.day DESC LIMIT 100`,
       [m],
     )
   ).rows;
   const milestones = (
     await q(
-      `SELECT g.id group_id,g.name group_name,p.id project_id,p.title,p.milestones FROM groups g JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id`,
+      `SELECT g.id group_id,g.name group_name,p.id project_id,p.title,p.milestones FROM groups g LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id WHERE ${MY_GROUP}`,
       [m],
     )
   ).rows;
@@ -210,13 +216,13 @@ r.get("/dashboard", async (req, res) => {
   const m = await mid(req.user.id);
   const groups = (
     await q(
-      `SELECT g.* FROM groups g JOIN mentor_assignments ma ON ma.group_id=g.id WHERE ma.mentor_id=$1 AND ma.active`,
+      `SELECT g.* FROM groups g WHERE ${MY_GROUP}`,
       [m],
     )
   ).rows;
   const submissions = (
     await q(
-      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) AND ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
+      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND ${SUBMISSION_INTERN_IS_MINE})) AND ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
       [m],
     )
   ).rows;
@@ -226,7 +232,7 @@ r.get("/submissions/:id", async (req, res) => {
   const m = await mid(req.user.id);
   const x = (
     await q(
-      `SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) AND ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,
+      `SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND ${SUBMISSION_INTERN_IS_MINE})) AND ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,
       [m, req.params.id],
     )
   ).rows[0];
@@ -238,7 +244,7 @@ r.post("/submissions/:id/evaluate", async (req, res) => {
   const m = await mid(req.user.id);
   const row = (
     await q(
-      `SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) AND ts.id=$2`,
+      `SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND ${SUBMISSION_INTERN_IS_MINE})) AND ts.id=$2`,
       [m, req.params.id],
     )
   ).rows[0];
@@ -337,7 +343,7 @@ r.get("/assessment-evaluations", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,
+        `SELECT DISTINCT aa.id attempt_id,aa.status,aa.total_score,aa.submitted_at,a.name assessment_name,ip.full_name,ip.id intern_id,COUNT(ans.id) FILTER(WHERE qb.type NOT IN ('MCQ','MULTI_SELECT','TRUE_FALSE') AND ans.manual_score IS NULL) pending_manual FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id AND ${INTERN_IS_MINE} JOIN assessment_answers ans ON ans.attempt_id=aa.id JOIN question_bank qb ON qb.id=ans.question_id WHERE aa.status IN ('PENDING_EVALUATION','SUBMITTED','EVALUATED') GROUP BY aa.id,a.name,ip.full_name,ip.id ORDER BY aa.submitted_at DESC`,
         [m],
       )
     ).rows,
@@ -347,7 +353,7 @@ r.get("/assessment-evaluations/:attemptId", async (req, res) => {
   const m = await mid(req.user.id);
   const at = (
     await q(
-      `SELECT DISTINCT aa.*,a.name assessment_name,ip.full_name FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE aa.id=$2`,
+      `SELECT DISTINCT aa.*,a.name assessment_name,ip.full_name FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id JOIN intern_profiles ip ON ip.id=aa.intern_id AND ${INTERN_IS_MINE} WHERE aa.id=$2`,
       [m, req.params.attemptId],
     )
   ).rows[0];
@@ -367,7 +373,7 @@ r.post("/assessment-answers/:answerId/evaluate", async (req, res) => {
   const m = await mid(req.user.id);
   const row = (
     await q(
-      `SELECT ans.*,qb.marks,qb.type,s.rubric_id FROM assessment_answers ans JOIN assessment_attempts aa ON aa.id=ans.attempt_id JOIN intern_profiles ip ON ip.id=aa.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=aa.assessment_id AND s.question_ids ? qb.id::text WHERE ans.id=$2`,
+      `SELECT ans.*,qb.marks,qb.type,s.rubric_id FROM assessment_answers ans JOIN assessment_attempts aa ON aa.id=ans.attempt_id JOIN intern_profiles ip ON ip.id=aa.intern_id AND ${INTERN_IS_MINE} JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=aa.assessment_id AND s.question_ids ? qb.id::text WHERE ans.id=$2`,
       [m, req.params.answerId],
     )
   ).rows[0];
@@ -433,7 +439,7 @@ r.post("/reviews", async (req, res) => {
   const b = req.body;
   const allowed = (
     await q(
-      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      HAS_GROUP_ACCESS,
       [m, b.groupId],
     )
   ).rowCount;
@@ -449,10 +455,10 @@ r.post("/reviews", async (req, res) => {
   const individuals = b.individualMarks || [];
   if (!Array.isArray(individuals) || individuals.some(im => !im.internId || !Number.isFinite(Number(im.marks)) || Number(im.marks) < 0 || Number(im.marks) > 100) || new Set(individuals.map(im => im.internId)).size !== individuals.length)
     return res.status(400).json({ error: "Individual marks must be unique and between 0 and 100" });
-  const members = (await q("SELECT intern_id FROM group_members WHERE group_id=$1 AND active", [b.groupId])).rows;
+  const members = (await q("SELECT gm.intern_id FROM group_members gm WHERE gm.group_id=$2 AND gm.active AND " + mentorOwnsIntern("gm.intern_id", "$1"), [m, b.groupId])).rows;
   const memberIds = new Set(members.map(x => x.intern_id));
   if (individuals.some(im => !memberIds.has(im.internId)))
-    return res.status(400).json({ error: "Individual review contains an intern outside this group" });
+    return res.status(400).json({ error: "Individual marks can only be given to your own interns in this group" });
   const x = await tx(async client => {
     const review = (await client.query(
       "INSERT INTO fortnight_reviews(group_id,period_no,review_date,status,progress,domain_review,presentation_review,group_marks,feedback,action_items,next_expectations,published_at,rubric_id,rubric_scores,created_by) VALUES($1,$2,$3,$4::text,$5,$6,$7,$8,$9,$10,$11,CASE WHEN $4::text='PUBLISHED' THEN now() END,$12,$13,$14) RETURNING *",
@@ -469,7 +475,7 @@ r.post("/reviews", async (req, res) => {
 // Scheduled -> Conducted -> Marks/Feedback Entered -> Published (Section 20).
 r.patch("/reviews/:id", async (req, res) => {
   const m = await mid(req.user.id), b = req.body;
-  const before = (await q("SELECT fr.* FROM fortnight_reviews fr JOIN mentor_assignments ma ON ma.group_id=fr.group_id AND ma.mentor_id=$1 AND ma.active WHERE fr.id=$2", [m, req.params.id])).rows[0];
+  const before = (await q("SELECT fr.* FROM fortnight_reviews fr WHERE fr.id=$2 AND " + mentorHasInternInGroup("fr.group_id", "$1"), [m, req.params.id])).rows[0];
   if (!before) return res.status(404).json({ error: "Review not found" });
   if (before.status === "PUBLISHED") return res.status(409).json({ error: "A published review cannot be changed" });
   const status = b.status || before.status;
@@ -505,14 +511,14 @@ r.patch("/reviews/:id", async (req, res) => {
 r.get("/submissions/:id/file", async (req, res) => {
   const m = await mid(req.user.id);
   const x = (await q(
-    "SELECT ts.file_path,ts.file_name,ts.mime_type FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) AND ts.id=$2",
+    "SELECT ts.file_path,ts.file_name,ts.mime_type FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND " + SUBMISSION_INTERN_IS_MINE + ")) AND ts.id=$2",
     [m, req.params.id],
   )).rows[0];
   if (!x?.file_path || !fs.existsSync(x.file_path)) return res.status(404).json({ error: "Submission file not found" });
   res.download(path.resolve(x.file_path), x.file_name || "submission");
 });
 const internInMyGroups = (mentorId) => async (internId) =>
-  (await q("SELECT 1 FROM group_members gm JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE gm.intern_id=$2 AND gm.active LIMIT 1", [mentorId, internId])).rowCount > 0;
+  (await q("SELECT 1 WHERE " + mentorOwnsIntern("$2::uuid", "$1::uuid"), [mentorId, internId])).rowCount > 0;
 r.post("/leave-requests/:id/decision", async (req, res) => {
   const m = await mid(req.user.id);
   res.json(await decideLeave(req, req.params.id, req.body.status, req.body.reason, internInMyGroups(m)));
@@ -520,7 +526,7 @@ r.post("/leave-requests/:id/decision", async (req, res) => {
 r.get("/attendance-exceptions", async (req, res) => {
   const m = await mid(req.user.id);
   res.json((await q(
-    `SELECT ae.*,ip.full_name,g.name group_name FROM attendance_exceptions ae JOIN intern_profiles ip ON ip.id=ae.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY CASE WHEN ae.status IN('DETECTED','REQUESTED') THEN 0 ELSE 1 END,ae.created_at DESC LIMIT 100`,
+    `SELECT ae.*,ip.full_name,g.name group_name FROM attendance_exceptions ae JOIN intern_profiles ip ON ip.id=ae.intern_id AND ${INTERN_IS_MINE} LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id ORDER BY CASE WHEN ae.status IN('DETECTED','REQUESTED') THEN 0 ELSE 1 END,ae.created_at DESC LIMIT 100`,
     [m],
   )).rows);
 });
@@ -532,15 +538,15 @@ r.get("/reviews/:id/report", async (req, res) => {
   const m = await mid(req.user.id);
   const review = (
     await q(
-      `SELECT fr.*,g.name group_name,b.name batch_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active WHERE fr.id=$2`,
+      `SELECT fr.*,g.name group_name,b.name batch_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id WHERE fr.id=$2 AND ${MY_GROUP}`,
       [m, req.params.id],
     )
   ).rows[0];
   if (!review) return res.status(404).json({ error: "Review not found" });
   const members = (
     await q(
-      `SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id WHERE rim.review_id=$1 ORDER BY ip.full_name`,
-      [review.id],
+      `SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id WHERE rim.review_id=$2 AND ${INTERN_IS_MINE} ORDER BY ip.full_name`,
+      [m, review.id],
     )
   ).rows;
   res.json({ review, members, generatedAt: new Date().toISOString() });
@@ -550,7 +556,7 @@ r.get("/reviews", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT fr.*,g.name group_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active ORDER BY fr.review_date DESC,fr.period_no DESC`,
+        `SELECT fr.*,g.name group_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id WHERE ${MY_GROUP} ORDER BY fr.review_date DESC,fr.period_no DESC`,
         [m],
       )
     ).rows,
@@ -560,7 +566,7 @@ r.get("/groups/:id/members", async (req, res) => {
   const m = await mid(req.user.id);
   const ok = (
     await q(
-      "SELECT 1 FROM mentor_assignments WHERE mentor_id=$1 AND group_id=$2 AND active",
+      HAS_GROUP_ACCESS,
       [m, req.params.id],
     )
   ).rowCount;
@@ -568,8 +574,8 @@ r.get("/groups/:id/members", async (req, res) => {
   res.json(
     (
       await q(
-        "SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active",
-        [req.params.id],
+        "SELECT ip.id,ip.full_name,ip.program,ip.branch FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$2 AND gm.active AND " + INTERN_IS_MINE,
+        [m, req.params.id],
       )
     ).rows,
   );
@@ -579,7 +585,7 @@ r.get("/final-evaluations/candidates", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT ip.id intern_id,ip.full_name,ip.roll_number,g.id group_id,g.name group_name,p.title project_title,COALESCE(att.pct,0) attendance_pct,COALESCE(ts.avg_marks,0) task_avg,COALESCE(rv.avg_marks,0) review_avg,fe.id evaluation_id,fe.group_marks,fe.individual_marks,fe.mentor_feedback,fe.recommendation FROM intern_profiles ip JOIN group_members gm ON gm.intern_id=ip.id AND gm.active JOIN groups g ON g.id=gm.group_id JOIN mentor_assignments ma ON ma.group_id=g.id AND ma.mentor_id=$1 AND ma.active LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id LEFT JOIN LATERAL(SELECT z.attendance_percent pct FROM attendance_summary z JOIN batch_allocations za ON za.id=z.allocation_id WHERE z.intern_id=ip.id ORDER BY za.intern_start DESC NULLS LAST LIMIT 1)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true ORDER BY g.name,ip.full_name`,
+        `SELECT ip.id intern_id,ip.full_name,ip.roll_number,g.id group_id,g.name group_name,p.title project_title,COALESCE(att.pct,0) attendance_pct,COALESCE(ts.avg_marks,0) task_avg,COALESCE(rv.avg_marks,0) review_avg,fe.id evaluation_id,fe.group_marks,fe.individual_marks,fe.mentor_feedback,fe.recommendation FROM intern_profiles ip JOIN group_members gm ON gm.intern_id=ip.id AND gm.active AND ${INTERN_IS_MINE} JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id LEFT JOIN LATERAL(SELECT z.attendance_percent pct FROM attendance_summary z JOIN batch_allocations za ON za.id=z.allocation_id WHERE z.intern_id=ip.id ORDER BY za.intern_start DESC NULLS LAST LIMIT 1)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true ORDER BY g.name,ip.full_name`,
         [m],
       )
     ).rows,
@@ -590,7 +596,7 @@ r.post("/final-evaluations", async (req, res) => {
     b = req.body;
   const ok = (
     await q(
-      "SELECT 1 FROM mentor_assignments ma JOIN group_members gm ON gm.group_id=ma.group_id AND gm.intern_id=$3 AND gm.active WHERE ma.mentor_id=$1 AND ma.group_id=$2 AND ma.active",
+      "SELECT 1 FROM group_members gm WHERE gm.group_id=$2 AND gm.intern_id=$3 AND gm.active AND " + mentorOwnsIntern("gm.intern_id", "$1"),
       [m, b.groupId, b.internId],
     )
   ).rowCount;
@@ -656,7 +662,7 @@ r.post("/final-evaluations", async (req, res) => {
 r.get("/final-project-submissions",async(req,res)=>{
  const m=await mid(req.user.id);
  const rows=(await q(`SELECT fps.id,fps.group_id,fps.project_id,fps.document_id,fps.repository_url,fps.demo_url,fps.notes,fps.status,fps.mentor_feedback,fps.reviewed_at,fps.created_at,g.name group_name,p.title project_title,d.title document_title
- FROM final_project_submissions fps JOIN mentor_assignments ma ON ma.group_id=fps.group_id AND ma.mentor_id=$1 AND ma.active JOIN groups g ON g.id=fps.group_id JOIN projects p ON p.id=fps.project_id LEFT JOIN documents d ON d.id=fps.document_id ORDER BY fps.updated_at DESC`,[m])).rows;
+ FROM final_project_submissions fps JOIN groups g ON g.id=fps.group_id JOIN projects p ON p.id=fps.project_id LEFT JOIN documents d ON d.id=fps.document_id WHERE ${MY_GROUP} ORDER BY fps.updated_at DESC`,[m])).rows;
  res.json(rows);
 });
 r.post("/final-project-submissions/:id/review",async(req,res)=>{
@@ -664,13 +670,13 @@ r.post("/final-project-submissions/:id/review",async(req,res)=>{
  const {status,feedback}=req.body||{};
  if(!["ACCEPTED","REVISION_REQUESTED"].includes(status)||typeof feedback!=="string"||!feedback.trim()||feedback.length>5000)return res.status(400).json({error:"Review decision and feedback are required"});
  const x=(await q(`UPDATE final_project_submissions fps SET status=$3,mentor_feedback=$4,reviewed_by=$5,reviewed_at=now(),updated_at=now()
- FROM mentor_assignments ma WHERE fps.id=$1 AND ma.group_id=fps.group_id AND ma.mentor_id=$2 AND ma.active RETURNING fps.*`,[req.params.id,m,status,feedback.trim(),req.user.id])).rows[0];
- if(!x)return res.status(404).json({error:"Submission not found in your assigned groups"});
+ WHERE fps.id=$1 AND ${mentorHasInternInGroup("fps.group_id","$2::uuid")} RETURNING fps.*`,[req.params.id,m,status,feedback.trim(),req.user.id])).rows[0];
+ if(!x)return res.status(404).json({error:"Submission not found for your interns' groups"});
  res.json(x);
 });
 
 r.get("/task-interns",async(req,res)=>{
- const x=await q("SELECT ip.id,ip.full_name,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE current_date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ip.full_name");
+ const x=await q("SELECT ip.id,ip.full_name,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE current_date BETWEEN ba.intern_start AND ba.intern_end AND "+mentorOwnsIntern("ip.id","$1")+" ORDER BY ip.full_name",[await mid(req.user.id)]);
  res.json(x.rows);
 });
 r.get("/assigned-tasks",async(req,res)=>{
@@ -685,8 +691,8 @@ r.post("/assigned-tasks",async(req,res)=>{
  if(due&&(!Number.isFinite(due.getTime())||due<=new Date()))return res.status(400).json({error:"Invalid due date"});
  const marks=Number(b.marks??100);
  if(!Number.isFinite(marks)||marks<=0||marks>1000)return res.status(400).json({error:"Invalid marks"});
- const intern=(await q("SELECT ip.id,ip.user_id,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE ip.id=$1 AND current_date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1",[b.internId])).rows[0];
- if(!intern)return res.status(400).json({error:"Intern has no active allocation"});
+ const intern=(await q("SELECT ip.id,ip.user_id,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE ip.id=$1 AND current_date BETWEEN ba.intern_start AND ba.intern_end AND "+mentorOwnsIntern("ip.id","$2")+" ORDER BY ba.intern_start DESC LIMIT 1",[b.internId,m])).rows[0];
+ if(!intern)return res.status(400).json({error:"Select one of your interns with an active allocation"});
  const types=["TEXT","LINK","REPOSITORY","DOCUMENT","PRESENTATION","VIDEO","FILE"].filter(x=>(b.submissionTypes||["REPOSITORY"]).includes(x));
  if(!types.length)return res.status(400).json({error:"Select submission type"});
  const x=(await q("INSERT INTO weekly_tasks(batch_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,status,release_timezone,target_intern_id,assigning_mentor_id) VALUES($1,$2,$3,$4,$5,$6,now(),$7,$8,'RELEASED','Asia/Kolkata',$9,$10) RETURNING *",[intern.batch_id,String(b.title).trim(),String(b.description).trim(),b.expectedOutput||null,JSON.stringify(types),b.resources||null,due?due.toISOString():null,marks,intern.id,m])).rows[0];

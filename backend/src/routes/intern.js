@@ -612,7 +612,7 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
   const deadline = previous?.rework_due_at || t.due_at;
   const x = (
     await q(
-      "INSERT INTO task_submissions(task_id,intern_id,content,file_path,file_name,mime_type,is_late,attempt,status) VALUES($1,$2,$3,$4,$5,$6,now()>$7,$8,$9) RETURNING *",
+      "INSERT INTO task_submissions(task_id,intern_id,content,file_path,file_name,mime_type,is_late,attempt,status) VALUES($1,$2,$3,$4,$5,$6,COALESCE(now()>$7::timestamptz,false),$8,$9) RETURNING *",
       [
         t.id,
         p.id,
@@ -917,8 +917,8 @@ r.get("/group", async (req, res) => {
   ).rows;
   g.mentors = (
     await q(
-      "SELECT m.full_name,ma.is_lead FROM mentor_assignments ma JOIN mentors m ON m.id=ma.mentor_id WHERE ma.group_id=$1 AND ma.active",
-      [g.id],
+      "SELECT m.full_name,ma.is_lead FROM mentor_assignments ma JOIN mentors m ON m.id=ma.mentor_id WHERE ma.group_id=$1 AND ma.active UNION SELECT m.full_name,false FROM intern_mentor_assignments ima JOIN mentors m ON m.id=ima.mentor_id WHERE ima.intern_id=$2 AND ima.active AND NOT EXISTS(SELECT 1 FROM mentor_assignments ma WHERE ma.group_id=$1 AND ma.active AND ma.mentor_id=ima.mentor_id)",
+      [g.id, p.id],
     )
   ).rows;
   res.json(g);

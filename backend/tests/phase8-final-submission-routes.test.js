@@ -13,7 +13,7 @@ test("final submissions require assigned project and group-scoped evidence",()=>
 test("mentor reviews require active assignment and explicit feedback",()=>{
  const route=mentor.slice(mentor.indexOf('r.post("/final-project-submissions/:id/review"'));
  assert.match(route,/REVISION_REQUESTED/);assert.match(route,/ACCEPTED/);
- assert.match(route,/ma\.mentor_id=\$2 AND ma\.active/);
+ assert.match(route,/mentorHasInternInGroup\("fps\.group_id","\$2::uuid"\)/);
  assert.match(route,/feedback\.trim\(\)/);
 });
 test("schema restricts final submission states and one row per project group",()=>{

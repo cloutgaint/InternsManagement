@@ -2,7 +2,8 @@
 import {useEffect,useState} from "react";
 import {api} from "@/shared/api/client";
 const blank=()=>({week:1,title:"",description:"",expectedOutput:"",releaseAt:"",marks:100,submissionTypes:["REPOSITORY"]});
-const localDate=x=>x?new Date(x).toISOString().slice(0,16):"";
+// datetime-local inputs hold local time; an ISO (UTC) value would shift by the offset on every save.
+const localDate=x=>{if(!x)return "";const d=new Date(x);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 export default function WeeklyTaskPlanner({role="mentor"}){
  const base="/"+role+"/task-plans";
  const [interns,setInterns]=useState([]),[plans,setPlans]=useState([]),[selected,setSelected]=useState(""),[plan,setPlan]=useState(null),[internId,setInternId]=useState(""),[weeks,setWeeks]=useState([blank()]),[error,setError]=useState(""),[success,setSuccess]=useState(""),[busy,setBusy]=useState(false);

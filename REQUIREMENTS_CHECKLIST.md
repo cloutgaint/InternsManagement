@@ -13,11 +13,12 @@ Verified by `backend/tests/blueprint-workflow-e2e.test.js`, which walks the life
 | Proof encryption, audited access, malware scan, retention (5.7) | Needs setup | `FILE_ENCRYPTION_KEY`, `CLAMAV_HOST`, `PROOF_RETENTION_DAYS` |
 | Domain Master, sub-domains, rubrics, capacity (6) | Done | `/admin/domain-master` |
 | Deliverable types per task and project (6.4) | Done | tasks, projects, templates |
-| Common + preferred-domain sections, manual marking, AI drafts reviewed (6.5, 7) | Done | `routes/intern.js`, `/admin/questions` |
+| MCQ-only assessments (Frontend and Backend sections for development); AI drafts reviewed (6.5, 7) | Done | `routes/intern.js`, `/admin/questions` |
 | AI question generation (7.2) | Needs setup | `services/aiQuestionService.js` provider configuration |
 | Recommendation is advisory; Admin confirms or changes with reason (Steps 10-11) | Done | `POST /admin/domain-confirm` |
 | Single-domain and cross-functional proposals, merge, split, history (Steps 12-13) | Done | `/admin/groups`, `group_history` |
-| Mentor assignment, capacity, reassignment (Step 14) | Done | `/admin/mentors` |
+| Mentor assignment, reassignment (Step 14); mentors see only their allotted interns | Done | `/admin/mentors`, `services/mentorScope.js` |
+| One batch and one active group per intern | Done | `services/groupMembership.js`, migration 1006 |
 | Offer letter: Draft, Previewed, Approved, Issued, Reissued, Revoked (8.1) | Done | `/admin/offers` |
 | Offer delivery by email (8.1, 23) | Not built | Portal view and PDF only; decide per Section 23 |
 | Face enrollment, approval, re-enrollment (9.1) | Done | `/admin/attendance`, `/intern/face-enrollment` |

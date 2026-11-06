@@ -76,9 +76,9 @@ r.post("/groups/:id/merge", async (req, res) => {
     const targetDomains = (await c.query("SELECT DISTINCT domain_id FROM group_members WHERE group_id=$1 AND active", [target.id])).rows.map((x) => x.domain_id);
     if (target.type === "SINGLE_DOMAIN" && new Set([...targetDomains, ...members.map((x) => x.domain_id)]).size > 1)
       throw Object.assign(new Error("Single-domain groups cannot mix confirmed domains"), { status: 409 });
+    await c.query("UPDATE group_members SET active=false WHERE group_id=$1", [source.id]);
     for (const m of members)
       await c.query("INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET active=true,domain_id=EXCLUDED.domain_id", [target.id, m.intern_id, m.domain_id]);
-    await c.query("UPDATE group_members SET active=false WHERE group_id=$1", [source.id]);
     await c.query("UPDATE groups SET status='MERGED' WHERE id=$1", [source.id]);
     await c.query("UPDATE mentor_assignments SET active=false WHERE group_id=$1", [source.id]);
     await history(c.query.bind(c), target.id, target.batch_id, req.user.id, "MERGED", { from: source.id, moved: members.map((x) => x.intern_id) });
@@ -262,7 +262,8 @@ r.post("/announcements", async (req, res) => {
   if (!title || !body) return res.status(400).json({ error: "Title and message are required" });
   const users = (await q(
     `SELECT DISTINCT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id JOIN users u ON u.id=ip.user_id AND u.is_active WHERE ($1::uuid IS NULL OR ba.batch_id=$1)
-     UNION SELECT DISTINCT m.user_id FROM mentors m JOIN users u ON u.id=m.user_id AND u.is_active LEFT JOIN mentor_assignments ma ON ma.mentor_id=m.id AND ma.active LEFT JOIN groups g ON g.id=ma.group_id WHERE m.active AND ($1::uuid IS NULL OR g.batch_id=$1)`,
+     UNION SELECT DISTINCT m.user_id FROM mentors m JOIN users u ON u.id=m.user_id AND u.is_active LEFT JOIN mentor_assignments ma ON ma.mentor_id=m.id AND ma.active LEFT JOIN groups g ON g.id=ma.group_id WHERE m.active AND ($1::uuid IS NULL OR g.batch_id=$1)
+     UNION SELECT m.user_id FROM intern_mentor_assignments ima JOIN mentors m ON m.id=ima.mentor_id AND m.active JOIN users u ON u.id=m.user_id AND u.is_active JOIN batch_allocations ba ON ba.intern_id=ima.intern_id WHERE ima.active AND ($1::uuid IS NULL OR ba.batch_id=$1)`,
     [batchId],
   )).rows;
   for (const u of users) await notify(u.user_id, "ANNOUNCEMENT", title, body);

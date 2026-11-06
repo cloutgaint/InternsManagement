@@ -1,4 +1,6 @@
 import taskPlans from "./taskPlans.js";
+import { claimInternsForGroup } from "../services/groupMembership.js";
+import { mentorHasInternInGroup, mentorOwnsIntern } from "../services/mentorScope.js";
 import {
   DEFAULT_WEIGHTS,
   validateWeights,
@@ -848,6 +850,8 @@ r.patch("/allocations/:id/batch",async(req,res)=>{
     if(rows.length!==1)return {code:409,error:"Multiple allocations already exist for this intern. Resolve them before transferring."};
     const current=rows[0];
     if(current.batch_id===batchId)return {code:409,error:"Already allocated to this batch. Select a different batch."};
+    const team=(await c.query("SELECT g.name FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.status='ACTIVE' LIMIT 1",[current.intern_id])).rows[0];
+    if(team)return {code:409,error:"This intern is in the group "+team.name+". Move them out of it before changing batch."};
     const linked=(await c.query("SELECT 1 FROM offer_letters WHERE allocation_id=$1 AND status<>'REVOKED' LIMIT 1",[current.id])).rowCount;
     if(linked)return {code:409,error:"An offer letter already exists. Revoke it before transferring the intern to another batch."};
     const target=(await c.query(`SELECT b.*,ip.college_id intern_college,cp.status proof_status,cp.approved_from,cp.approved_to FROM batches b JOIN intern_profiles ip ON ip.id=$2 JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL(SELECT status,approved_from,approved_to FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true WHERE b.id=$1 AND u.role='INTERN' AND u.is_active=true AND u.status='ACTIVE'`,[batchId,current.intern_id])).rows[0];
@@ -1839,7 +1843,7 @@ r.get("/mentors", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT m.*,u.email,COUNT(DISTINCT ma.group_id) FILTER(WHERE ma.active)::int assigned_groups,COUNT(DISTINCT gm.intern_id) FILTER(WHERE ma.active AND gm.active)::int assigned_interns FROM mentors m JOIN users u ON u.id=m.user_id LEFT JOIN mentor_assignments ma ON ma.mentor_id=m.id LEFT JOIN group_members gm ON gm.group_id=ma.group_id WHERE m.active GROUP BY m.id,u.email ORDER BY m.full_name`,
+        `SELECT m.*,u.email,(SELECT count(*)::int FROM groups g WHERE ${mentorHasInternInGroup("g.id", "m.id")}) assigned_groups,(SELECT count(*)::int FROM intern_profiles ip JOIN users iu ON iu.id=ip.user_id AND iu.status<>'DELETED' WHERE ${mentorOwnsIntern("ip.id", "m.id")}) assigned_interns FROM mentors m JOIN users u ON u.id=m.user_id WHERE m.active ORDER BY m.full_name`,
       )
     ).rows,
   ),
@@ -1935,14 +1939,14 @@ r.patch("/groups/:id/members", async (req, res) => {
       .json({ error: "Single-domain groups cannot mix confirmed domains" });
   const conflicts = (
     await q(
-      `SELECT gm.intern_id,g.name FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=ANY($1::uuid[]) AND gm.active AND g.batch_id=$2 AND g.id<>$3 AND g.status='ACTIVE'`,
-      [ids, g.batch_id, g.id],
+      `SELECT gm.intern_id,g.name FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=ANY($1::uuid[]) AND gm.active AND g.id<>$2 AND g.status='ACTIVE'`,
+      [ids, g.id],
     )
   ).rows;
   if (conflicts.length)
     return res.status(409).json({
       error:
-        "One or more interns already belong to another active group in this batch",
+        "One or more interns already belong to another active group",
     });
   await tx(async (c) => {
     await c.query(
@@ -1952,6 +1956,7 @@ r.patch("/groups/:id/members", async (req, res) => {
     await c.query("UPDATE group_members SET active=false WHERE group_id=$1", [
       g.id,
     ]);
+    await claimInternsForGroup(c, ids, g.id);
     for (const p of people)
       await c.query(
         `INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,active=true`,
@@ -1981,9 +1986,9 @@ r.post("/groups/:id/transfer", async(req,res)=>{
   if(!person)return res.status(409).json({error:"Intern must be allocated to the destination batch"});
 
   const result=await tx(async client=>{
-    const old=(await client.query("SELECT gm.group_id,g.name,gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.batch_id=$2 AND g.status='ACTIVE' FOR UPDATE OF gm",[internId,g.batch_id])).rows;
+    const old=(await client.query("SELECT gm.group_id,g.name,gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.status='ACTIVE' FOR UPDATE OF gm",[internId])).rows;
     if(old.some(x=>x.group_id===g.id))throw conflict("Intern is already assigned to this team");
-    await client.query("UPDATE group_members gm SET active=false FROM groups other WHERE gm.group_id=other.id AND other.batch_id=$2 AND gm.intern_id=$1 AND gm.active",[internId,g.batch_id]);
+    await client.query("UPDATE group_members SET active=false WHERE intern_id=$1 AND active",[internId]);
     await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,project_role,active) VALUES($1,$2,$3,NULL,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,project_role=NULL,active=true",[g.id,internId,person.final_domain_id]);
     await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action,details) VALUES($1,$2,$3,'MEMBER_TRANSFER',$4)",[g.id,g.batch_id,req.user.id,JSON.stringify({internId,from:old.map(x=>x.group_id)})]);
     return old;
@@ -2789,7 +2794,7 @@ r.post("/group-proposals/:batchId/generate", async (req, res) => {
     return res.status(400).json({ error: "Invalid group composition" });
   const students = (
     await q(
-      `SELECT ip.id,ip.full_name,ip.final_domain_id,d.name domain_name,COALESCE(bd.capacity,d.default_capacity,25) domain_capacity,COALESCE(sc.score,0) score FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN batch_domains bd ON bd.batch_id=ba.batch_id AND bd.domain_id=ip.final_domain_id JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT max(aa.total_score) score FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.intern_id=ip.id AND a.batch_id=$1) sc ON true WHERE ba.batch_id=$1 AND ip.final_domain_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM group_members gm JOIN groups gx ON gx.id=gm.group_id WHERE gm.intern_id=ip.id AND gm.active AND gx.batch_id=$1 AND gx.status='ACTIVE') AND NOT EXISTS(SELECT 1 FROM exit_records ex WHERE ex.intern_id=ip.id) ORDER BY d.name,sc.score DESC NULLS LAST,ip.full_name`,
+      `SELECT ip.id,ip.full_name,ip.final_domain_id,d.name domain_name,COALESCE(bd.capacity,d.default_capacity,25) domain_capacity,COALESCE(sc.score,0) score FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN batch_domains bd ON bd.batch_id=ba.batch_id AND bd.domain_id=ip.final_domain_id JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT max(aa.total_score) score FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.intern_id=ip.id AND a.batch_id=$1) sc ON true WHERE ba.batch_id=$1 AND ip.final_domain_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM group_members gm JOIN groups gx ON gx.id=gm.group_id WHERE gm.intern_id=ip.id AND gm.active AND gx.status='ACTIVE') AND NOT EXISTS(SELECT 1 FROM exit_records ex WHERE ex.intern_id=ip.id) ORDER BY d.name,sc.score DESC NULLS LAST,ip.full_name`,
       [batch.id],
     )
   ).rows;
@@ -2804,6 +2809,7 @@ r.post("/group-proposals/:batchId/generate", async (req, res) => {
       "DELETE FROM groups WHERE batch_id=$1 AND status='SYSTEM_DRAFT'",
       [batch.id],
     );
+    await claimInternsForGroup(c, students.map((st) => st.id), null);
     const out = [];
     for (const list of Object.values(by)) {
       const cap = Number(list[0].domain_capacity || 25);
@@ -2887,6 +2893,7 @@ r.patch("/group-proposals/:groupId", async (req, res) => {
       req.body.name || null,
     ]);
     await c.query("DELETE FROM group_members WHERE group_id=$1", [g.id]);
+    await claimInternsForGroup(c, ids, g.id);
     const domains = new Set();
     await c.query(
       "INSERT INTO group_history(group_id,batch_id,actor_id,action,details) VALUES($1,$2,$3,'PROPOSAL_EDITED',$4)",
@@ -2963,18 +2970,23 @@ r.post("/group-proposals/:groupId/approve", async (req, res) => {
 });
 r.post("/groups", async (req, res) => {
   const b = req.body;
-  const g = (
-    await q(
-      "INSERT INTO groups(batch_id,name,type,status) VALUES($1,$2,$3,'SYSTEM_DRAFT') RETURNING *",
-      [b.batchId, b.name, b.type || "SINGLE_DOMAIN"],
-    )
-  ).rows[0];
+  const internIds = [...new Set(b.internIds || [])];
+  const g = await tx(async (c) => {
+    const created = (
+      await c.query(
+        "INSERT INTO groups(batch_id,name,type,status) VALUES($1,$2,$3,'SYSTEM_DRAFT') RETURNING *",
+        [b.batchId, b.name, b.type || "SINGLE_DOMAIN"],
+      )
+    ).rows[0];
+    await claimInternsForGroup(c, internIds, created.id);
+    for (const internId of internIds)
+      await c.query(
+        "INSERT INTO group_members(group_id,intern_id,domain_id) VALUES($1,$2,$3)",
+        [created.id, internId, b.domainId || null],
+      );
+    return created;
+  });
   await audit(req, "GROUP_CREATED", "group", g.id, null, g);
-  for (const internId of b.internIds || [])
-    await q(
-      "INSERT INTO group_members(group_id,intern_id,domain_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
-      [g.id, internId, b.domainId || null],
-    );
   res.status(201).json(g);
 });
 r.post("/mentor-assignments", async (req, res) => {
@@ -3013,6 +3025,7 @@ r.post("/project-groups", async(req,res)=>{
    if(duplicates.length)throw conflict("One or more selected interns already belong to an active project: "+duplicates.map(x=>x.name).join(", "));
    const savedProject=project||(await client.query("INSERT INTO projects(title,description,domain_ids,milestones,deliverable_types,status) VALUES($1,$2,$3,$4,$5,'ACTIVE') RETURNING id,title",[String(title).trim(),description||null,JSON.stringify([]),JSON.stringify([]),JSON.stringify([])])).rows[0];
    const g=(await client.query("INSERT INTO groups(batch_id,name,type,status) VALUES($1,$2,'MULTI_DOMAIN','ACTIVE') RETURNING *",[batchId,savedProject.title])).rows[0];
+   await claimInternsForGroup(client,ids,g.id);
    for(const m of members)await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true)",[g.id,m.id,m.final_domain_id]);
    await client.query("INSERT INTO project_assignments(project_id,group_id,assigned_by,status) VALUES($1,$2,$3,'ASSIGNED')",[savedProject.id,g.id,req.user.id]);
    await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action) VALUES($1,$2,$3,'APPROVED')",[g.id,batchId,req.user.id]);

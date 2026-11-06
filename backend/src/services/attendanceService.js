@@ -24,7 +24,7 @@ export async function attendanceDayState(internId) {
 
 export async function notifyGroupMentors(internId, type, title, body, actionUrl) {
   const mentors = (await q(
-    "SELECT DISTINCT m.user_id FROM group_members gm JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.active JOIN mentors m ON m.id=ma.mentor_id WHERE gm.intern_id=$1 AND gm.active",
+    "SELECT m.user_id FROM group_members gm JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.active JOIN mentors m ON m.id=ma.mentor_id WHERE gm.intern_id=$1 AND gm.active UNION SELECT m.user_id FROM intern_mentor_assignments ima JOIN mentors m ON m.id=ima.mentor_id WHERE ima.intern_id=$1 AND ima.active",
     [internId],
   )).rows;
   for (const mentor of mentors) await notify(mentor.user_id, type, title, body, actionUrl);
