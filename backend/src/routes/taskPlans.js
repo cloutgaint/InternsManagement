@@ -5,6 +5,7 @@ import {mentorOwnsIntern} from "../services/mentorScope.js";
 const r=Router();
 const allowed=["TEXT","LINK","REPOSITORY","DOCUMENT","PRESENTATION","VIDEO","FILE"];
 const isAdmin=req=>String(req.user.role).includes("ADMIN");
+const requiredWeeks=(start,end)=>Math.min(52,Math.max(1,Math.ceil((Date.parse(new Date(end).toISOString().slice(0,10))-Date.parse(new Date(start).toISOString().slice(0,10))+86400000)/604800000)));
 const mentorIdOf=async(req,db=q)=>(await db("SELECT id FROM mentors WHERE user_id=$1",[req.user.id])).rows[0]?.id||null;
 const parseWeekTypes=w=>Array.isArray(w.submissionTypes)?w.submissionTypes.filter(x=>allowed.includes(x)):["REPOSITORY"];
 async function owner(req,planId,lock=false,db=q){
@@ -87,6 +88,8 @@ r.post("/task-plans/:id/confirm",async(req,res)=>{
   if(!tasks.length)return {code:400,error:"Add weekly tasks before confirmation"};
   const alloc=(await client.query("SELECT intern_start,intern_end FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
   if(!alloc)return {code:409,error:"Internship allocation is no longer active"};
+  const required=requiredWeeks(alloc.intern_start,alloc.intern_end);
+  if(tasks.length!==required||tasks.some((t,i)=>Number(t.plan_week)!==i+1))return {code:400,error:"Complete all "+required+" internship weeks before confirmation. "+tasks.length+" week(s) saved; keep the plan as a draft until all weeks are ready."};
   const start=new Date(new Date(alloc.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(alloc.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
   if(tasks.some(t=>new Date(t.release_at)<start||new Date(t.release_at)>end))return {code:409,error:"Task dates are outside internship dates"};
   await client.query("UPDATE weekly_tasks SET status='SCHEDULED' WHERE task_plan_id=$1",[p.id]);
