@@ -100,4 +100,29 @@ r.post("/task-plans/:id/confirm",async(req,res)=>{
  await audit(req,"TASK_PLAN_CONFIRMED","weekly_task_plan",req.params.id,null,outcome);
  res.json({confirmed:true,...outcome});
 });
+r.post("/task-plans/:id/append-week",async(req,res)=>{
+ const w=req.body||{};
+ const outcome=await tx(async(client)=>{
+  const p=await owner(req,req.params.id,true,(sql,args)=>client.query(sql,args));
+  if(p===false)return {code:403,error:"Not your task plan"};
+  if(!p)return {code:404,error:"Plan not found"};
+  if(p.status!=="CONFIRMED")return {code:409,error:"Only confirmed plans can append a week"};
+  const existing=(await client.query("SELECT plan_week FROM weekly_tasks WHERE task_plan_id=$1 ORDER BY plan_week FOR UPDATE",[p.id])).rows;
+  const next=existing.length+1;
+  if(existing.some((t,i)=>Number(t.plan_week)!==i+1))return {code:409,error:"Existing weekly schedule is not sequential"};
+  const allocation=(await client.query("SELECT * FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
+  if(!allocation)return {code:409,error:"Internship allocation not found"};
+  if(next>requiredWeeks(allocation.intern_start,allocation.intern_end))return {code:409,error:"All internship weeks already have tasks"};
+  const release=new Date(w.releaseAt),start=new Date(new Date(allocation.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(allocation.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
+  const types=parseWeekTypes(w);
+  if(!String(w.title||"").trim()||!String(w.description||"").trim()||!Number.isFinite(release.getTime())||release<start||release>end||!types.length||!Number.isFinite(Number(w.marks??100))||Number(w.marks??100)<=0||Number(w.marks??100)>1000)return {code:400,error:"Enter a valid title, instructions, release date within internship dates, marks and submission type"};
+  const mentor=isAdmin(req)?null:await mentorIdOf(req,(sql,args)=>client.query(sql,args));
+  if(!isAdmin(req)&&!mentor)return {code:403,error:"Mentor profile not found"};
+  const task=(await client.query("INSERT INTO weekly_tasks(batch_id,title,description,expected_output,submission_types,release_at,due_at,marks,status,release_timezone,target_intern_id,assigning_mentor_id,task_plan_id,plan_week) VALUES($1,$2,$3,$4,$5,$6,NULL,$7,'SCHEDULED','Asia/Kolkata',$8,$9,$10,$11) RETURNING id",[allocation.batch_id,String(w.title).trim(),String(w.description).trim(),w.expectedOutput||null,JSON.stringify(types),w.releaseAt,Number(w.marks??100),p.intern_id,mentor,p.id,next])).rows[0];
+  return {week:next,taskId:task.id};
+ });
+ if(outcome.code)return res.status(outcome.code).json({error:outcome.error});
+ await audit(req,"TASK_PLAN_WEEK_APPENDED","weekly_task_plan",req.params.id,null,outcome);
+ res.status(201).json(outcome);
+});
 export default r;
