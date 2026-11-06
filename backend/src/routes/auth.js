@@ -327,7 +327,7 @@ r.post("/mfa/verify", async (req, res) => {
     const x = challengeUser(req.body.challenge),
       u = (await q("SELECT * FROM users WHERE id=$1", [x.id])).rows[0];
     const normalizedCode = String(req.body.code || "").trim();
-    const isTestCode = process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true" && normalizedCode === "000000" && ["ADMIN","SUPER_ADMIN"].includes(u?.role);
+    const isTestCode = process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true" && normalizedCode === "000000" && ["ADMIN","SUPER_ADMIN","COLLEGE_COORDINATOR","MENTOR"].includes(u?.role);
     const isValidCode = !!u?.mfa_secret && authenticator.check(normalizedCode, u.mfa_secret);
     if (!u || (!isTestCode && !isValidCode))
       return res.status(401).json({ error: "Invalid authentication code" });
