@@ -666,4 +666,31 @@ r.post("/final-project-submissions/:id/review",async(req,res)=>{
  if(!x)return res.status(404).json({error:"Submission not found in your assigned groups"});
  res.json(x);
 });
+
+r.get("/task-interns",async(req,res)=>{
+ const x=await q("SELECT ip.id,ip.full_name,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE current_date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ip.full_name");
+ res.json(x.rows);
+});
+r.get("/assigned-tasks",async(req,res)=>{
+ const m=await mid(req.user.id);
+ res.json((await q("SELECT wt.*,ip.full_name intern_name FROM weekly_tasks wt JOIN intern_profiles ip ON ip.id=wt.target_intern_id WHERE wt.assigning_mentor_id=$1 ORDER BY wt.release_at DESC",[m])).rows);
+});
+r.post("/assigned-tasks",async(req,res)=>{
+ const m=await mid(req.user.id),b=req.body||{};
+ if(!m)return res.status(403).json({error:"Mentor not found"});
+ if(!b.internId||!String(b.title||"").trim()||!String(b.description||"").trim())return res.status(400).json({error:"Intern, title and instructions are required"});
+ const due=b.dueAt?new Date(b.dueAt):null;
+ if(due&&(!Number.isFinite(due.getTime())||due<=new Date()))return res.status(400).json({error:"Invalid due date"});
+ const marks=Number(b.marks??100);
+ if(!Number.isFinite(marks)||marks<=0||marks>1000)return res.status(400).json({error:"Invalid marks"});
+ const intern=(await q("SELECT ip.id,ip.user_id,ba.batch_id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE ip.id=$1 AND current_date BETWEEN ba.intern_start AND ba.intern_end ORDER BY ba.intern_start DESC LIMIT 1",[b.internId])).rows[0];
+ if(!intern)return res.status(400).json({error:"Intern has no active allocation"});
+ const types=["TEXT","LINK","REPOSITORY","DOCUMENT","PRESENTATION","VIDEO","FILE"].filter(x=>(b.submissionTypes||["REPOSITORY"]).includes(x));
+ if(!types.length)return res.status(400).json({error:"Select submission type"});
+ const x=(await q("INSERT INTO weekly_tasks(batch_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,status,release_timezone,target_intern_id,assigning_mentor_id) VALUES($1,$2,$3,$4,$5,$6,now(),$7,$8,'RELEASED','Asia/Kolkata',$9,$10) RETURNING *",[intern.batch_id,String(b.title).trim(),String(b.description).trim(),b.expectedOutput||null,JSON.stringify(types),b.resources||null,due?due.toISOString():null,marks,intern.id,m])).rows[0];
+ await audit(req,"MENTOR_TASK_ASSIGNED","weekly_task",x.id,null,{internId:intern.id});
+ await notify(intern.user_id,"TASK_ASSIGNED","New mentor task",x.title,"/intern/tasks");
+ res.status(201).json(x);
+});
+
 export default r;
