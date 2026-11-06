@@ -1,3 +1,4 @@
+import taskPlans from "./taskPlans.js";
 import { Router } from "express";
 import { q, tx } from "../common/database/index.js";
 import { audit } from "../common/audit/audit.service.js";
@@ -10,6 +11,7 @@ import { auth, permit } from "../common/security/auth.middleware.js";
 const r = Router();
 const REVIEW_STATUSES = ["SCHEDULED", "CONDUCTED", "MARKS_ENTERED", "PUBLISHED"];
 r.use(auth, permit("MENTOR"));
+r.use(taskPlans);
 async function mid(uid) {
   return (await q("SELECT id FROM mentors WHERE user_id=$1", [uid])).rows[0]
     ?.id;
