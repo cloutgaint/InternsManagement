@@ -21,8 +21,8 @@ export async function releaseDueTasks() {
       const t = x;
       const users = (
         await q(
-          `SELECT DISTINCT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active WHERE ba.batch_id=$1 AND ($2::uuid IS NULL OR ip.final_domain_id=$2) AND ($3::uuid IS NULL OR gm.group_id=$3)`,
-          [t.batch_id, t.domain_id, t.group_id],
+          `SELECT DISTINCT ip.user_id FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active WHERE ba.batch_id=$1 AND ($2::uuid IS NULL OR ip.final_domain_id=$2) AND ($3::uuid IS NULL OR gm.group_id=$3) AND ($4::uuid IS NULL OR ip.id=$4)`,
+          [t.batch_id, t.domain_id, t.group_id, t.target_intern_id],
         )
       ).rows;
       for (const u of users)
@@ -47,7 +47,7 @@ export async function sendDueReminders() {
   const deadlines = (await q(
     `SELECT DISTINCT wt.id,wt.title,wt.due_at,ip.user_id FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id JOIN intern_profiles ip ON ip.id=ba.intern_id
      JOIN users u ON u.id=ip.user_id AND u.is_active WHERE wt.status='RELEASED' AND wt.due_at BETWEEN now() AND now()+interval '24 hours'
-       AND (wt.domain_id IS NULL OR wt.domain_id=ip.final_domain_id) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=ip.id AND gm.active))
+       AND (wt.target_intern_id IS NULL OR wt.target_intern_id=ip.id) AND (wt.domain_id IS NULL OR wt.domain_id=ip.final_domain_id) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=ip.id AND gm.active))
        AND NOT EXISTS(SELECT 1 FROM task_submissions ts WHERE ts.task_id=wt.id AND ts.intern_id=ip.id)`,
   )).rows;
   for (const x of deadlines) await notify(x.user_id, "TASK_DEADLINE", "Task due soon: " + x.title, "This task is due within 24 hours.", "/intern/tasks", "TASK-DUE:" + x.id);
