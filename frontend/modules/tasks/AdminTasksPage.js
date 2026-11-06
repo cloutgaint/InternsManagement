@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 import TaskTemplates from "./TaskTemplates";
+import Link from "next/link";
 const types = [
   "TEXT",
   "LINK",
@@ -109,7 +110,7 @@ export default function AdminTasksPage() {
     <main className="wrap">
       <div className="intern-head">
         <div>
-          <h1>Weekly Task Scheduler</h1>
+          <h1>Weekly Task Scheduler</h1><Link className="btn" href="/admin/task-plans">Bulk Weekly Planner · Confirm All</Link>
           <p className="muted">
             Configure tasks now; the server releases them automatically at the
             scheduled date and time.
