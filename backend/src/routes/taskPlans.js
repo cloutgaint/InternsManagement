@@ -49,7 +49,7 @@ r.put("/task-plans/:id/weeks",async(req,res)=>{
   if(p.status!=="DRAFT")return {code:409,error:"Confirmed plans cannot be edited"};
   const allocation=(await client.query("SELECT * FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
   if(!allocation)return {code:409,error:"Internship allocation not found"};
-  const start=new Date(String(allocation.intern_start).slice(0,10)+"T00:00:00+05:30"),end=new Date(String(allocation.intern_end).slice(0,10)+"T23:59:59+05:30");
+  const start=new Date(new Date(allocation.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(allocation.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
   for(const w of weeks){if(new Date(w.releaseAt)<start||new Date(w.dueAt)>end)return {code:400,error:"Task dates must be within the Admin-approved internship dates"};}
   await client.query("DELETE FROM weekly_tasks WHERE task_plan_id=$1",[p.id]);
   const mentor=isAdmin(req)?null:(await client.query("SELECT id FROM mentors WHERE user_id=$1",[req.user.id])).rows[0]?.id;
@@ -75,7 +75,7 @@ r.post("/task-plans/:id/confirm",async(req,res)=>{
   if(!tasks.length)return {code:400,error:"Add weekly tasks before confirmation"};
   const alloc=(await client.query("SELECT intern_start,intern_end FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
   if(!alloc)return {code:409,error:"Internship allocation is no longer active"};
-  const start=new Date(String(alloc.intern_start).slice(0,10)+"T00:00:00+05:30"),end=new Date(String(alloc.intern_end).slice(0,10)+"T23:59:59+05:30");
+  const start=new Date(new Date(alloc.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(alloc.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
   if(tasks.some(t=>new Date(t.release_at)<start||new Date(t.due_at)>end))return {code:409,error:"Task dates are outside internship dates"};
   await client.query("UPDATE weekly_tasks SET status='SCHEDULED' WHERE task_plan_id=$1",[p.id]);
   await client.query("UPDATE weekly_task_plans SET status='CONFIRMED',confirmed_by=$2,confirmed_at=now() WHERE id=$1",[p.id,req.user.id]);
