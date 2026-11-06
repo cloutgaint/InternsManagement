@@ -1,3 +1,4 @@
+import taskPlans from "./taskPlans.js";
 import {
   DEFAULT_WEIGHTS,
   validateWeights,
@@ -78,6 +79,7 @@ async function notifyMentorAssigned(mentorId, groupId) {
   );
 }
 r.use(auth, permit("ADMIN", "SUPER_ADMIN"));
+r.use(taskPlans);
 r.use(batchAllotmentOrders);
 r.use(adminWorkflow);
 r.get("/dashboard", async (req, res) => {
