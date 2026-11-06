@@ -214,7 +214,7 @@ r.get("/dashboard", async (req, res) => {
   ).rows;
   const submissions = (
     await q(
-      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
+      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id AND ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
       [m],
     )
   ).rows;
@@ -224,7 +224,7 @@ r.get("/submissions/:id", async (req, res) => {
   const m = await mid(req.user.id);
   const x = (
     await q(
-      `SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,
+      `SELECT ts.*,wt.title,wt.description,wt.expected_output,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id AND ts.id=$2 GROUP BY ts.id,wt.id,r.id,ip.id`,
       [m, req.params.id],
     )
   ).rows[0];
@@ -236,7 +236,7 @@ r.post("/submissions/:id/evaluate", async (req, res) => {
   const m = await mid(req.user.id);
   const row = (
     await q(
-      `SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE ts.id=$2`,
+      `SELECT ts.*,wt.marks task_marks,wt.rubric_id FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) AND ts.id=$2`,
       [m, req.params.id],
     )
   ).rows[0];
@@ -503,7 +503,7 @@ r.patch("/reviews/:id", async (req, res) => {
 r.get("/submissions/:id/file", async (req, res) => {
   const m = await mid(req.user.id);
   const x = (await q(
-    "SELECT ts.file_path,ts.file_name,ts.mime_type FROM task_submissions ts JOIN group_members gm ON gm.intern_id=ts.intern_id AND gm.active JOIN mentor_assignments ma ON ma.group_id=gm.group_id AND ma.mentor_id=$1 AND ma.active WHERE ts.id=$2",
+    "SELECT ts.file_path,ts.file_name,ts.mime_type FROM task_submissions ts WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND EXISTS(SELECT 1 FROM intern_mentor_assignments ima WHERE ima.intern_id=ts.intern_id AND ima.mentor_id=$1 AND ima.active))) WHERE ts.id=$2",
     [m, req.params.id],
   )).rows[0];
   if (!x?.file_path || !fs.existsSync(x.file_path)) return res.status(404).json({ error: "Submission file not found" });
