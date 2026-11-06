@@ -83,7 +83,7 @@ r.get("/dashboard", async (req, res) => {
       [p.id],
     ),
     q(
-      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') AND (wt.domain_id IS NULL OR wt.domain_id=$2) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=$1 AND gm.active AND (wt.project_role IS NULL OR gm.project_role=wt.project_role))) ORDER BY wt.due_at`,
+      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') AND (wt.target_intern_id IS NULL OR wt.target_intern_id=$1) AND (wt.domain_id IS NULL OR wt.domain_id=$2) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=$1 AND gm.active AND (wt.project_role IS NULL OR gm.project_role=wt.project_role))) ORDER BY wt.due_at`,
       [p.id, p.final_domain_id],
     ),
     q(
@@ -531,6 +531,7 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
       [p.id, t.batch_id, t.group_id, t.domain_id, p.final_domain_id],
     )
   ).rowCount;
+  if (t.target_intern_id && t.target_intern_id !== p.id) { if(req.file) fs.unlinkSync(req.file.path); return res.status(403).json({error:"This task is assigned to another intern"}); }
   if (t.project_role) {
     const eligible=(await q("SELECT 1 FROM group_members WHERE intern_id=$1 AND group_id=$2 AND active AND project_role=$3",[p.id,t.group_id,t.project_role])).rowCount;
     if (!eligible) {
