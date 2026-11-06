@@ -7,6 +7,7 @@ export default function LoginPage() {
   const router=useRouter();
   const adminMode=router.query.role==="admin";
   const collegeMode=router.query.role==="college";
+  const mentorMode=router.query.role==="mentor";
   const [e, setE] = useState(""),
     [p, setP] = useState(""),
     [show, setShow] = useState(false),
@@ -42,6 +43,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password: p }),
       });
       if(collegeMode&&d.user?.role!=="COLLEGE_COORDINATOR")return setErr("This account does not have college coordinator access.");
+      if(mentorMode&&d.user?.role!=="MENTOR")return setErr("This account does not have mentor access.");
       if (d.mfaRequired) {
         setMfa(d);
         if (d.mfaSetupRequired)
@@ -85,12 +87,12 @@ export default function LoginPage() {
     <main className="auth-shell auth-login-shell">
       <section className="auth-panel auth-login-panel">
         <div className="auth-brand">
-          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":collegeMode?"COLLEGE COORDINATOR PORTAL":"GAINT STUDENT PORTAL"}</span>
-          <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : collegeMode ? "College coordinator sign in" : "Welcome back"}</h1>
+          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":collegeMode?"COLLEGE COORDINATOR PORTAL":mentorMode?"GAINT MENTOR PORTAL":"GAINT STUDENT PORTAL"}</span>
+          <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : collegeMode ? "College coordinator sign in" : mentorMode ? "Mentor sign in" : "Welcome back"}</h1>
           <p>
             {mfa
               ? "Admin and Mentor accounts require multi-factor authentication."
-              : adminMode ? "Access the administrative workspace using your authorized account." : collegeMode ? "View your college interns and semester batches." : "Sign in to continue to your internship workspace."}
+              : adminMode ? "Access the administrative workspace using your authorized account." : collegeMode ? "View your college interns and semester batches." : mentorMode ? "Assign tasks and review intern submissions." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
         {router.query.registered==="1"&&!adminMode&&<p className="success" role="status">Registration submitted successfully. Your college permission proof is awaiting Admin verification and approval. You can sign in after your account is activated.</p>}
@@ -134,7 +136,7 @@ export default function LoginPage() {
             <button className="btn auth-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign in"}
             </button>
-            <p className="auth-login-switch"><Link href="/forgot-password">Forgot password?</Link>{!adminMode&&!collegeMode&&<> · <Link href="/application-status">Check application status</Link></>}</p><p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link> · College coordinator? <Link href="/login?role=college">Coordinator Login</Link></>}</p>
+            <p className="auth-login-switch"><Link href="/forgot-password">Forgot password?</Link>{!adminMode&&!collegeMode&&!mentorMode&&<> · <Link href="/application-status">Check application status</Link></>}</p><p className="auth-login-switch">{adminMode?<>Student account? <Link href="/login">Student Login</Link></>:<>Administrator? <Link href="/login?role=admin">Admin Login</Link> · College coordinator? <Link href="/login?role=college">Coordinator Login</Link> · Mentor? <Link href="/login?role=mentor">Mentor Login</Link></>}</p>
           </form>
         ) : (
           <form onSubmit={verify}>
