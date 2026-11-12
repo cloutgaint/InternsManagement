@@ -62,20 +62,20 @@ export default function MentorFinalEvaluationsPage() {
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
       <section className="card">
-        {rows.map((x) => (
-          <div className="workflow-row" key={x.intern_id}>
+        {!rows.length&&<p className="muted">No interns are awaiting final evaluation.</p>}{rows.map((x) => (
+          <div className="workflow-row" key={x.intern_id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap",padding:"16px 0",borderBottom:"1px solid #e2e8e5"}}>
             <div>
-              <b>{x.full_name}</b>
-              <small>
+              <b style={{display:"block",fontSize:16}}>{x.full_name}</b>
+              <small style={{display:"block",marginTop:4,color:"#64766b"}}>
                 {x.group_name} · {x.project_title || "No project"}
               </small>
-              <div className="final-metrics">
+              <div className="final-metrics" style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:10,color:"#53675b"}}>
                 <span>Attendance {x.attendance_pct}%</span>
                 <span>Task Avg {x.task_avg}</span>
                 <span>Review Avg {x.review_avg}</span>
               </div>
             </div>
-            <div className="action-row">
+            <div className="action-row" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <span className="status-pill">
                 {x.evaluation_id ? x.recommendation : "Pending"}
               </span>
