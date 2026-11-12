@@ -29,15 +29,7 @@ export default function InternTasksPage() {
         v = form[t.id] || {};
       fd.append("content", JSON.stringify(v));
       if (files[t.id]) fd.append("file", files[t.id]);
-      const token = localStorage.getItem("token"),
-        base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-      const response = await fetch(base + "/intern/tasks/" + t.id + "/submit", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + token },
-          body: fd,
-        }),
-        out = await response.json();
-      if (!response.ok) throw new Error(out.error || "Submission failed");
+      await api("/intern/tasks/" + t.id + "/submit", { method: "POST", body: fd });
       setMsg("Task submitted successfully.");
       hist(t);
     } catch (e) {
