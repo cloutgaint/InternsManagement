@@ -83,7 +83,7 @@ export default function MentorDashboardPage() {
       <div className="verification-title">
         <h1>Mentor Dashboard</h1>
         <div className="action-row">
-          <a className="btn" href="/mentor/tasks">Assign Tasks</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
+          <a className="btn" href="/mentor/tasks">Create / Edit Tasks</a><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
             Final Evaluations
           </a>
           <a className="btn secondary" href="/mentor/operations">
@@ -98,14 +98,14 @@ export default function MentorDashboardPage() {
       {err && <p className="error">{err}</p>}
       <div className="form-grid" style={{margin:"20px 0",gap:12}}>
         <section className="card"><p className="muted">My Task Plans</p><h2>{plans.length}</h2><a href="/mentor/tasks">Manage weekly tasks</a></section>
-        <section className="card"><p className="muted">Scheduled Plans</p><h2>{plans.filter(p=>p.status==="CONFIRMED").length}</h2><a href="/mentor/tasks">Review release schedule</a></section>
+        <section className="card"><p className="muted">Scheduled Plans</p><h2>{plans.filter(p=>p.status==="CONFIRMED").length}</h2><a href="/mentor/task-schedule">View scheduled tasks</a></section>
         <section className="card"><p className="muted">Pending Evaluations</p><h2>{d.submissions?.length||0}</h2><a href="/mentor/final-evaluations">Final evaluations</a></section>
       </div>
       <section className="card" style={{marginBottom:16}}>
-        <div className="workflow-row" style={{alignItems:"center",justifyContent:"space-between"}}><h2>Weekly Task Plans</h2><a className="btn secondary" href="/mentor/tasks">Open Task Planner</a></div>
+        <div className="workflow-row" style={{alignItems:"center",justifyContent:"space-between"}}><h2>Weekly Task Plans</h2><a className="btn secondary" href="/mentor/task-schedule">View Full Schedule</a></div>
         {planError&&<p className="error">Task plans unavailable: {planError}</p>}
         {!planError&&!plans.length&&<p className="muted">No weekly task plans created yet. Start by assigning tasks to an intern.</p>}
-        {plans.slice(0,6).map(p=><div className="workflow-row" key={p.id} style={{padding:"12px 0",borderBottom:"1px solid #e5ece8",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{p.intern_name}</strong><div className="muted">{p.project_name||"Project not assigned"} · {p.college_name||"College unavailable"} · {p.batch_name||"Batch unavailable"}</div><small>{p.task_count||0} weeks · {p.status==="CONFIRMED"?"Confirmed schedule":"Draft"}</small></div><a className="btn secondary" href="/mentor/tasks">View Tasks</a></div>)}
+        {plans.slice(0,6).map(p=><div className="workflow-row" key={p.id} style={{padding:"12px 0",borderBottom:"1px solid #e5ece8",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{p.intern_name}</strong><div className="muted">{p.project_name||"Project not assigned"} · {p.college_name||"College unavailable"} · {p.batch_name||"Batch unavailable"}</div><small>{p.task_count||0} weeks · {p.status==="CONFIRMED"?"Confirmed schedule":"Draft"}</small></div><a className="btn secondary" href={"/mentor/tasks?plan="+encodeURIComponent(p.id)}>Open This Plan</a></div>)}
       </section>
       <div className="intern-sections">
         <section className="card">
