@@ -550,30 +550,11 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
     if (req.file) fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: "Invalid submission content" });
   }
-  const allowed = t.submission_types || [];
+  // Submission methods are unrestricted; legacy task submission_types are metadata only.
   const rejectContent = (message) => {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(400).json({ error: message });
   };
-  if (content.repositoryUrl && !allowed.includes("REPOSITORY"))
-    return rejectContent("Repository submission is not enabled for this task");
-  if (content.videoUrl && !allowed.includes("VIDEO"))
-    return rejectContent("Video link submission is not enabled for this task");
-  if (content.link && !allowed.includes("LINK"))
-    return rejectContent("Link submission is not enabled for this task");
-  if (content.text && !allowed.includes("TEXT"))
-    return rejectContent("Text submission is not enabled for this task");
-  if (
-    req.file &&
-    !["FILE", "DOCUMENT", "PRESENTATION", "VIDEO"].some((x) =>
-      allowed.includes(x),
-    )
-  ) {
-    fs.unlinkSync(req.file.path);
-    return res
-      .status(400)
-      .json({ error: "File submission is not enabled for this task" });
-  }
   for (const u of [
     content.repositoryUrl,
     content.videoUrl,
