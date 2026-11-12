@@ -1,6 +1,8 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+const isKlu = (name = "") => /koneru lakshmaiah|\\bklu\\b/i.test(name);
+const reportTemplate = (name = "") => isKlu(name) ? "KLU Fortnight Evaluation" : "General Fortnight Evaluation";
 export default function MentorReportsPage() {
   const [reviews, setReviews] = useState([]),
     [report, setReport] = useState(null),
@@ -56,8 +58,7 @@ export default function MentorReportsPage() {
         <div>
           <h1>Fortnight Reports</h1>
           <p className="muted">
-            Generated from published mentor reviews and individual contribution
-            marks.
+            Record marks and comments from offline evaluations. Reports use a college-specific format where configured.
           </p>
         </div>
       </div>
@@ -66,6 +67,7 @@ export default function MentorReportsPage() {
       {edit && (
         <section className="card">
           <h2>{edit.title}</h2>
+          <p className="muted">Enter the marks and comments collected during the offline fortnight review. College-specific fields can be configured without changing other colleges.</p>
           <form className="form-grid" onSubmit={saveEdit}>
             <div className="form-field"><label>Status</label><select className="input" value={edit.status} onChange={(e) => setEdit((x) => ({ ...x, status: e.target.value }))}><option value="CONDUCTED">Conducted</option><option value="MARKS_ENTERED">Marks Entered</option><option value="PUBLISHED">Published</option></select></div>
             <div className="form-field"><label>Group Marks (0-100)</label><input className="input" type="number" min="0" max="100" value={edit.groupMarks} onChange={(e) => setEdit((x) => ({ ...x, groupMarks: e.target.value }))} /></div>
@@ -94,7 +96,7 @@ export default function MentorReportsPage() {
                   {x.group_name} · Period {x.period_no}
                 </b>
                 <div className="muted">
-                  {String(x.review_date).slice(0, 10)} · {x.status} ·{" "}
+                  {x.college_name || "College not assigned"} · {reportTemplate(x.college_name)} · {String(x.review_date).slice(0, 10)} · {x.status} ·{" "}
                   {x.individual_count} individual review(s)
                 </div>
               </div>
@@ -114,19 +116,18 @@ export default function MentorReportsPage() {
         <section className="card fortnight-report">
           <div className="verification-title">
             <div>
-              <h2>Fortnight Progress Report</h2>
+              <h2>{reportTemplate(report.review.college_name)}</h2>
+              <p><b>GAINT CLOUT TECHNOLOGIES PVT. LTD.</b></p>
+              <p className="muted">{report.review.college_name || "College not assigned"} · Fortnight evaluation</p>
               <p className="muted">
                 {report.review.group_name} · {report.review.batch_name || ""} ·
                 Period {report.review.period_no}
               </p>
             </div>
-            <button
-              className="btn secondary no-print"
-              onClick={() => window.print()}
-            >
-              Print / Save PDF
-            </button>
+            <button className="btn secondary no-print" onClick={() => window.print()} disabled={report.review.status !== "PUBLISHED"} title={report.review.status !== "PUBLISHED" ? "Publish the review before printing" : "Print the approved report"}>Print / Save PDF</button>
           </div>
+          {report.review.status !== "PUBLISHED" && <p className="error no-print">Draft preview only. Publish the review before issuing a report.</p>}
+          {isKlu(report.review.college_name) && <p className="muted">KLU-specific report profile. The official college layout is pending the approved KLU template.</p>}
           <div className="report-meta">
             <span>
               <b>Review Date</b>
@@ -173,9 +174,8 @@ export default function MentorReportsPage() {
               </Fragment>
             ))}
           </div>
-          <small className="muted">
-            Generated {new Date(report.generatedAt).toLocaleString()}
-          </small>
+          <div className="report-block"><h3>Company Verification</h3><p>Authorized GAINT signature: ____________________</p><p>Company stamp: To be applied by an authorized signatory</p></div>
+          <small className="muted">Generated {new Date(report.generatedAt).toLocaleString()}</small>
         </section>
       )}
     </main>
