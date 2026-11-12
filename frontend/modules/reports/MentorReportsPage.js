@@ -3,7 +3,8 @@ import { Fragment, useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
 const isKlu = (name = "") => /koneru lakshmaiah|\\bklu\\b/i.test(name);
 const reportTemplate = (name = "") => isKlu(name) ? "KLU Fortnight Evaluation" : "General Fortnight Evaluation";
-export default function MentorReportsPage() {
+export default function MentorReportsPage({ admin = false }) {
+  const base = admin ? "/admin/fortnight" : "/mentor";
   const [reviews, setReviews] = useState([]),
     [report, setReport] = useState(null),
     [err, setErr] = useState(""),
@@ -13,19 +14,19 @@ export default function MentorReportsPage() {
     [creating, setCreating] = useState(false),
     [draft, setDraft] = useState({ groupId: "", periodNo: 1, reviewDate: new Date().toISOString().slice(0, 10), groupMarks: "", feedback: "", progress: "", domainReview: "", presentationReview: "", actionItems: "", nextExpectations: "", marks: [] });
   const load = () =>
-    api("/mentor/reviews")
+    api(base + "/reviews")
       .then(setReviews)
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
-    api("/mentor/dashboard").then((x) => setGroups(x.groups || [])).catch((e) => setErr(e.message));
+    (admin ? api("/admin/fortnight/groups").then(setGroups) : api("/mentor/dashboard").then((x) => setGroups(x.groups || [])).catch((e) => setErr(e.message));
   }, []);
   async function chooseGroup(groupId) {
     setErr("");
     setDraft((x) => ({ ...x, groupId, marks: [] }));
     if (!groupId) return;
     try {
-      const members = await api("/mentor/groups/" + groupId + "/members");
+      const members = await api((admin ? "/admin/fortnight/groups/" : "/mentor/groups/") + groupId + "/members");
       setDraft((x) => ({ ...x, groupId, marks: members.map((m) => ({ internId: m.id, name: m.full_name, marks: "", note: "" })) }));
     } catch (e) { setErr(e.message); }
   }
@@ -35,7 +36,7 @@ export default function MentorReportsPage() {
     if (!draft.groupId) return setErr("Select a project before creating a review.");
     if (draft.marks.some((m) => m.marks === "")) return setErr("Enter marks for every intern before creating the review.");
     try {
-      await api("/mentor/reviews", { method: "POST", body: JSON.stringify({
+      await api(base + "/reviews", { method: "POST", body: JSON.stringify({
         groupId: draft.groupId, periodNo: Number(draft.periodNo), reviewDate: draft.reviewDate,
         status: "MARKS_ENTERED", groupMarks: draft.groupMarks === "" ? null : Number(draft.groupMarks),
         progress: draft.progress, domainReview: draft.domainReview, presentationReview: draft.presentationReview,
@@ -49,8 +50,8 @@ export default function MentorReportsPage() {
   }
   async function startEdit(x) {
     try {
-      const members = await api("/mentor/groups/" + x.group_id + "/members");
-      const saved = (await api("/mentor/reviews/" + x.id + "/report")).members;
+      const members = await api((admin ? "/admin/fortnight/groups/" : "/mentor/groups/") + x.group_id + "/members");
+      const saved = (await api(base + "/reviews/" + x.id + "/report")).members;
       setEdit({
         id: x.id, title: x.group_name + " · Fortnight " + x.period_no, status: x.status === "SCHEDULED" ? "CONDUCTED" : x.status,
         progress: x.progress || "", domainReview: x.domain_review || "", presentationReview: x.presentation_review || "", groupMarks: x.group_marks ?? "", feedback: x.feedback || "", actionItems: x.action_items || "", nextExpectations: x.next_expectations || "",
@@ -65,7 +66,7 @@ export default function MentorReportsPage() {
     setErr("");
     const individualMarks = edit.marks.filter((m) => m.marks !== "").map((m) => ({ internId: m.internId, marks: Number(m.marks), note: m.note }));
     try {
-      await api("/mentor/reviews/" + edit.id, {
+      await api(base + "/reviews/" + edit.id, {
         method: "PATCH",
         body: JSON.stringify({ status: edit.status, progress: edit.progress, domainReview: edit.domainReview, presentationReview: edit.presentationReview, groupMarks: edit.groupMarks === "" ? null : Number(edit.groupMarks), feedback: edit.feedback, actionItems: edit.actionItems, nextExpectations: edit.nextExpectations, individualMarks }),
       });
@@ -78,7 +79,7 @@ export default function MentorReportsPage() {
   }
   async function open(x) {
     try {
-      setReport(await api("/mentor/reviews/" + x.id + "/report"));
+      setReport(await api(base + "/reviews/" + x.id + "/report"));
     } catch (e) {
       setErr(e.message);
     }
@@ -87,7 +88,7 @@ export default function MentorReportsPage() {
     <main className="wrap mentor-reports-page">
       <div className="intern-head">
         <div>
-          <h1>Fortnight Reports</h1>
+          <h1>{admin ? "Admin Fortnight Evaluations" : "Fortnight Reports"}</h1>
           <p className="muted">
             Record marks and comments from offline evaluations. Reports use a college-specific format where configured.
           </p>
