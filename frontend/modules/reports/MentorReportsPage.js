@@ -8,14 +8,45 @@ export default function MentorReportsPage() {
     [report, setReport] = useState(null),
     [err, setErr] = useState(""),
     [msg, setMsg] = useState(""),
-    [edit, setEdit] = useState(null);
+    [edit, setEdit] = useState(null),
+    [groups, setGroups] = useState([]),
+    [creating, setCreating] = useState(false),
+    [draft, setDraft] = useState({ groupId: "", periodNo: 1, reviewDate: new Date().toISOString().slice(0, 10), groupMarks: "", feedback: "", progress: "", domainReview: "", presentationReview: "", actionItems: "", nextExpectations: "", marks: [] });
   const load = () =>
     api("/mentor/reviews")
       .then(setReviews)
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
+    api("/mentor/dashboard").then((x) => setGroups(x.groups || [])).catch((e) => setErr(e.message));
   }, []);
+  async function chooseGroup(groupId) {
+    setErr("");
+    setDraft((x) => ({ ...x, groupId, marks: [] }));
+    if (!groupId) return;
+    try {
+      const members = await api("/mentor/groups/" + groupId + "/members");
+      setDraft((x) => ({ ...x, groupId, marks: members.map((m) => ({ internId: m.id, name: m.full_name, marks: "", note: "" })) }));
+    } catch (e) { setErr(e.message); }
+  }
+  async function createReview(event) {
+    event.preventDefault();
+    setErr(""); setMsg("");
+    if (!draft.groupId) return setErr("Select a project before creating a review.");
+    if (draft.marks.some((m) => m.marks === "")) return setErr("Enter marks for every intern before creating the review.");
+    try {
+      await api("/mentor/reviews", { method: "POST", body: JSON.stringify({
+        groupId: draft.groupId, periodNo: Number(draft.periodNo), reviewDate: draft.reviewDate,
+        status: "MARKS_ENTERED", groupMarks: draft.groupMarks === "" ? null : Number(draft.groupMarks),
+        progress: draft.progress, domainReview: draft.domainReview, presentationReview: draft.presentationReview,
+        feedback: draft.feedback, actionItems: draft.actionItems, nextExpectations: draft.nextExpectations,
+        individualMarks: draft.marks.map((m) => ({ internId: m.internId, marks: Number(m.marks), note: m.note })),
+      }) });
+      setMsg("Fortnight evaluation saved. Review the report before publishing.");
+      setCreating(false);
+      await load();
+    } catch (e) { setErr(e.message); }
+  }
   async function startEdit(x) {
     try {
       const members = await api("/mentor/groups/" + x.group_id + "/members");
@@ -64,6 +95,18 @@ export default function MentorReportsPage() {
       </div>
       {err && <p className="error">{err}</p>}
       {msg && <p className="success" role="status">{msg}</p>}
+      <section className="card">
+        <div className="verification-title"><div><h2>Fortnight Evaluations</h2><p className="muted">Create a record after completing the offline review. Each project and fortnight can have one review.</p></div><button type="button" className="btn" onClick={() => { setCreating((v) => !v); setErr(""); }}>{creating ? "Close Form" : "Create Fortnight Evaluation"}</button></div>
+        {creating && <form className="form-grid" onSubmit={createReview}>
+          <div className="form-field"><label>Project / Group</label><select className="input" required value={draft.groupId} onChange={(e) => chooseGroup(e.target.value)}><option value="">Select project</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
+          <div className="form-field"><label>Fortnight Number</label><input className="input" type="number" min="1" required value={draft.periodNo} onChange={(e) => setDraft((x) => ({ ...x, periodNo: e.target.value }))} /></div>
+          <div className="form-field"><label>Offline Review Date</label><input className="input" type="date" required value={draft.reviewDate} onChange={(e) => setDraft((x) => ({ ...x, reviewDate: e.target.value }))} /></div>
+          <div className="form-field"><label>Group Marks (0–100)</label><input className="input" type="number" min="0" max="100" value={draft.groupMarks} onChange={(e) => setDraft((x) => ({ ...x, groupMarks: e.target.value }))} /></div>
+          {([["progress","Progress"],["domainReview","Technical Work"],["presentationReview","Presentation / Demo"],["feedback","Mentor Comments"],["actionItems","Action Items"],["nextExpectations","Next Fortnight Expectations"]]).map(([key,label]) => <div className="form-field" key={key} style={{gridColumn:"1 / -1"}}><label>{label}</label><textarea className="input" value={draft[key]} onChange={(e) => setDraft((x) => ({...x,[key]:e.target.value}))} /></div>)}
+          {draft.marks.map((m,i) => <div className="form-field" key={m.internId} style={{gridColumn:"1 / -1"}}><label>{m.name}: Marks and Comments</label><div className="action-row"><input className="input" aria-label={"Marks for "+m.name} type="number" min="0" max="100" required value={m.marks} onChange={(e) => setDraft((x) => ({...x,marks:x.marks.map((v,j) => j===i?{...v,marks:e.target.value}:v)}))} /><input className="input" aria-label={"Comments for "+m.name} placeholder="Individual feedback" value={m.note} onChange={(e) => setDraft((x) => ({...x,marks:x.marks.map((v,j) => j===i?{...v,note:e.target.value}:v)}))} /></div></div>)}
+          <div className="form-actions"><button className="btn" type="submit">Save Fortnight Evaluation</button></div>
+        </form>}
+      </section>
       {edit && (
         <section className="card">
           <h2>{edit.title}</h2>
