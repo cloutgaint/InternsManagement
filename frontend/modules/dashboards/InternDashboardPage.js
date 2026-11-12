@@ -137,19 +137,6 @@ export default function InternDashboardPage() {
       setErr(e.message);
     }
   }
-  async function submitTask(t) {
-    const text = prompt("Enter submission details / links:");
-    if (!text) return;
-    try {
-      await api("/intern/tasks/" + t.id + "/submit", {
-        method: "POST",
-        body: JSON.stringify({ content: { text } }),
-      });
-      setMsg("Task submitted successfully.");
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
   async function viewOffer(x) {
     try {
       setOfferView(await api("/intern/offer-letters/" + x.id + "/view"));
@@ -317,7 +304,7 @@ export default function InternDashboardPage() {
           )}
           <div className={s.formActions}>
             <a className={s.btn} href="/intern/tasks">
-              Open Task Workspace
+              View Weekly Tasks
             </a>
           </div>
         </section>
