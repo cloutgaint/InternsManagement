@@ -3455,4 +3455,53 @@ r.get("/audit", async (req, res) =>
       .rows,
   ),
 );
+
+const validFortnightMarks = (marks) => Array.isArray(marks) && new Set(marks.map(x=>x.internId)).size===marks.length && marks.every(x=>x.internId && x.marks!=="" && x.marks!=null && Number.isFinite(Number(x.marks)) && Number(x.marks)>=0 && Number(x.marks)<=100);
+const fortnightMembers = async (groupId) => (await q("SELECT gm.intern_id id,ip.full_name name,ip.roll_number FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id WHERE gm.group_id=$1 AND gm.active ORDER BY ip.full_name",[groupId])).rows;
+r.get("/fortnight/groups", async (req,res) => res.json((await q("SELECT g.id,g.name FROM groups g ORDER BY g.name")).rows));
+r.get("/fortnight/groups/:id/members", async (req,res) => res.json(await fortnightMembers(req.params.id)));
+r.get("/fortnight/reviews", async (req,res) => res.json((await q("SELECT fr.*,g.name group_name,c.id college_id,c.name college_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN colleges c ON c.id=b.college_id ORDER BY fr.review_date DESC,fr.period_no DESC")).rows));
+r.get("/fortnight/reviews/:id/report", async (req,res) => {
+ const review=(await q("SELECT fr.*,g.name group_name,b.name batch_name,c.id college_id,c.name college_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN colleges c ON c.id=b.college_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id WHERE fr.id=$1",[req.params.id])).rows[0];
+ if(!review)return res.status(404).json({error:"Review not found"});
+ const members=(await q("SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number,ip.id intern_id FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id WHERE rim.review_id=$1 ORDER BY ip.full_name",[review.id])).rows;
+ res.json({review,members,generatedAt:new Date().toISOString()});
+});
+r.post("/fortnight/reviews", async (req,res) => {
+ const b=req.body,group=(await q("SELECT id FROM groups WHERE id=$1",[b.groupId||null])).rows[0];
+ if(!group)return res.status(404).json({error:"Project not found"});
+ if(!Number.isInteger(Number(b.periodNo))||Number(b.periodNo)<1||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(b.reviewDate||"")))return res.status(400).json({error:"Valid fortnight number and review date required"});
+ if((await q("SELECT 1 FROM fortnight_reviews WHERE group_id=$1 AND period_no=$2",[group.id,b.periodNo])).rowCount)return res.status(409).json({error:"Fortnight review already exists for this project"});
+ const members=await fortnightMembers(group.id),marks=b.individualMarks;
+ if(!validFortnightMarks(marks)||marks.length!==members.length||marks.some(x=>!members.some(m=>m.id===x.internId)))return res.status(400).json({error:"Provide valid marks for every project member"});
+ if(b.groupMarks!==null&&b.groupMarks!==undefined&&(!Number.isFinite(Number(b.groupMarks))||Number(b.groupMarks)<0||Number(b.groupMarks)>100))return res.status(400).json({error:"Group marks must be between 0 and 100"});
+ const review=await tx(async client=>{
+  const row=(await client.query("INSERT INTO fortnight_reviews(group_id,period_no,review_date,status,progress,domain_review,presentation_review,group_marks,feedback,action_items,next_expectations,published_at,created_by) VALUES($1,$2,$3,'MARKS_ENTERED',$4,$5,$6,$7,$8,$9,$10,NULL,$11) RETURNING *",[group.id,Number(b.periodNo),b.reviewDate,b.progress||null,b.domainReview||null,b.presentationReview||null,b.groupMarks??null,b.feedback||null,b.actionItems||null,b.nextExpectations||null,req.user.id])).rows[0];
+  for(const x of marks)await client.query("INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)",[row.id,x.internId,Number(x.marks),x.note||null]);
+  return row;
+ });
+ await audit(req,"REVIEW_RECORDED","fortnight_review",review.id,null,review);
+ res.status(201).json(review);
+});
+r.patch("/fortnight/reviews/:id", async(req,res)=>{
+ const b=req.body,before=(await q("SELECT * FROM fortnight_reviews WHERE id=$1",[req.params.id])).rows[0];
+ if(!before)return res.status(404).json({error:"Review not found"});
+ if(before.status==="PUBLISHED")return res.status(409).json({error:"Finalized evaluations are locked"});
+ const members=await fortnightMembers(before.group_id),marks=b.individualMarks;
+ if(!validFortnightMarks(marks)||marks.length!==members.length||marks.some(x=>!members.some(m=>m.id===x.internId)))return res.status(400).json({error:"Provide valid marks for every project member"});
+ if(b.groupMarks!==null&&b.groupMarks!==undefined&&(!Number.isFinite(Number(b.groupMarks))||Number(b.groupMarks)<0||Number(b.groupMarks)>100))return res.status(400).json({error:"Group marks must be between 0 and 100"});
+ if(b.status==="PUBLISHED"&&(b.groupMarks==null||b.groupMarks===""))return res.status(400).json({error:"Group marks required to finalize"});
+ const status=b.status==="PUBLISHED"?"PUBLISHED":"MARKS_ENTERED";
+ const row=await tx(async client=>{
+  const result=(await client.query("UPDATE fortnight_reviews SET status=$2,progress=$3,domain_review=$4,presentation_review=$5,group_marks=$6,feedback=$7,action_items=$8,next_expectations=$9,published_at=CASE WHEN $2='PUBLISHED' THEN now() ELSE NULL END,updated_at=now() WHERE id=$1 AND status<>'PUBLISHED' RETURNING *",[before.id,status,b.progress||null,b.domainReview||null,b.presentationReview||null,b.groupMarks??null,b.feedback||null,b.actionItems||null,b.nextExpectations||null])).rows[0];
+  if(!result)return null;
+  await client.query("DELETE FROM review_individual_marks WHERE review_id=$1",[before.id]);
+  for(const x of marks)await client.query("INSERT INTO review_individual_marks(review_id,intern_id,marks,contribution_note) VALUES($1,$2,$3,$4)",[before.id,x.internId,Number(x.marks),x.note||null]);
+  return result;
+ });
+ if(!row)return res.status(409).json({error:"Review already finalized"});
+ await audit(req,"REVIEW_UPDATED","fortnight_review",row.id,before,row);
+ res.json(row);
+});
+
 export default r;
