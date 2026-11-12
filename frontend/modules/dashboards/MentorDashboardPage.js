@@ -5,13 +5,15 @@ export default function MentorDashboardPage() {
   const [d, setD] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [taskEval, setTaskEval] = useState(null);
+    [taskEval, setTaskEval] = useState(null),
+    [plans,setPlans]=useState([]),[planError,setPlanError]=useState("");
   const load = async () => {
     setErr("");
     try {
       const x=await api("/mentor/dashboard");
       setD(x);
     } catch(e) {setErr("Mentor dashboard: "+e.message);}
+    try{setPlans(await api("/mentor/task-plans"));setPlanError("");}catch(e){setPlanError(e.message);}
     // Initial assessment is MCQ-only and scored automatically; do not call legacy written-answer evaluation API.
   };
   useEffect(() => {
@@ -94,6 +96,17 @@ export default function MentorDashboardPage() {
       </p>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
+      <div className="form-grid" style={{margin:"20px 0",gap:12}}>
+        <section className="card"><p className="muted">My Task Plans</p><h2>{plans.length}</h2><a href="/mentor/tasks">Manage weekly tasks</a></section>
+        <section className="card"><p className="muted">Scheduled Plans</p><h2>{plans.filter(p=>p.status==="CONFIRMED").length}</h2><a href="/mentor/tasks">Review release schedule</a></section>
+        <section className="card"><p className="muted">Pending Evaluations</p><h2>{d.submissions?.length||0}</h2><a href="/mentor/final-evaluations">Final evaluations</a></section>
+      </div>
+      <section className="card" style={{marginBottom:16}}>
+        <div className="workflow-row" style={{alignItems:"center",justifyContent:"space-between"}}><h2>Weekly Task Plans</h2><a className="btn secondary" href="/mentor/tasks">Open Task Planner</a></div>
+        {planError&&<p className="error">Task plans unavailable: {planError}</p>}
+        {!planError&&!plans.length&&<p className="muted">No weekly task plans created yet. Start by assigning tasks to an intern.</p>}
+        {plans.slice(0,6).map(p=><div className="workflow-row" key={p.id} style={{padding:"12px 0",borderBottom:"1px solid #e5ece8",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{p.intern_name}</strong><div className="muted">{p.project_name||"Project not assigned"} · {p.college_name||"College unavailable"} · {p.batch_name||"Batch unavailable"}</div><small>{p.task_count||0} weeks · {p.status==="CONFIRMED"?"Confirmed schedule":"Draft"}</small></div><a className="btn secondary" href="/mentor/tasks">View Tasks</a></div>)}
+      </section>
       <div className="intern-sections">
         <section className="card">
           <h2>Pending Task Evaluations</h2>
