@@ -6,12 +6,14 @@ export default function MentorDashboardPage() {
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [taskEval, setTaskEval] = useState(null),
-    [plans,setPlans]=useState([]),[planError,setPlanError]=useState("");
+    [plans,setPlans]=useState([]),[planError,setPlanError]=useState(""),[teamMembers,setTeamMembers]=useState({});
   const load = async () => {
     setErr("");
     try {
       const x=await api("/mentor/dashboard");
       setD(x);
+      const entries=await Promise.all((x.groups||[]).map(async(g)=>{try{return [g.id,await api("/mentor/groups/"+g.id+"/members")];}catch{return [g.id,[]];}}));
+      setTeamMembers(Object.fromEntries(entries));
     } catch(e) {setErr("Mentor dashboard: "+e.message);}
     try{setPlans(await api("/mentor/task-plans"));setPlanError("");}catch(e){setPlanError(e.message);}
     // Initial assessment is MCQ-only and scored automatically; do not call legacy written-answer evaluation API.
@@ -106,6 +108,12 @@ export default function MentorDashboardPage() {
         {planError&&<p className="error">Task plans unavailable: {planError}</p>}
         {!planError&&!plans.length&&<p className="muted">No weekly task plans created yet. Start by assigning tasks to an intern.</p>}
         {plans.slice(0,6).map(p=><div className="workflow-row" key={p.id} style={{padding:"12px 0",borderBottom:"1px solid #e5ece8",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{p.intern_name}</strong><div className="muted">{p.project_name||"Project not assigned"} · {p.college_name||"College unavailable"} · {p.batch_name||"Batch unavailable"}</div><small>{p.task_count||0} weeks · {p.status==="CONFIRMED"?"Confirmed schedule":"Draft"}</small></div><a className="btn secondary" href={"/mentor/tasks?plan="+encodeURIComponent(p.id)}>Open This Plan</a></div>)}
+      </section>
+      <section className="card" style={{marginBottom:16}}>
+        <h2>Project Team Members</h2>
+        <p className="muted">Every mentor assigned to a project can see its complete team. Directly assigned interns are marked separately.</p>
+        {(d.groups||[]).map((g)=><div key={g.id} className="workflow-row"><div><b>{g.name}</b><div className="muted">{(teamMembers[g.id]||[]).map(m=>m.full_name+(m.is_my_intern?" (My intern)":" (Teammate)")).join(" · ")||"No active team members"}</div></div></div>)}
+        {!d.groups?.length&&<p className="muted">No projects assigned yet.</p>}
       </section>
       <div className="intern-sections">
         <section className="card">
