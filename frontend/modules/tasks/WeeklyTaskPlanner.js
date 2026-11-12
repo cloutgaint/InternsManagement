@@ -8,7 +8,7 @@ export default function WeeklyTaskPlanner({role="mentor"}){
  const base="/"+role+"/task-plans";
  const [releaseReasons,setReleaseReasons]=useState({}),[editingWeek,setEditingWeek]=useState(null),[newWeek,setNewWeek]=useState(null),[interns,setInterns]=useState([]),[plans,setPlans]=useState([]),[selected,setSelected]=useState(""),[plan,setPlan]=useState(null),[internId,setInternId]=useState(""),[weeks,setWeeks]=useState([blank()]),[error,setError]=useState(""),[success,setSuccess]=useState(""),[busy,setBusy]=useState(false);
  const refresh=async()=>{try{const [i,p]=await Promise.all([api(base+"/interns"),api(base)]);setInterns(i);setPlans(p);}catch(e){setError(e.message);}};
- useEffect(()=>{refresh();},[base]);
+ useEffect(()=>{refresh();const id=new URLSearchParams(window.location.search).get("plan");if(id)open(id);},[base]);
  async function open(id){setError("");setNewWeek(null);setEditingWeek(null);try{const p=await api(base+"/"+id);setSelected(id);setPlan(p);setInternId(p.intern_id);setWeeks(p.tasks.length?p.tasks.map(t=>({week:t.plan_week,title:t.title,description:t.description||"",expectedOutput:t.expected_output||"",releaseAt:localDate(t.release_at),status:t.status,scheduledAt:t.release_at,taskId:t.id})):[blank()]);}catch(e){setError(e.message);}}
  async function create(){setError("");setSuccess("");try{if(!internId)throw Error("Select an intern first");const p=await api(base,{method:"POST",body:JSON.stringify({internId})});await refresh();await open(p.id);setSuccess("Draft created. Add all weekly tasks before confirming.");}catch(e){setError(e.message);}}
  function update(i,key,value){setWeeks(w=>w.map((x,j)=>i===j?{...x,[key]:value}:x));}
