@@ -83,7 +83,7 @@ export default function MentorDashboardPage() {
       <div className="verification-title">
         <h1>Mentor Dashboard</h1>
         <div className="action-row">
-          <a className="btn" href="/mentor/tasks">Create / Edit Tasks</a><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
+          <a className="btn" href="/mentor/tasks">Create / Edit Tasks</a><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
             Final Evaluations
           </a>
           <a className="btn secondary" href="/mentor/operations">
@@ -92,7 +92,7 @@ export default function MentorDashboardPage() {
         </div>
       </div>
       <p className="muted">
-        Assign weekly tasks, review submissions and complete final project evaluations. Fortnight reviews are conducted offline.
+        Assign weekly tasks and record fortnight marks and comments from offline reviews.
       </p>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
