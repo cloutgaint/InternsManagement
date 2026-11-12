@@ -538,7 +538,7 @@ r.get("/reviews/:id/report", async (req, res) => {
   const m = await mid(req.user.id);
   const review = (
     await q(
-      `SELECT fr.*,g.name group_name,b.name batch_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id WHERE fr.id=$2 AND ${MY_GROUP}`,
+      `SELECT fr.*,g.name group_name,b.name batch_name,c.id college_id,c.name college_name,p.title project_title FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN colleges c ON c.id=b.college_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id WHERE fr.id=$2 AND ${MY_GROUP}`,
       [m, req.params.id],
     )
   ).rows[0];
@@ -556,7 +556,7 @@ r.get("/reviews", async (req, res) => {
   res.json(
     (
       await q(
-        `SELECT fr.*,g.name group_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id WHERE ${MY_GROUP} ORDER BY fr.review_date DESC,fr.period_no DESC`,
+        `SELECT fr.*,g.name group_name,c.id college_id,c.name college_name,(SELECT count(*) FROM review_individual_marks rim WHERE rim.review_id=fr.id) individual_count FROM fortnight_reviews fr JOIN groups g ON g.id=fr.group_id LEFT JOIN batches b ON b.id=g.batch_id LEFT JOIN colleges c ON c.id=b.college_id WHERE ${MY_GROUP} ORDER BY fr.review_date DESC,fr.period_no DESC`,
         [m],
       )
     ).rows,
