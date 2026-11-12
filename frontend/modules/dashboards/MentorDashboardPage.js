@@ -9,16 +9,15 @@ export default function MentorDashboardPage() {
     [attempt, setAttempt] = useState(null),
     [scores, setScores] = useState({}),
     [taskEval, setTaskEval] = useState(null);
-  const load = () =>
-    Promise.all([
-      api("/mentor/dashboard"),
-      api("/mentor/assessment-evaluations"),
-    ])
-      .then(([x, a]) => {
-        setD(x);
-        setAssess(a);
-      })
-      .catch((e) => setErr(e.message));
+  const load = async () => {
+    setErr("");
+    try {
+      const x=await api("/mentor/dashboard");
+      setD(x);
+    } catch(e) {setErr("Mentor dashboard: "+e.message);}
+    // Initial assessment is MCQ-only and scored automatically; do not call legacy written-answer evaluation API.
+    setAssess([]);
+  };
   useEffect(() => {
     load();
   }, []);
