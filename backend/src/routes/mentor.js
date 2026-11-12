@@ -214,19 +214,19 @@ r.get("/operations", async (req, res) => {
 });
 r.get("/dashboard", async (req, res) => {
   const m = await mid(req.user.id);
-  const groups = (
-    await q(
-      `SELECT g.* FROM groups g WHERE ${MY_GROUP}`,
-      [m],
-    )
-  ).rows;
-  const submissions = (
-    await q(
-      `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM task_submissions ts JOIN weekly_tasks wt ON wt.id=ts.task_id JOIN intern_profiles ip ON ip.id=ts.intern_id LEFT JOIN rubrics r ON r.id=wt.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND ${SUBMISSION_INTERN_IS_MINE})) AND ts.status IN ('SUBMITTED','RESUBMITTED') GROUP BY ts.id,wt.id,r.id,ip.id ORDER BY ts.submitted_at`,
-      [m],
-    )
-  ).rows;
-  res.json({ groups, submissions });
+  if (!m) return res.status(403).json({error:"Mentor profile not found"});
+  const groups = (await q(`SELECT g.* FROM groups g WHERE ${MY_GROUP}`,[m])).rows;
+  const submissions = (await q(
+    `SELECT ts.*,wt.title,wt.marks task_marks,wt.rubric_id,r.name rubric_name,ip.full_name,
+      COALESCE((SELECT json_agg(rc ORDER BY rc.name) FROM rubric_criteria rc WHERE rc.rubric_id=r.id),'[]'::json) rubric_criteria
+      FROM task_submissions ts
+      JOIN weekly_tasks wt ON wt.id=ts.task_id
+      JOIN intern_profiles ip ON ip.id=ts.intern_id
+      LEFT JOIN rubrics r ON r.id=wt.rubric_id
+      WHERE (wt.assigning_mentor_id=$1 OR (wt.assigning_mentor_id IS NULL AND ${SUBMISSION_INTERN_IS_MINE}))
+      AND ts.status IN ('SUBMITTED','RESUBMITTED')
+      ORDER BY ts.submitted_at`,[m])).rows;
+  res.json({groups,submissions});
 });
 r.get("/submissions/:id", async (req, res) => {
   const m = await mid(req.user.id);
