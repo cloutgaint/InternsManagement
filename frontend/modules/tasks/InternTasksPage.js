@@ -6,11 +6,20 @@ export default function InternTasksPage() {
     [form, setForm] = useState({}),
     [files, setFiles] = useState({}),
     [history, setHistory] = useState({}),
+    [latest, setLatest] = useState({}),
+    [busy, setBusy] = useState({}),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState("");
   useEffect(() => {
     api("/intern/dashboard")
-      .then((x) => setTasks(x.tasks || []))
+      .then(async (x) => {
+        const items = x.tasks || [];
+        setTasks(items);
+        await Promise.all(items.map(async (t) => {
+          try { const submissions = await api("/intern/tasks/" + t.id + "/submissions"); setLatest((prev) => ({ ...prev, [t.id]: submissions[0] || null })); }
+          catch { /* History remains available for retry. */ }
+        }));
+      })
       .catch((e) => setErr(e.message));
   }, []);
   const field = (id, k, v) =>
@@ -19,22 +28,26 @@ export default function InternTasksPage() {
     try {
       const submissions = await api("/intern/tasks/" + t.id + "/submissions");
       setHistory((x) => ({ ...x, [t.id]: submissions }));
+      setLatest((x) => ({ ...x, [t.id]: submissions[0] || null }));
     } catch (e) {
       setErr(e.message);
     }
   }
   async function submit(t) {
+    setErr(""); setMsg("");
+    const v = form[t.id] || {};
+    if (!files[t.id] && !Object.values(v).some((value) => typeof value === "string" && value.trim())) return setErr("Add a note, URL, or file before submitting.");
+    setBusy((x) => ({ ...x, [t.id]: true }));
     try {
-      const fd = new FormData(),
-        v = form[t.id] || {};
+      const fd = new FormData();
       fd.append("content", JSON.stringify(v));
       if (files[t.id]) fd.append("file", files[t.id]);
       await api("/intern/tasks/" + t.id + "/submit", { method: "POST", body: fd });
       setMsg("Task submitted successfully.");
-      hist(t);
+      await hist(t);
     } catch (e) {
       setErr(e.message);
-    }
+    } finally { setBusy((x) => ({ ...x, [t.id]: false })); }
   }
   return (
     <main className="wrap">
@@ -42,26 +55,24 @@ export default function InternTasksPage() {
         <div>
           <h1>Weekly Tasks</h1>
           <p className="muted">
-            Submit the evidence types enabled for each released task.
+            Submit your work using notes, links, or supporting files.
           </p>
         </div>
       </div>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
       {tasks.map((t) => {
-        const ty = t.submission_types || [],
-          v = form[t.id] || {};
+        const v = form[t.id] || {}, current = latest[t.id], canSubmit = !current || current.status === "REWORK_REQUIRED";
         return (
           <section className="card task-submit-card" key={t.id}>
             <div className="verification-title">
               <div>
                 <h2>{t.title}</h2>
                 <p className="muted">
-                  {t.due_at ? "Due " + new Date(t.due_at).toLocaleString() : ""}{" "}
-                  · {t.marks || 0} marks
+                  Weekly assignment
                 </p>
               </div>
-              <span className="status-pill">{t.status}</span>
+              <div><span className="status-pill">Task: {t.status}</span>{" "}{current && <span className="status-pill">Submission: {current.status.replaceAll("_", " ")}</span>}</div>
             </div>
             <p>{t.description}</p>
             {t.expected_output && (
@@ -70,73 +81,15 @@ export default function InternTasksPage() {
               </p>
             )}
             <div className="submission-form">
-              {ty.includes("TEXT") && (
-                <label>
-                  Submission Notes
-                  <textarea
-                    className="input"
-                    value={v.text || ""}
-                    onChange={(e) => field(t.id, "text", e.target.value)}
-                  />
-                </label>
-              )}
-              {ty.includes("LINK") && (
-                <label>
-                  Work Link
-                  <input
-                    className="input"
-                    type="url"
-                    value={v.link || ""}
-                    onChange={(e) => field(t.id, "link", e.target.value)}
-                  />
-                </label>
-              )}
-              {ty.includes("REPOSITORY") && (
-                <label>
-                  Repository URL
-                  <input
-                    className="input"
-                    type="url"
-                    value={v.repositoryUrl || ""}
-                    onChange={(e) =>
-                      field(t.id, "repositoryUrl", e.target.value)
-                    }
-                  />
-                </label>
-              )}
-              {ty.includes("VIDEO") && (
-                <label>
-                  Video URL
-                  <input
-                    className="input"
-                    type="url"
-                    value={v.videoUrl || ""}
-                    onChange={(e) => field(t.id, "videoUrl", e.target.value)}
-                  />
-                </label>
-              )}
-              {ty.some((x) =>
-                ["FILE", "DOCUMENT", "PRESENTATION", "VIDEO"].includes(x),
-              ) && (
-                <label>
-                  Evidence File
-                  <input
-                    className="input"
-                    type="file"
-                    accept=".pdf,.docx,.pptx,.zip,.txt,.mp4"
-                    onChange={(e) =>
-                      setFiles((x) => ({
-                        ...x,
-                        [t.id]: e.target.files?.[0] || null,
-                      }))
-                    }
-                  />
-                </label>
-              )}
+              <label>Submission Notes<textarea className="input" value={v.text || ""} onChange={(e) => field(t.id, "text", e.target.value)} disabled={!canSubmit} /></label>
+              <label>Work Link<input className="input" type="url" value={v.link || ""} onChange={(e) => field(t.id, "link", e.target.value)} disabled={!canSubmit} /></label>
+              <label>Repository URL<input className="input" type="url" value={v.repositoryUrl || ""} onChange={(e) => field(t.id, "repositoryUrl", e.target.value)} disabled={!canSubmit} /></label>
+              <label>Video URL<input className="input" type="url" value={v.videoUrl || ""} onChange={(e) => field(t.id, "videoUrl", e.target.value)} disabled={!canSubmit} /></label>
+              <label>Supporting File<input className="input" type="file" onChange={(e) => setFiles((x) => ({ ...x, [t.id]: e.target.files?.[0] || null }))} disabled={!canSubmit} /></label>
             </div>
             <div className="form-actions">
-              <button className="btn" onClick={() => submit(t)}>
-                Submit Task
+              <button className="btn" disabled={!canSubmit || busy[t.id]} onClick={() => submit(t)}>
+                {busy[t.id] ? "Submitting…" : current?.status === "REWORK_REQUIRED" ? "Resubmit Task" : "Submit Task"}
               </button>
               <button className="btn secondary" onClick={() => hist(t)}>
                 Submission History
@@ -150,6 +103,8 @@ export default function InternTasksPage() {
                   {x.is_late ? "Late" : "On time"} · {x.status}
                 </span>
                 {x.file_name && <small>File: {x.file_name}</small>}
+                {x.mentor_feedback && <p><b>Mentor feedback:</b> {x.mentor_feedback}</p>}
+                {x.rework_instructions && <p><b>Rework instructions:</b> {x.rework_instructions}</p>}
               </div>
             ))}
           </section>
