@@ -545,8 +545,8 @@ r.get("/reviews/:id/report", async (req, res) => {
   if (!review) return res.status(404).json({ error: "Review not found" });
   const members = (
     await q(
-      `SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.group_id=review.group_id AND gm.active WHERE rim.review_id=$2 ORDER BY ip.full_name`,
-      [m, review.id],
+      `SELECT rim.marks,rim.contribution_note,ip.full_name,ip.roll_number FROM review_individual_marks rim JOIN intern_profiles ip ON ip.id=rim.intern_id JOIN group_members gm ON gm.intern_id=ip.id AND gm.group_id=$3 AND gm.active WHERE rim.review_id=$2 ORDER BY ip.full_name`,
+      [m, review.id, review.group_id],
     )
   ).rows;
   res.json({ review, members, generatedAt: new Date().toISOString() });
