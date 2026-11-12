@@ -127,4 +127,31 @@ r.post("/task-plans/:id/append-week",async(req,res)=>{
  await audit(req,"TASK_PLAN_WEEK_APPENDED","weekly_task_plan",req.params.id,null,outcome);
  res.status(201).json(outcome);
 });
+r.patch("/task-plans/:id/weeks/:week",async(req,res)=>{
+ const n=Number(req.params.week),w=req.body||{};
+ if(!Number.isInteger(n)||n<1||n>52)return res.status(400).json({error:"Invalid week number"});
+ if(!String(w.title||"").trim())return res.status(400).json({error:"Task title is required"});
+ if(!String(w.description||"").trim())return res.status(400).json({error:"Task instructions are required"});
+ const at=new Date(w.releaseAt);
+ if(!Number.isFinite(at.getTime()))return res.status(400).json({error:"Select a valid release date and time"});
+ const outcome=await tx(async client=>{
+  const p=await owner(req,req.params.id,true,(sql,args)=>client.query(sql,args));
+  if(p===false)return {code:403,error:"Not your task plan"};
+  if(!p)return {code:404,error:"Plan not found"};
+  const t=(await client.query("SELECT id,status,release_at FROM weekly_tasks WHERE task_plan_id=$1 AND plan_week=$2 FOR UPDATE",[p.id,n])).rows[0];
+  if(!t)return {code:404,error:"Week not found"};
+  if(t.status==="RELEASED"||new Date(t.release_at)<=new Date())return {code:409,error:"This task has already reached its release time and cannot be edited"};
+  const submitted=(await client.query("SELECT 1 FROM task_submissions WHERE task_id=$1 LIMIT 1",[t.id])).rowCount;
+  if(submitted)return {code:409,error:"This task has submissions and cannot be edited"};
+  const alloc=(await client.query("SELECT intern_start,intern_end FROM batch_allocations WHERE intern_id=$1 AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1",[p.intern_id])).rows[0];
+  if(!alloc)return {code:409,error:"Internship allocation not found"};
+  const start=new Date(new Date(alloc.intern_start).toISOString().slice(0,10)+"T00:00:00+05:30"),end=new Date(new Date(alloc.intern_end).toISOString().slice(0,10)+"T23:59:59+05:30");
+  if(at<start||at>end)return {code:400,error:"Release date must be within the internship dates"};
+  await client.query("UPDATE weekly_tasks SET title=$2,description=$3,expected_output=$4,release_at=$5 WHERE id=$1",[t.id,String(w.title).trim(),String(w.description).trim(),w.expectedOutput||null,at.toISOString()]);
+  return {week:n,taskId:t.id};
+ });
+ if(outcome.code)return res.status(outcome.code).json({error:outcome.error});
+ await audit(req,"TASK_PLAN_WEEK_EDITED","weekly_task_plan",req.params.id,null,outcome);
+ res.json(outcome);
+});
 export default r;
