@@ -363,8 +363,8 @@ r.get("/assessment-evaluations/:attemptId", async (req, res) => {
       .json({ error: "This intern is not assigned to you" });
   at.answers = (
     await q(
-      `SELECT ans.*,qb.question,qb.type,qb.marks,qb.marking_guide,qb.correct_answer,s.name section_name,s.pass_score,s.rubric_id,r.name rubric_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=$2 AND s.question_ids ? qb.id::text LEFT JOIN rubrics r ON r.id=s.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ans.attempt_id=$2 GROUP BY ans.id,qb.id,s.id,r.id ORDER BY ans.id`,
-      [m, at.id],
+      `SELECT ans.*,qb.question,qb.type,qb.marks,qb.marking_guide,qb.correct_answer,s.name section_name,s.pass_score,s.rubric_id,r.name rubric_name,COALESCE(json_agg(rc ORDER BY rc.name) FILTER(WHERE rc.id IS NOT NULL),'[]') rubric_criteria FROM assessment_answers ans JOIN question_bank qb ON qb.id=ans.question_id LEFT JOIN assessment_sections s ON s.assessment_id=aa.assessment_id AND s.question_ids ? qb.id::text LEFT JOIN rubrics r ON r.id=s.rubric_id LEFT JOIN rubric_criteria rc ON rc.rubric_id=r.id WHERE ans.attempt_id=$1 GROUP BY ans.id,qb.id,s.id,r.id ORDER BY ans.id`,
+      [at.id],
     )
   ).rows;
   res.json(at);
