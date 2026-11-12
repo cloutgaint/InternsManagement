@@ -62,6 +62,7 @@ const modules = [
     "Project roles, mentors and weekly tasks",
     "/admin/work",
   ],
+  ["📋", "Fortnight Evaluations", "Create, review and finalize offline fortnight marks", "/admin/fortnight"],
   [
     "📊",
     "Reports & Exports",
