@@ -154,4 +154,25 @@ r.patch("/task-plans/:id/weeks/:week",async(req,res)=>{
  await audit(req,"TASK_PLAN_WEEK_EDITED","weekly_task_plan",req.params.id,null,outcome);
  res.json(outcome);
 });
+r.post("/task-plans/:id/weeks/:week/release",async(req,res)=>{
+ const week=Number(req.params.week),reason=String(req.body?.reason||"").trim();
+ if(!Number.isInteger(week)||week<1||week>52)return res.status(400).json({error:"Invalid week"});
+ const result=await tx(async client=>{
+  const p=await owner(req,req.params.id,true,(sql,args)=>client.query(sql,args));
+  if(p===false)return {code:403,error:"You are not authorized to release this plan"};
+  if(!p)return {code:404,error:"Task plan not found"};
+  if(p.status!=="CONFIRMED")return {code:409,error:"Confirm the task plan before releasing tasks"};
+  const task=(await client.query("SELECT id,status,release_at FROM weekly_tasks WHERE task_plan_id=$1 AND plan_week=$2 FOR UPDATE",[p.id,week])).rows[0];
+  if(!task)return {code:404,error:"Week not found"};
+  if(["RELEASED","IN_PROGRESS","COMPLETED"].includes(task.status))return {code:409,error:"This week has already been released"};
+  if(!["SCHEDULED"].includes(task.status))return {code:409,error:"Only scheduled tasks can be released"};
+  const early=new Date(task.release_at)>new Date();
+  if(early&&reason.length<10)return {code:400,error:"Enter an early-release reason of at least 10 characters"};
+  await client.query("UPDATE weekly_tasks SET status='RELEASED' WHERE id=$1",[task.id]);
+  return {week,taskId:task.id,early,scheduledAt:task.release_at,reason:early?reason:null,releasedBy:req.user.id,releasedAt:new Date().toISOString()};
+ });
+ if(result.code)return res.status(result.code).json({error:result.error});
+ await audit(req,result.early?"TASK_WEEK_RELEASED_EARLY":"TASK_WEEK_RELEASED","weekly_task",result.taskId,null,result);
+ res.json(result);
+});
 export default r;
