@@ -62,6 +62,7 @@ const modules = [
     "Project roles, mentors and weekly tasks",
     "/admin/work",
   ],
+  ["📄", "KLU Fortnight Reports", "KLU-specific progress reports and attendance", "/admin/klu-fortnight"],
   ["📋", "Fortnight Evaluations", "Create, review and finalize offline fortnight marks", "/admin/fortnight"],
   [
     "📊",
