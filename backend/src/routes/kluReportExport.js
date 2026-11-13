@@ -178,14 +178,16 @@ async function makeDocx(x){
  tableRow([[4,"4. Regional Office: Hyderabad"],[8,"5. Practice School Company: GAINT Clout Technologies Pvt. Ltd."]],390),
  tableRow([[5,v("6. Company Guide",x.guide)],[7,"7. University Guide: __________________"]],390),
  tableRow([[12,v("8. Project Title",x.project_title)]],390),
- tableRow([[2,v("9. Fortnight No.",x.fortnight_no)],[2,v("10. Commencing",date(x.from_date))],[8,"11. Working days: "+x.fort.work+" / "+x.all.work+"    12. Days present: "+x.fort.present+" / "+x.all.present+"    13. Leaves: "+x.fort.leave+" / "+x.all.leave]],580),
+ tableRow([[2,"9. Fortnight No."],[2,"10. Commencing date"],[2,"11. No. of working days"],[3,"12. No. of days present"],[3,"13. No. of Leaves availed"]],350),
+ tableRow([[2,String(x.fortnight_no)],[2,date(x.from_date)],[1,"This fortnight"],[1,"Till date"],[1,"This fortnight"],[2,"Till date"],[1,"This fortnight"],[2,"Till date"]],330),
+ tableRow([[2,""],[2,""],[1,String(x.fort.work)],[1,String(x.all.work)],[1,String(x.fort.present)],[2,String(x.all.present)],[1,String(x.fort.leave)],[2,String(x.all.leave)]],320),
  tableRow([[12,"Report on On-the-Job Engineer Training (OJET)",{shade:true,bold:true}]],280),
  tableRow([[12,[para("14. Achievements / Progress till date",true),para(x.achievements||"—")]]],1120),
  tableRow([[12,[para("15. Plan for the coming fortnight     From: "+date(x.next_from)+"     To: "+date(x.next_to),true),para(x.next_plan||"—")]]],880),
  tableRow([[12,[para("16. Exceptions, if any",true),para(x.exceptions||"No exceptions."),para("Date: "+date(x.to_date)+"                                   Signature of Student: __________________")]]],680),
  tableRow([[12,"Evaluation by University Guide & Company Guide",{shade:true,bold:true}]],280),
- tableRow([[10,[para("17. Criteria for evaluation:",true),para("Discipline, regularity, punctuality, commitment, willingness to work hard, attitude and behavior."),para("Signature of University Guide: __________________")]], [2,"Assessed by UG: "+(x.university_marks??"—")+"/10"]],1050),
- tableRow([[10,[para("18. Criteria for evaluation:",true),para("OJET progress, work engagement, problem solving, knowledge application, professional behavior, teamwork, ideas and appreciation."),para(x.company_comments||"—"),...sign]],[2,"Assessed by CG: "+(x.company_marks??"—")+"/30"]],1400),
+ tableRow([[10,[para("17. Criteria for evaluation:",true),para("a) student discipline, b) regularity, c) punctuality, d) commitment, e) willingness to work hard, f) attitude & behavior etc."),para("Signature of University Guide: __________________")]], [2,"Assessed by UG for 10 M per fortnight: "+(x.university_marks??"—")+"/10"]],1050),
+ tableRow([[10,[para("18. Criteria for evaluation:",true),para("a) progress achieved during the fortnight on OJET, b) work engagement, c) ability to solve problems, d) knowledge application, e) professional behavior, f) team work, g) new ideas generated for the company, h) appreciations received etc."),para(x.company_comments||"—"),...sign]],[2,"Assessed by CG for 30 M per fortnight: "+(x.company_marks??"—")+"/30"]],1400),
  tableRow([[10,[para("19. Feedback, if any, to the student",true),para(x.student_feedback||"—"),para("University Guide shall forward to Director, Industrial Practice School")]], [2,"Total Marks: "+total+"/40"]],1000)
  ];
  const document=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:540,bottom:540,left:540,right:540}}},children:[
