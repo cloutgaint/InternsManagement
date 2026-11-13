@@ -55,10 +55,14 @@ r.get("/reports",async(req,res)=>{
  const accessible=[];for(const x of rows)if(await scope(req,x.intern_id))accessible.push(x);
  res.json(accessible);
 });
+async function currentBrand(req){const stamp=(await q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='company_stamp' AND owner_user_id IS NULL")).rows[0];const signature=(await q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='mentor_signature' AND owner_user_id=$1",[req.user.id])).rows[0];const url=x=>x?"data:"+x.mime_type+";base64,"+x.image_data.toString("base64"):null;return {stamp:url(stamp),signature:url(signature)};}
+r.get("/branding",async(req,res)=>res.json(await currentBrand(req)));
 r.get("/reports/:id",async(req,res)=>{
  const x=(await q("SELECT * FROM klu_fortnight_reports WHERE id=$1",[req.params.id])).rows[0];if(!x)return res.status(404).json({error:"Report not found"});
  const p=await scope(req,x.intern_id);if(!p)return res.status(403).json({error:"Not authorized"});
- res.json({report:x,profile:p,attendance:await attendance(p,{from:x.from_date,to:x.to_date})});
+ const brand=x.status==="FINALIZED"?{stamp:x.stamp_snapshot&&x.stamp_mime?"data:"+x.stamp_mime+";base64,"+x.stamp_snapshot.toString("base64"):null,signature:x.signature_snapshot&&x.signature_mime?"data:"+x.signature_mime+";base64,"+x.signature_snapshot.toString("base64"):null}:await currentBrand(req);
+ delete x.stamp_snapshot;delete x.signature_snapshot;
+ res.json({report:x,profile:p,attendance:await attendance(p,{from:x.from_date,to:x.to_date}),brand});
 });
 const fields=["achievements","next_plan","exceptions","company_comments","student_feedback"];
 function payload(b){const x={};for(const f of fields)x[f]=String(b[f]||"").slice(0,12000);for(const [k,max] of [["company_marks",30],["university_marks",10]]){const v=b[k];if(v===""||v===null||v===undefined)x[k]=null;else if(!Number.isFinite(Number(v))||Number(v)<0||Number(v)>max)return null;else x[k]=Number(v);}return x;}
@@ -75,7 +79,9 @@ r.patch("/reports/:id",async(req,res)=>{
  if(before.status==="FINALIZED")return res.status(409).json({error:"Finalized report is locked"});
  const data=payload(req.body||{});if(!data)return res.status(400).json({error:"Marks must be within allowed ranges"});
  const finalize=req.body?.finalize===true;if(finalize&&(data.company_marks===null||!data.company_comments.trim()))return res.status(400).json({error:"Company Guide marks and comments required to finalize"});
- const x=(await q(`UPDATE klu_fortnight_reports SET achievements=$2,next_plan=$3,exceptions=$4,company_comments=$5,company_marks=$6,university_marks=$7,student_feedback=$8,status=$9,finalized_by=CASE WHEN $9='FINALIZED' THEN $10 ELSE NULL END,finalized_at=CASE WHEN $9='FINALIZED' THEN now() ELSE NULL END,updated_at=now() WHERE id=$1 AND status='DRAFT' RETURNING *`,[before.id,data.achievements,data.next_plan,data.exceptions,data.company_comments,data.company_marks,data.university_marks,data.student_feedback,finalize?"FINALIZED":"DRAFT",req.user.id])).rows[0];
+ const assets=finalize?await Promise.all([q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='company_stamp' AND owner_user_id IS NULL"),q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='mentor_signature' AND owner_user_id=$1",[req.user.id])]):null;
+ if(finalize&&(!assets[0].rows[0]||!assets[1].rows[0]))return res.status(409).json({error:"Upload the official company stamp and your mentor signature before finalizing."});
+ const x=(await q(`UPDATE klu_fortnight_reports SET achievements=$2,next_plan=$3,exceptions=$4,company_comments=$5,company_marks=$6,university_marks=$7,student_feedback=$8,status=$9,finalized_by=CASE WHEN $9='FINALIZED' THEN $10 ELSE NULL END,finalized_at=CASE WHEN $9='FINALIZED' THEN now() ELSE NULL END,updated_at=now(),stamp_snapshot=CASE WHEN $9='FINALIZED' THEN $11 ELSE stamp_snapshot END,stamp_mime=CASE WHEN $9='FINALIZED' THEN $12 ELSE stamp_mime END,signature_snapshot=CASE WHEN $9='FINALIZED' THEN $13 ELSE signature_snapshot END,signature_mime=CASE WHEN $9='FINALIZED' THEN $14 ELSE signature_mime END,finalized_mentor_id=CASE WHEN $9='FINALIZED' THEN $10 ELSE finalized_mentor_id END WHERE id=$1 AND status='DRAFT' RETURNING *`,[before.id,data.achievements,data.next_plan,data.exceptions,data.company_comments,data.company_marks,data.university_marks,data.student_feedback,finalize?"FINALIZED":"DRAFT",req.user.id,assets?.[0]?.rows[0]?.image_data||null,assets?.[0]?.rows[0]?.mime_type||null,assets?.[1]?.rows[0]?.image_data||null,assets?.[1]?.rows[0]?.mime_type||null])).rows[0];
  if(!x)return res.status(409).json({error:"Report already finalized"});await audit(req,finalize?"KLU_REPORT_FINALIZED":"KLU_REPORT_UPDATED","klu_fortnight_report",x.id,before,x);res.json(x);
 });
 r.delete("/reports/:id",async(req,res)=>{
