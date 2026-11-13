@@ -1,7 +1,9 @@
 import {Router} from "express";
 import {q,tx} from "../common/database/index.js";
 import {audit} from "../common/audit/audit.service.js";
-import {mentorOwnsIntern} from "../services/mentorScope.js";
+import {mentorOwnsIntern,mentorHasInternInGroup} from "../services/mentorScope.js";
+// Mentors assigned to any project member may plan tasks for all teammates in that project.
+const mentorCanPlanIntern=(col,param)=>`EXISTS(SELECT 1 FROM group_members team JOIN groups g ON g.id=team.group_id WHERE team.intern_id=${col} AND team.active AND ${mentorHasInternInGroup("g.id",param)})`;
 const r=Router();
 const allowed=["TEXT","LINK","REPOSITORY","DOCUMENT","PRESENTATION","VIDEO","FILE"];
 const isAdmin=req=>String(req.user.role).includes("ADMIN");
@@ -17,7 +19,7 @@ async function owner(req,planId,lock=false,db=q){
 }
 r.get("/task-plans/interns",async(req,res)=>{
  const admin=isAdmin(req);
- res.json((await q("SELECT ip.id,ip.full_name,ba.batch_id,ba.intern_start,ba.intern_end,b.name batch_name,COALESCE(co.name,bc.name) college_name,(SELECT string_agg(DISTINCT pr.title, ', ' ORDER BY pr.title) FROM group_members gm JOIN project_assignments pa ON pa.group_id=gm.group_id AND pa.status='ASSIGNED' JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=ip.id AND gm.active) project_name FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN LATERAL(SELECT batch_id,intern_start,intern_end FROM batch_allocations WHERE intern_id=ip.id AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1) ba ON true JOIN batches b ON b.id=ba.batch_id LEFT JOIN colleges co ON co.id=ip.college_id LEFT JOIN colleges bc ON bc.id=b.college_id "+(admin?"":"WHERE "+mentorOwnsIntern("ip.id","$1")+" ")+"ORDER BY ip.full_name",admin?[]:[await mentorIdOf(req)])).rows);
+ res.json((await q("SELECT ip.id,ip.full_name,ba.batch_id,ba.intern_start,ba.intern_end,b.name batch_name,COALESCE(co.name,bc.name) college_name,(SELECT string_agg(DISTINCT pr.title, ', ' ORDER BY pr.title) FROM group_members gm JOIN project_assignments pa ON pa.group_id=gm.group_id AND pa.status='ASSIGNED' JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=ip.id AND gm.active) project_name FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN LATERAL(SELECT batch_id,intern_start,intern_end FROM batch_allocations WHERE intern_id=ip.id AND intern_end>=current_date ORDER BY intern_start DESC LIMIT 1) ba ON true JOIN batches b ON b.id=ba.batch_id LEFT JOIN colleges co ON co.id=ip.college_id LEFT JOIN colleges bc ON bc.id=b.college_id "+(admin?"":"WHERE "+mentorCanPlanIntern("ip.id","$1")+" ")+"ORDER BY ip.full_name",admin?[]:[await mentorIdOf(req)])).rows);
 });
 r.get("/task-plans",async(req,res)=>{
  const params=isAdmin(req)?[]:[req.user.id];
@@ -26,8 +28,8 @@ r.get("/task-plans",async(req,res)=>{
 });
 r.post("/task-plans",async(req,res)=>{
  const admin=isAdmin(req);
- const intern=(await q("SELECT ip.id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE ip.id=$1 AND ba.intern_end>=current_date"+(admin?"":" AND "+mentorOwnsIntern("ip.id","$2"))+" LIMIT 1",admin?[req.body?.internId||null]:[req.body?.internId||null,await mentorIdOf(req)])).rows[0];
- if(!intern)return res.status(400).json({error:"Select "+(admin?"an intern":"one of your interns")+" with an upcoming or active internship"});
+ const intern=(await q("SELECT ip.id FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id WHERE ip.id=$1 AND ba.intern_end>=current_date"+(admin?"":" AND "+mentorCanPlanIntern("ip.id","$2"))+" LIMIT 1",admin?[req.body?.internId||null]:[req.body?.internId||null,await mentorIdOf(req)])).rows[0];
+ if(!intern)return res.status(400).json({error:"Select "+(admin?"an intern":"an intern in one of your assigned projects")+" with an upcoming or active internship"});
  // One plan per intern: reopen the existing one instead of stacking duplicate drafts.
  const existing=(await q("SELECT * FROM weekly_task_plans WHERE intern_id=$1 ORDER BY (status='DRAFT') DESC,created_at DESC LIMIT 1",[intern.id])).rows[0];
  if(existing){
