@@ -10,6 +10,7 @@ import collegeRoutes from "./modules/colleges/college.routes.js";
 import internRoutes from "./routes/intern.js";
 import collegeCoordinatorRoutes from "./routes/collegeCoordinator.js";
 import mentorRoutes from "./routes/mentor.js";
+import kluFortnightRoutes from "./routes/kluFortnight.js";
 import notificationRoutes from "./routes/notifications.js";
 import publicRoutes from "./routes/public.js";
 import { errorHandler } from "./common/middleware/error-handler.js";
@@ -37,6 +38,7 @@ export function createApp() {
   app.use("/api/college-coordinator", collegeCoordinatorRoutes);
   app.use("/api/intern", internRoutes);
   app.use("/api/mentor", mentorRoutes);
+  app.use("/api/klu-fortnight", kluFortnightRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use(
     "/api/public",
