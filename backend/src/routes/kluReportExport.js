@@ -307,138 +307,39 @@ function makePdf(x) {
   doc.end();
   return doc;
 }
-function cell(s) {
-  return new TableCell({
-    margins: { top: 45, bottom: 45, left: 70, right: 70 },
-    children: [
-      new Paragraph({
-        spacing: { before: 0, after: 0 },
-        children: [new TextRun({ text: plain(s), size: 15 })],
-      }),
-    ],
-  });
-}
-function line(...values) {
-  return new TableRow({ cantSplit: true, children: values.map(cell) });
-}
-async function makeDocx(x) {
-  const lines = [
-    [
-      "1. Student: " + x.full_name,
-      "2. University ID: " + (x.roll_number || "—"),
-      "3. Branch: " + (x.branch || "—"),
-    ],
-    [
-      "4. Regional Office: Hyderabad",
-      "5. Practice School Company: GAINT Clout Technologies Pvt. Ltd.",
-    ],
-    [
-      "6. Company Guide: " + (x.guide || "—"),
-      "7. University Guide: __________________",
-    ],
-    ["8. Project Title: " + (x.project_title || "—")],
-    [
-      "9. Fortnight: " + x.fortnight_no,
-      "10. Commencing: " + date(x.from_date),
-      "From: " + date(x.from_date) + " To: " + date(x.to_date),
-    ],
-    ["11. Working days", "12. Days present", "13. Leaves availed"],
-    [
-      "Fortnight: " + x.fort.work + " | Till date: " + x.all.work,
-      "Fortnight: " + x.fort.present + " | Till date: " + x.all.present,
-      "Fortnight: " + x.fort.leave + " | Till date: " + x.all.leave,
-    ],
-    ["Report on On-the-Job Engineer Training (OJET)"],
-    ["14. Achievements / Progress till date: " + (x.achievements || "—")],
-    [
-      "15. Plan for the coming fortnight (" +
-        date(x.next_from) +
-        " to " +
-        date(x.next_to) +
-        "): " +
-        (x.next_plan || "—"),
-    ],
-    ["16. Exceptions, if any: " + (x.exceptions || "No exceptions.")],
-    ["Date: " + date(x.to_date), "Signature of Student: __________________"],
-    ["Evaluation by University Guide & Company Guide"],
-    [
-      "17. University Guide Evaluation (10 marks): " +
-        (x.university_marks ?? "—") +
-        "/10. Discipline, regularity, punctuality, commitment, willingness to work hard, attitude and behavior. University Guide Signature: __________________",
-    ],
-    [
-      "18. Company Guide Evaluation (30 marks): " +
-        (x.company_marks ?? "—") +
-        "/30. " +
-        (x.company_comments || "—"),
-    ],
-    ["19. Feedback, if any, to the student: " + (x.student_feedback || "—")],
-    [
-      "University Guide shall forward to Director, Industrial Practice School",
-      "Total Marks: " +
-        (x.company_marks != null && x.university_marks != null
-          ? Number(x.company_marks) + Number(x.university_marks)
-          : "—") +
-        "/40",
-    ],
-  ];
-  const rows = lines.map(line);
-  const images = [];
-  for (const [label, data, mime] of [
-    ["Company Guide Signature", x.signature_snapshot, x.signature_mime],
-    ["Official Company Stamp", x.stamp_snapshot, x.stamp_mime],
-  ]) {
-    const runs = [new TextRun({ text: label + ": ", size: 15 })];
-    if (data && mime)
-      runs.push(
-        new ImageRun({
-          data,
-          transformation: { width: 85, height: 36 },
-          type: mime === "image/png" ? "png" : "jpg",
-        }),
-      );
-    images.push(
-      new Paragraph({ spacing: { before: 0, after: 0 }, children: runs }),
-    );
-  }
-  rows.splice(
-    15,
-    0,
-    new TableRow({
-      cantSplit: true,
-      children: [new TableCell({ children: images })],
-    }),
-  );
-  return Packer.toBuffer(
-    new Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              size: { width: 11906, height: 16838 },
-              margin: { top: 500, bottom: 500, left: 500, right: 500 },
-            },
-          },
-          children: [
-            new Paragraph({
-              text: "INDUSTRIAL PRACTICE SCHOOL :: K. L. DEEMED TO BE UNIVERSITY",
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 40 },
-            }),
-            new Paragraph({
-              text: "FORTNIGHTLY PROGRESS REPORT",
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 80 },
-            }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows,
-            }),
-          ],
-        },
-      ],
-    }),
-  );
+const para=(text,bold=false)=>new Paragraph({spacing:{before:0,after:0},children:[new TextRun({text:plain(text),bold,size:15})]});
+const makeCell=(span,content,opts={})=>new TableCell({columnSpan:span,verticalAlign:"center",shading:opts.shade?{fill:"E7E7E7"}:undefined,margins:{top:55,bottom:55,left:80,right:80},children:Array.isArray(content)?content:[para(content,opts.bold)]});
+const tableRow=(parts,height)=>new TableRow({cantSplit:true,height:{value:height,rule:"atLeast"},children:parts.map(([span,value,opts])=>makeCell(span,value,opts))});
+async function makeDocx(x){
+ const v=(label,value)=>label+": "+(value??"—");
+ const total=x.company_marks!=null&&x.university_marks!=null?Number(x.company_marks)+Number(x.university_marks):"—";
+ const sign=[];
+ for(const [label,data,mime] of [["Company Guide Signature",x.signature_snapshot,x.signature_mime],["Official Company Stamp",x.stamp_snapshot,x.stamp_mime]]){
+  const runs=[new TextRun({text:label+": ",size:14})];
+  if(data&&mime)runs.push(new ImageRun({data,transformation:{width:95,height:36},type:mime==="image/png"?"png":"jpg"}));
+  sign.push(new Paragraph({spacing:{before:0,after:0},children:runs}));
+ }
+ const rows=[
+ tableRow([[6,v("1. Name of the Student",x.full_name)],[3,v("2. University ID No.",x.roll_number)],[3,v("3. Branch",x.branch)]],430),
+ tableRow([[4,"4. Regional Office: Hyderabad"],[8,"5. Practice School Company: GAINT Clout Technologies Pvt. Ltd."]],390),
+ tableRow([[5,v("6. Company Guide",x.guide)],[7,"7. University Guide: __________________"]],390),
+ tableRow([[12,v("8. Project Title",x.project_title)]],390),
+ tableRow([[2,v("9. Fortnight No.",x.fortnight_no)],[2,v("10. Commencing",date(x.from_date))],[8,"11. Working days: "+x.fort.work+" / "+x.all.work+"    12. Days present: "+x.fort.present+" / "+x.all.present+"    13. Leaves: "+x.fort.leave+" / "+x.all.leave]],580),
+ tableRow([[12,"Report on On-the-Job Engineer Training (OJET)",{shade:true,bold:true}]],280),
+ tableRow([[12,[para("14. Achievements / Progress till date",true),para(x.achievements||"—")]]],1120),
+ tableRow([[12,[para("15. Plan for the coming fortnight     From: "+date(x.next_from)+"     To: "+date(x.next_to),true),para(x.next_plan||"—")]]],880),
+ tableRow([[12,[para("16. Exceptions, if any",true),para(x.exceptions||"No exceptions."),para("Date: "+date(x.to_date)+"                                   Signature of Student: __________________")]]],680),
+ tableRow([[12,"Evaluation by University Guide & Company Guide",{shade:true,bold:true}]],280),
+ tableRow([[10,[para("17. Criteria for evaluation:",true),para("Discipline, regularity, punctuality, commitment, willingness to work hard, attitude and behavior."),para("Signature of University Guide: __________________")]], [2,"Assessed by UG: "+(x.university_marks??"—")+"/10"]],1050),
+ tableRow([[10,[para("18. Criteria for evaluation:",true),para("OJET progress, work engagement, problem solving, knowledge application, professional behavior, teamwork, ideas and appreciation."),para(x.company_comments||"—"),...sign]],[2,"Assessed by CG: "+(x.company_marks??"—")+"/30"]],1400),
+ tableRow([[10,[para("19. Feedback, if any, to the student",true),para(x.student_feedback||"—"),para("University Guide shall forward to Director, Industrial Practice School")]], [2,"Total Marks: "+total+"/40"]],1000)
+ ];
+ const document=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:540,bottom:540,left:540,right:540}}},children:[
+ new Paragraph({text:"INDUSTRIAL PRACTICE SCHOOL :: K. L. DEEMED TO BE UNIVERSITY",alignment:AlignmentType.CENTER,spacing:{after:70},run:{bold:true}}),
+ new Paragraph({text:"FORTNIGHTLY PROGRESS REPORT",alignment:AlignmentType.CENTER,spacing:{after:100}}),
+ new Table({width:{size:100,type:WidthType.PERCENTAGE},columnWidths:Array(12).fill(900),rows})
+ ]}]});
+ return Packer.toBuffer(document);
 }
 export function registerKluExports(r) {
   r.get("/reports/:id/export/:format", async (req, res) => {
