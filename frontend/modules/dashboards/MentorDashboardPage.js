@@ -85,7 +85,7 @@ export default function MentorDashboardPage() {
       <div className="verification-title">
         <h1>Mentor Dashboard</h1>
         <div className="action-row">
-          <a className="btn" href="/mentor/tasks">Create / Edit Tasks</a><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a><a className="btn secondary" href="/mentor/klu-fortnight">KLU Fortnight Reports</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
+          <a className="btn" href="/mentor/tasks">Create / Edit Tasks</a><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a><a className="btn secondary" href="/mentor/klu-fortnight">KLU Fortnight Reports</a><a className="btn secondary" href="/mentor/profile">My Profile / Signature</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">
             Final Evaluations
           </a>
           <a className="btn secondary" href="/mentor/operations">
