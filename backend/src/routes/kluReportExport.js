@@ -145,10 +145,12 @@ function makePdf(x){
   const main=W-93;rect(L,y,main,height);rect(L+main,y,93,height,true);
   put(title,L,y,main,17,{bold:true});put(criteria,L,y+16,main,36,{size:7});
   if(extra)put(extra,L+2,y+49,main-4,assets?36:height-54);
-  put(marks,L+main,y,93,43,{bold:true,align:"center"});
+  const [markLabel,markValue]=String(marks).split("\\n");
+  font(true,7);doc.text(markLabel,L+main+4,y+7,{width:85,align:"center",height:39});
+  font(true,15);doc.text(markValue||"—",L+main+4,y+height/2-5,{width:85,align:"center",height:25});
   if(assets){
-   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-173,y+height-42,{fit:[75,32]});
-   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-91,y+height-48,{fit:[76,40]});
+   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-173,y+height-47,{fit:[75,36]});
+   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-91,y+height-51,{fit:[76,44]});
    font(false,6);doc.text("(Signature of Company Guide)",L+main-185,y+height-10,{width:180,align:"right",lineBreak:false});
   }else{font(false,6);doc.text("(Signature of University Guide)",L+main-190,y+height-13,{width:185,align:"right",lineBreak:false});}
   y+=height;
@@ -218,6 +220,7 @@ export function registerKluExports(r) {
         format +
         '"',
     );
+    if(x.branding_missing?.length)return res.status(409).json({error:"Report cannot be exported: missing "+x.branding_missing.join(" and ")+". Upload both assets before generating the report."});
     if (format === "pdf") {
       if (!pdfFits(x))
         return res
