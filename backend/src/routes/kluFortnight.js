@@ -1,5 +1,5 @@
 import {Router} from "express";
-import {q,tx} from "../common/database/index.js";
+import {q} from "../common/database/index.js";
 import {auth,permit} from "../common/security/auth.middleware.js";
 import {audit} from "../common/audit/audit.service.js";
 import {mentorHasInternInGroup} from "../services/mentorScope.js";
