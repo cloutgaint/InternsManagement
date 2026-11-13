@@ -1,4 +1,5 @@
 import {Router} from "express";
+import {registerKluExports} from "./kluReportExport.js";
 import {q} from "../common/database/index.js";
 import {auth,permit} from "../common/security/auth.middleware.js";
 import {audit} from "../common/audit/audit.service.js";
@@ -90,4 +91,5 @@ r.delete("/reports/:id",async(req,res)=>{
  if(before.status==="FINALIZED")return res.status(409).json({error:"Finalized reports cannot be deleted"});
  await q("DELETE FROM klu_fortnight_reports WHERE id=$1 AND status='DRAFT'",[before.id]);await audit(req,"KLU_REPORT_DELETED","klu_fortnight_report",before.id,before,null);res.json({deleted:true});
 });
+registerKluExports(r);
 export default r;
