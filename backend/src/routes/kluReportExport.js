@@ -158,9 +158,9 @@ function makePdf(x){
   const main=W-93;rect(L,y,main,height);rect(L+main,y,93,height,true);
   put(title,L,y,main,17,{bold:true});put(criteria,L,y+16,main,36,{size:7});
   if(extra)put(extra,L+2,y+49,main-4,assets?36:height-54);
-  const [markLabel,markValue]=String(marks).split("\\n");
+  const [markLabel,markValue]=String(marks).split("\n");
   font(true,7);doc.text(markLabel,L+main+4,y+7,{width:85,align:"center",height:39});
-  font(true,15);doc.text(markValue||"—",L+main+4,y+height/2-5,{width:85,align:"center",height:25});
+  font(true,16);doc.text(markValue||"—",L+main+4,y+height/2+1,{width:85,align:"center",height:26});
   if(assets){
    if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-173,y+height-47,{fit:[75,36]});
    if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-91,y+height-51,{fit:[76,44]});
