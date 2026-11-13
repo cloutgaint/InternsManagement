@@ -61,14 +61,19 @@ test("weekly plans and task grading follow the intern's mentor", { skip: process
     assert.equal(second.data.id, plan.id);
   });
 
-  await t.test("a refused save keeps the saved weeks, and dates must fall inside the internship", async () => {
+  await t.test("a refused save keeps the saved weeks, and a complete plan stays inside the internship", async () => {
     const path = "/mentor/task-plans/" + plan.id + "/weeks";
     assert.equal((await call(mine.token, "PUT", path, { weeks: [week()] })).status, 200);
-    assert.equal((await call(mine.token, "PUT", path, { weeks: [week({ submissionTypes: ["NOPE"] })] })).status, 400);
-    assert.equal((await one("SELECT count(*)::int c FROM weekly_tasks WHERE task_plan_id=$1", [plan.id])).c, 1);
     const late = new Date(Date.now() + 60 * 86400000).toISOString();
     assert.equal((await call(mine.token, "PUT", path, { weeks: [week({ releaseAt: late })] })).status, 400);
     assert.equal((await one("SELECT count(*)::int c FROM weekly_tasks WHERE task_plan_id=$1", [plan.id])).c, 1);
+    const required = Math.ceil((Date.parse(end) - Date.parse(start) + 86400000) / 604800000);
+    const weeks = Array.from({ length: required }, (_, index) => week({
+      week: index + 1,
+      title: "Week " + (index + 1),
+      releaseAt: new Date(Date.now() + (index * 5 + 1) * 86400000).toISOString(),
+    }));
+    assert.equal((await call(mine.token, "PUT", path, { weeks })).status, 200);
   });
 
   await t.test("the per-intern mentor is notified and grades a submission with no deadline", async () => {
@@ -96,7 +101,7 @@ test("weekly plans and task grading follow the intern's mentor", { skip: process
     assert.equal((await call(mine.token, "GET", "/mentor/submissions/" + submission.id)).status, 403);
   });
 
-  await t.test("two mentors sharing a group each see only their own interns", async () => {
+  await t.test("shared-group mentors see the full team while ownership remains scoped", async () => {
     const team = await one("INSERT INTO groups(batch_id,name,status) VALUES($1,$2,'ACTIVE') RETURNING id", [batch.id, "Shared" + suffix]);
     const [ours, theirs] = [await intern("ours"), await intern("theirs")];
     await q("INSERT INTO group_members(group_id,intern_id,active) VALUES($1,$2,true),($1,$3,true)", [team.id, ours.id, theirs.id]);
@@ -106,7 +111,10 @@ test("weekly plans and task grading follow the intern's mentor", { skip: process
     assert.deepEqual(operations.interns.map((x) => x.id), [ours.id]);
     assert.deepEqual(operations.leave.map((x) => x.intern_id), [ours.id]);
     assert.deepEqual(operations.groups.map((x) => x.id), [team.id]);
-    assert.deepEqual((await call(other.token, "GET", "/mentor/groups/" + team.id + "/members")).data.map((x) => x.id), [ours.id]);
+    const members = (await call(other.token, "GET", "/mentor/groups/" + team.id + "/members")).data;
+    assert.deepEqual(members.map((x) => x.id), [ours.id, theirs.id]);
+    assert.equal(members.find((x) => x.id === ours.id).is_my_intern, true);
+    assert.equal(members.find((x) => x.id === theirs.id).is_my_intern, false);
     assert.equal((await call(mine.token, "GET", "/mentor/groups/" + team.id + "/members")).status, 403);
     const review = await call(other.token, "POST", "/mentor/reviews", { groupId: team.id, periodNo: 1, reviewDate: day(1), individualMarks: [{ internId: theirs.id, marks: 5 }] });
     assert.equal(review.status, 400, JSON.stringify(review.data));

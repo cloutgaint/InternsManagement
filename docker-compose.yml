@@ -20,14 +20,21 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgres://postgres:postgres@db:5432/gaint_interns
-      JWT_SECRET: change-me-in-production
+      JWT_SECRET: ${JWT_SECRET:-development-only-change-me}
       FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      BIOMETRIC_VERIFY_URL: ${BIOMETRIC_VERIFY_URL:-}
+      BIOMETRIC_VERIFY_TOKEN: ${BIOMETRIC_VERIFY_TOKEN:-}
+      PROOF_RETENTION_DAYS: ${PROOF_RETENTION_DAYS:-}
+      FACE_RETENTION_DAYS: ${FACE_RETENTION_DAYS:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-45}
@@ -50,6 +57,7 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost:8000/api
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-development}
       NEXT_PUBLIC_API_URL: http://localhost:8000/api
     ports:
       - "3000:3000"

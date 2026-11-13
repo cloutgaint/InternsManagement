@@ -30,7 +30,7 @@ export default function InternFaceEnrollmentPage() {
       });
       video.current.srcObject = stream.current;
       await video.current.play();
-    } catch (e) {
+    } catch {
       setErr(
         "Camera permission is required. Allow camera access in your browser and try again.",
       );

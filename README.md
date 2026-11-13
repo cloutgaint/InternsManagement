@@ -33,7 +33,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open frontend at `http://localhost:3000`, API at `http://localhost:8000/api/health`, and connect pgAdmin to PostgreSQL on host port **5434** (`postgres` / `postgres`, DB `gaint_interns`).
+Open frontend at `http://localhost:3000`, API at `http://localhost:8000/api/health`, and connect pgAdmin to PostgreSQL on host port **5434** (`postgres` / `postgres`, DB `gaint_interns`). The health endpoint returns `503` unless the API can query PostgreSQL.
 
 Seed Super Admin: `admin@gaintclout.com` / `ChangeMe123!`. **Change this immediately.**
 
@@ -72,10 +72,14 @@ See `REQUIREMENTS_CHECKLIST.md` for traceability.
 
 ## Production settings
 
-Before going live set `FILE_ENCRYPTION_KEY` (uploads fail without it in production), `SMTP_*` (applicants without login access only hear about decisions by email), and optionally `CLAMAV_HOST` and the retention periods. `.env.example` documents each one.
+Before going live, set `NODE_ENV=production` and configure every production requirement documented in `.env.example`: a 64-byte `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `SMTP_*`, `CLAMAV_HOST`, an approved HTTPS biometric verifier, and proof/face retention periods. The API now refuses to start in production when any of these controls are absent or insecure.
 
 Run the full test suite against a disposable database whose name contains `intern_test`:
 
 ```bash
+cd backend
 RUN_DB_E2E=1 DATABASE_URL=postgresql://.../intern_test npm test
+
+cd ../frontend
+npm test
 ```

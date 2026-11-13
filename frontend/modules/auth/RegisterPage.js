@@ -110,7 +110,7 @@ export default function RegisterPage() {
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw new Error("Enter a valid 10-digit Indian mobile number.");
       let validResumeLink=!f.resumePortfolioUrl.trim();
-      try{const url=new URL(f.resumePortfolioUrl.trim());validResumeLink=url.protocol==="https:"&&!!url.hostname;}catch{}
+      try{const url=new URL(f.resumePortfolioUrl.trim());validResumeLink=url.protocol==="https:"&&!!url.hostname;}catch{/* The validation message below handles malformed URLs. */}
       if (!validResumeLink) {
         setResumeError("Enter a valid HTTPS link to your resume or portfolio.");
         resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
@@ -126,7 +126,7 @@ export default function RegisterPage() {
         !/[A-Z]/.test(f.password) ||
         !/[a-z]/.test(f.password) ||
         !/[0-9]/.test(f.password) ||
-        !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(f.password)
+        !/[^A-Za-z0-9]/.test(f.password)
       )
         throw new Error(
           "Password must be 10+ characters and include uppercase, lowercase, number and special character.",

@@ -13,12 +13,15 @@ import mentorRoutes from "./routes/mentor.js";
 import notificationRoutes from "./routes/notifications.js";
 import publicRoutes from "./routes/public.js";
 import { errorHandler } from "./common/middleware/error-handler.js";
+import { q } from "./common/database/index.js";
 
 export function createApp() {
   const app = express();
   app.set("trust proxy", 1);
   app.use(helmet());
-  app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+  app.use(
+    cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }),
+  );
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("combined"));
   // Only credential attempts count. Reads such as /auth/me run on every page view, and a whole
@@ -35,8 +38,20 @@ export function createApp() {
   app.use("/api/intern", internRoutes);
   app.use("/api/mentor", mentorRoutes);
   app.use("/api/notifications", notificationRoutes);
-  app.use("/api/public", rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }), publicRoutes);
-  app.get("/api/health", (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+  app.use(
+    "/api/public",
+    rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }),
+    publicRoutes,
+  );
+  app.get("/api/health", async (_req, res) => {
+    const checkedAt = new Date().toISOString();
+    try {
+      await q("SELECT 1");
+      res.json({ ok: true, database: "up", time: checkedAt });
+    } catch {
+      res.status(503).json({ ok: false, database: "down", time: checkedAt });
+    }
+  });
   app.use(errorHandler);
   return app;
 }

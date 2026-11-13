@@ -77,16 +77,15 @@
 .top.glass-top{position:sticky;top:0;z-index:100;display:block;min-height:76px;padding:10px 24px;background:rgba(244,250,247,.72);color:#153e2b;border-bottom:1px solid rgba(255,255,255,.78);box-shadow:0 8px 30px rgba(12,65,39,.075);backdrop-filter:blur(20px) saturate(155%);-webkit-backdrop-filter:blur(20px) saturate(155%)}
 .glass-nav-shell{max-width:1200px;min-height:54px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}
 .glass-brand{display:inline-flex;align-items:center;gap:11px;min-width:0;border-radius:12px;color:#123d29}
-.glass-brand-mark{width:39px;height:39px;flex:none;display:grid;place-items:center;border-radius:12px;background:linear-gradient(145deg,#0c7047,#08492f);color:#fff;font-size:22px;font-weight:850;box-shadow:0 5px 15px rgba(7,91,59,.18)}
-.glass-brand-copy{display:flex;flex-direction:column;gap:1px;line-height:1.15}.glass-brand-copy strong{font-size:16px;letter-spacing:.07em}.glass-brand-copy small{font-size:11px;font-weight:600;color:#597467;letter-spacing:.015em}
+.glass-brand-logo{display:block;width:156px;height:46px;object-fit:contain}
 .top .glass-nav{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:5px;border:1px solid rgba(255,255,255,.92);border-radius:16px;background:rgba(255,255,255,.54);box-shadow:0 5px 24px rgba(14,61,39,.055),inset 0 1px 0 rgba(255,255,255,.9)}
 .top .glass-nav-link{display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:9px 17px;border-radius:11px;color:#375746;font-size:13px;font-weight:700;white-space:nowrap;transition:background .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease}
 .top .glass-nav-link:hover{background:rgba(12,103,66,.09);color:#075b3b}.top .glass-nav-link.is-active:not(.glass-nav-cta){background:rgba(9,98,60,.11);color:#075b3b}
 .top .glass-nav-cta{background:linear-gradient(135deg,#0b754b,#075537);color:#fff;box-shadow:0 4px 12px rgba(7,91,59,.18)}.top .glass-nav-cta:hover,.top .glass-nav-cta.is-active{background:linear-gradient(135deg,#09643f,#06462e);color:#fff;transform:translateY(-1px)}
 .glass-brand:focus-visible,.top .glass-nav-link:focus-visible{outline:3px solid #2c8e65;outline-offset:3px}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.top.glass-top{background:#f3faf6}}
-@media(max-width:600px){.top.glass-top{padding:9px 12px;min-height:65px}.glass-nav-shell{gap:9px}.glass-brand{gap:7px}.glass-brand-mark{width:33px;height:33px;font-size:19px;border-radius:10px}.glass-brand-copy strong{font-size:13px}.glass-brand-copy small{font-size:9px}.top .glass-nav{gap:2px;padding:3px;border-radius:12px}.top .glass-nav-link{padding:8px 9px;min-height:34px;font-size:11px;border-radius:9px}}
-@media(max-width:390px){.glass-brand-copy small{display:none}.top .glass-nav-link{padding:7px}.glass-nav-shell{gap:5px}}
+@media(max-width:600px){.top.glass-top{padding:9px 12px;min-height:65px}.glass-nav-shell{gap:9px}.glass-brand{gap:7px}.glass-brand-logo{width:132px;height:39px}.top .glass-nav{gap:2px;padding:3px;border-radius:12px}.top .glass-nav-link{padding:8px 9px;min-height:34px;font-size:11px;border-radius:9px}}
+@media(max-width:390px){.glass-brand-logo{width:116px;height:34px}.top .glass-nav-link{padding:7px}.glass-nav-shell{gap:5px}}
 @media(prefers-reduced-motion:reduce){.top .glass-nav-link{transition:none}.top .glass-nav-cta:hover{transform:none}}
 
 /* Keep descriptive student navigation labels readable on smaller screens. */

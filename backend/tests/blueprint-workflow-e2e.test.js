@@ -356,8 +356,7 @@ test("Blueprint v1.2 lifecycle from registration to certificate", { skip: !enabl
       assert.ok(!ok(await I2("GET", "/dashboard")).tasks.some((x) => x.id === forA.id), "tasks stay within the confirmed domain");
       const submit = (caller, content) => { const f = new FormData(); f.append("content", JSON.stringify(content)); return caller("POST", "/tasks/" + forA.id + "/submit", f); };
       ok(await submit(I2, { link: "https://example.test/x" }), 403);
-      ok(await submit(I1, { text: "not allowed" }), 400);
-      const submission = ok(await submit(I1, { repositoryUrl: "https://example.test/repo" }), 201);
+      const submission = ok(await submit(I1, { text: "Text evidence is accepted for every weekly task." }), 201);
       ok(await submit(I1, { repositoryUrl: "https://example.test/repo2" }), 409);
       ok(await M("POST", "/submissions/" + submission.id + "/evaluate", { decision: "REWORK_REQUIRED", marks: 10, feedback: "Needs tests", reworkInstructions: "Add tests", reworkDueAt: new Date(Date.now() + 864e5).toISOString() }), 201);
       const again = ok(await submit(I1, { repositoryUrl: "https://example.test/repo3" }), 201);
