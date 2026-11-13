@@ -6,6 +6,7 @@ const date=s=>s?rawDate(s).split("-").reverse().join("-"):"—";
 const plain=s=>String(s??"").replace(/\s+/g," ").trim();
 const rawDate=s=>s instanceof Date?s.toISOString().slice(0,10):String(s??"").slice(0,10);
 const clip=(s,n=400)=>plain(s).slice(0,n);
+const pdfFits=x=>[["achievements",270],["next_plan",190],["exceptions",130],["company_comments",190],["student_feedback",200]].every(([k,n])=>plain(x[k]).length<=n);
 async function fetchReport(req,id){
  const x=(await q(`SELECT f.*,ip.full_name,ip.roll_number,ip.branch,ip.program,c.name college_name,
  (SELECT pr.title FROM group_members gm JOIN project_assignments pa ON pa.group_id=gm.group_id AND pa.status='ASSIGNED' JOIN projects pr ON pr.id=pa.project_id WHERE gm.intern_id=ip.id AND gm.active LIMIT 1) project_title,
@@ -29,7 +30,6 @@ async function fetchReport(req,id){
 function makePdf(x){
  const doc=new PDFDocument({size:"A4",margin:32,autoFirstPage:true,bufferPages:false});
  const W=531,L=32;let y=35;
- const text=(s,size=8,opts={})=>{doc.font("Helvetica").fontSize(size).fillColor("#111").text(clip(s,opts.max||700),L+5,y,{width:W-10,lineBreak:false,...opts});};
  const band=(s,h=20)=>{doc.rect(L,y,W,h).fillAndStroke("#e9ecef","#444");doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(s,L+4,y+5,{width:W-8,align:"center"});y+=h;};
  const row=(cells,h=25)=>{let xx=L;for(const [w,label] of cells){doc.rect(xx,y,w,h).stroke("#555");doc.font("Helvetica").fontSize(8).fillColor("#111").text(clip(label,170),xx+4,y+5,{width:w-8,height:h-8,ellipsis:true});xx+=w;}y+=h;};
  const area=(label,value,h)=>{doc.rect(L,y,W,h).stroke("#555");doc.font("Helvetica-Bold").fontSize(8).text(label,L+5,y+4,{width:W-10});doc.font("Helvetica").fontSize(8).text(clip(value,480),L+7,y+19,{width:W-14,height:h-22,ellipsis:true});y+=h;};
@@ -97,5 +97,5 @@ async function makeDocx(x){
  ]}]}));
 }
 export function registerKluExports(r){
- r.get("/reports/:id/export/:format",async(req,res)=>{const format=req.params.format;if(!["pdf","docx"].includes(format))return res.status(400).json({error:"Unsupported format"});const x=await fetchReport(req,req.params.id);if(!x)return res.status(404).json({error:"Report not found or access denied"});res.set("Cache-Control","no-store");res.set("Content-Disposition",'attachment; filename="KLU_Fortnight_'+x.fortnight_no+"_"+x.roll_number+"."+format+'"');if(format==="pdf"){res.type("application/pdf");makePdf(x).pipe(res);}else{res.type("application/vnd.openxmlformats-officedocument.wordprocessingml.document");res.send(await makeDocx(x));}});
+ r.get("/reports/:id/export/:format",async(req,res)=>{const format=req.params.format;if(!["pdf","docx"].includes(format))return res.status(400).json({error:"Unsupported format"});const x=await fetchReport(req,req.params.id);if(!x)return res.status(404).json({error:"Report not found or access denied"});res.set("Cache-Control","no-store");res.set("Content-Disposition",'attachment; filename="KLU_Fortnight_'+x.fortnight_no+"_"+x.roll_number+"."+format+'"');if(format==="pdf"){if(!pdfFits(x))return res.status(422).json({error:"Report text is too long for one A4 page. Shorten the achievements, plan, exceptions, company comments or feedback before downloading."});res.type("application/pdf");makePdf(x).pipe(res);}else{res.type("application/vnd.openxmlformats-officedocument.wordprocessingml.document");res.send(await makeDocx(x));}});
 }
