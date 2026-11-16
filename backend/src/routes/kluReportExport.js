@@ -162,18 +162,18 @@ function makePdf(x){
   if(extra)put(extra,L+2,y+49,main-4,assets?36:height-54);
   const [markLabel,markValue]=String(marks).split("\n");
   font(true,7);doc.text(markLabel,L+main+4,y+7,{width:85,align:"center",height:39});
-  font(true,16);doc.text(markValue||"—",L+main+4,y+height/2+1,{width:85,align:"center",height:26});
+  if(markValue?.trim()&&markValue.trim()!=="— / 10"&&markValue.trim()!=="— / 30"){font(true,16);doc.text(markValue,L+main+4,y+height/2+1,{width:85,align:"center",height:26});}
   if(assets){
-   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-151,y+height-67,{fit:[105,57]});
-   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-111,y+height-80,{fit:[104,78]});
-   font(false,6);doc.text("(Signature of Company Guide)",L+main-185,y+height-10,{width:180,align:"right",lineBreak:false});
+   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-146,y+height-76,{fit:[102,58]});
+   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-102,y+height-84,{fit:[92,68]});
+   font(false,6);doc.text("(Signature of Company Guide)",L+main-175,y+height-12,{width:165,align:"center",lineBreak:false});
   }else{font(false,6);doc.text("(Signature of University Guide)",L+main-190,y+height-13,{width:185,align:"right",lineBreak:false});}
   y+=height;
  };
- evalRow("17. Criteria for evaluation:","a) student discipline, b) regularity, c) punctuality, d) commitment, e) willingness to work hard, f) attitude & behavior etc.","Assessed by UG for 10 M per fortnight\n"+(x.university_marks??"—")+" / 10",79,"");
- evalRow("18. Criteria for evaluation:","a) progress achieved during the fortnight on OJET, b) work engagement, c) ability to solve problems, d) knowledge application, e) professional behavior, f) teamwork, g) new ideas generated for the company, h) appreciations received etc.","Assessed by CG for 30 M per fortnight\n"+(x.company_marks??"—")+" / 30",107,x.company_comments,true);
- const total=x.company_marks!=null&&x.university_marks!=null?Number(x.company_marks)+Number(x.university_marks):"—";
- rect(L,y,W-93,58);rect(R-93,y,93,58,true);put("19. Feedback, if any, to the student",L,y,W-93,17,{bold:true});put(x.student_feedback||"—",L,y+17,W-93,31);put("Total Marks for the fortnight (10+30=40 M)\n"+total+" / 40",R-93,y,93,50,{bold:true,align:"center"});
+ evalRow("17. Criteria for evaluation:","a) student discipline, b) regularity, c) punctuality, d) commitment, e) willingness to work hard, f) attitude & behavior etc.","Assessed by UG for 10 M per fortnight\n"+(x.university_marks==null?"":x.university_marks+" / 10"),79,"");
+ evalRow("18. Criteria for evaluation:","a) progress achieved during the fortnight on OJET, b) work engagement, c) ability to solve problems, d) knowledge application, e) professional behavior, f) teamwork, g) new ideas generated for the company, h) appreciations received etc.","Assessed by CG for 30 M per fortnight\n"+(x.company_marks==null?"":x.company_marks+" / 30"),107,x.company_comments,true);
+ const total=x.company_marks!=null&&x.university_marks!=null?Number(x.company_marks)+Number(x.university_marks):null;
+ rect(L,y,W-93,58);rect(R-93,y,93,58,true);put("19. Feedback, if any, to the student",L,y,W-93,17,{bold:true});put(x.student_feedback||"—",L,y+17,W-93,31);put("Total Marks for the fortnight (10+30=40 M)\n"+(total==null?"":total+" / 40"),R-93,y,93,50,{bold:true,align:"center"});
  font(false,6);doc.text("(University Guide shall forward to the Director, Industrial Practice School)",L+30,y+48,{width:W-130,align:"center",lineBreak:false});y+=58;
  if(y>810)throw Error("KLU layout exceeds A4 page");
  doc.end();return doc;
