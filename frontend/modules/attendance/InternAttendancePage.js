@@ -260,13 +260,14 @@ export default function InternAttendancePage() {
           <h2>Attendance Summary{st.allocation?.batch_name ? " · " + st.allocation.batch_name : ""}</h2>
           <div className="att-stats">
             <div className="card"><small>Attendance</small><strong>{st.summary.attendance_percent}%</strong></div>
-            <div className="card"><small>Present / Late</small><strong>{st.summary.present_days} / {st.summary.late_days}</strong></div>
+            <div className="card"><small>Full days / Late</small><strong>{st.summary.present_days} / {st.summary.late_days}</strong></div>
+            <div className="card"><small>Half days</small><strong>{st.summary.half_day_days ?? 0}</strong></div>
             <div className="card"><small>Absent</small><strong>{st.summary.absent_days}</strong></div>
             <div className="card"><small>On leave / Holiday</small><strong>{st.summary.leave_days} / {st.summary.holiday_days}</strong></div>
           </div>
-          <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted.</p>
+          <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted. Full day: 8 hours; half day: 4 hours. Late arrival is tracked separately.</p>
           <div>
-            {(st.history || []).slice(0, 14).map((x, index) => (
+            {(st.history || []).filter((x, index, rows) => rows.findIndex((r) => r.day === x.day) === index).slice(0, 14).map((x, index) => (
               <div className="status-row" key={`${x.day}-${x.source || x.status}-${index}`}>
                 <span>{x.day}{x.holiday_name ? " · " + x.holiday_name : ""}{x.source === "MANUAL" ? " · corrected" : ""}</span>
                 <span className="status-pill">{String(x.status).replace("_", " ")}</span>
