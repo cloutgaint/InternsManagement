@@ -33,7 +33,11 @@ export async function verifyAttendanceBiometrics({ imageData, baselineImageData,
       return { ok: false, unavailable: true, reason: "Invalid biometric verifier response" };
     // matchScore is Human's normalized similarity, where values above 0.5 are considered a match.
     const matchThreshold = Number(process.env.BIOMETRIC_MATCH_THRESHOLD || 0.6);
-    return { ok: result.challengePass && matchScore >= matchThreshold && livenessScore >= 0.75, matchScore, livenessScore, challengePass: result.challengePass, reason: "Biometric verification did not meet threshold" };
+    const matched = matchScore >= matchThreshold;
+    const live = result.challengePass && livenessScore >= 0.75;
+    const reason = !matched && !live ? "Face similarity and head-turn verification both failed" : !matched ? "Live face did not match the approved registration" : !live ? "Head-turn challenge was not verified. Start facing straight ahead, then turn your head in the requested direction." : null;
+    if (process.env.NODE_ENV !== "production") console.log("[biometric] attendance decision", { matched, challengePass: result.challengePass, matchScore: Number(matchScore.toFixed(3)), matchThreshold, livenessScore });
+    return { ok: matched && live, matchScore, livenessScore, challengePass: result.challengePass, reason };
   } catch {
     return { ok: false, unavailable: true, reason: "Biometric verifier unavailable" };
   } finally { clearTimeout(timeout); }
