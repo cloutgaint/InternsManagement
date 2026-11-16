@@ -24,10 +24,17 @@ SELECT dates.allocation_id,dates.intern_id,dates.batch_id,dates.day,
        ad.id record_id,ad.check_in,ad.check_out,COALESCE(ad.working_minutes,0) working_minutes,ad.source,ad.correction_reason,
        CASE WHEN h.name IS NOT NULL THEN 'HOLIDAY'
             WHEN lv.id IS NOT NULL THEN 'ON_LEAVE'
+            WHEN ad.source='CAMERA' AND ad.check_in IS NOT NULL AND ad.check_out IS NULL THEN 'PENDING'
+            WHEN ad.source='CAMERA' AND ad.check_in IS NOT NULL AND ad.check_out IS NOT NULL THEN
+              CASE WHEN extract(epoch FROM (ad.check_out-ad.check_in)) >= 25200 THEN
+                CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END
+              WHEN extract(epoch FROM (ad.check_out-ad.check_in)) >= 14400 THEN 'HALF_DAY'
+              ELSE 'ABSENT' END
             WHEN ad.status IS NOT NULL THEN ad.status
             ELSE 'ABSENT' END AS status,
        h.name holiday_name
 FROM dates
+JOIN batches b ON b.id=dates.batch_id
 LEFT JOIN attendance_daily ad ON ad.intern_id=dates.intern_id AND ad.day=dates.day
 LEFT JOIN holidays h ON h.batch_id=dates.batch_id AND h.day=dates.day
 LEFT JOIN LATERAL (SELECT lr.id FROM leave_requests lr WHERE lr.intern_id=dates.intern_id AND lr.status='APPROVED' AND dates.day BETWEEN lr.from_date AND lr.to_date LIMIT 1) lv ON true
