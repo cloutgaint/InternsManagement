@@ -164,8 +164,8 @@ function makePdf(x){
   font(true,7);doc.text(markLabel,L+main+4,y+7,{width:85,align:"center",height:39});
   font(true,16);doc.text(markValue||"—",L+main+4,y+height/2+1,{width:85,align:"center",height:26});
   if(assets){
-   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-173,y+height-47,{fit:[75,36]});
-   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-91,y+height-51,{fit:[76,44]});
+   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-151,y+height-67,{fit:[105,57]});
+   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-111,y+height-80,{fit:[104,78]});
    font(false,6);doc.text("(Signature of Company Guide)",L+main-185,y+height-10,{width:180,align:"right",lineBreak:false});
   }else{font(false,6);doc.text("(Signature of University Guide)",L+main-190,y+height-13,{width:185,align:"right",lineBreak:false});}
   y+=height;
