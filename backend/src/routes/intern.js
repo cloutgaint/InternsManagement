@@ -333,12 +333,12 @@ r.post("/attendance/verify", async (req, res) => {
     const daily = eventType === "CHECK_IN"
       ? (await client.query(
         `INSERT INTO attendance_daily(intern_id,batch_id,day,check_in,status)
-         SELECT $1,b.id,current_date,now(),CASE WHEN (now() AT TIME ZONE b.timezone)::time>b.late_after THEN 'LATE' ELSE 'PRESENT' END FROM batches b WHERE b.id=$2
+         SELECT $1,b.id,current_date,now(),'PENDING' FROM batches b WHERE b.id=$2
          ON CONFLICT(intern_id,day) DO UPDATE SET check_in=COALESCE(attendance_daily.check_in,EXCLUDED.check_in),status=EXCLUDED.status RETURNING *`,
         [p.id, alloc.batch_id],
       )).rows[0]
       : (await client.query(
-        "UPDATE attendance_daily SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-check_in))/60)::int WHERE intern_id=$1 AND day=current_date AND check_in IS NOT NULL AND check_out IS NULL RETURNING *",
+        `UPDATE attendance_daily ad SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-ad.check_in))/60)::int, status=CASE WHEN extract(epoch from(now()-ad.check_in))/60 >= 480 THEN CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END WHEN extract(epoch from(now()-ad.check_in))/60 >= 240 THEN 'HALF_DAY' ELSE 'ABSENT' END FROM batches b WHERE ad.intern_id=$1 AND ad.day=current_date AND ad.check_in IS NOT NULL AND ad.check_out IS NULL AND b.id=ad.batch_id RETURNING ad.*`,
         [p.id],
       )).rows[0];
     if (!daily) throw new Error("Attendance daily record could not be updated");
