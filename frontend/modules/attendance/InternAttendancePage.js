@@ -266,8 +266,8 @@ export default function InternAttendancePage() {
           </div>
           <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted.</p>
           <div>
-            {(st.history || []).slice(0, 14).map((x) => (
-              <div className="status-row" key={x.day}>
+            {(st.history || []).slice(0, 14).map((x, index) => (
+              <div className="status-row" key={`${x.day}-${x.source || x.status}-${index}`}>
                 <span>{x.day}{x.holiday_name ? " · " + x.holiday_name : ""}{x.source === "MANUAL" ? " · corrected" : ""}</span>
                 <span className="status-pill">{String(x.status).replace("_", " ")}</span>
               </div>
