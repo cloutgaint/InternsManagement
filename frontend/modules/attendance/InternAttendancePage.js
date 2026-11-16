@@ -260,7 +260,8 @@ export default function InternAttendancePage() {
           <h2>Attendance Summary{st.allocation?.batch_name ? " · " + st.allocation.batch_name : ""}</h2>
           <div className="att-stats">
             <div className="card"><small>Attendance</small><strong>{st.summary.attendance_percent}%</strong></div>
-            <div className="card"><small>Full days / Late</small><strong>{st.summary.present_days} / {st.summary.late_days}</strong></div>
+            <div className="card"><small>Full Days</small><strong>{st.summary.present_days}</strong></div>
+            <div className="card"><small>Late Arrivals</small><strong>{st.summary.late_days}</strong></div>
             <div className="card"><small>Half days</small><strong>{st.summary.half_day_days ?? 0}</strong></div>
             <div className="card"><small>Absent</small><strong>{st.summary.absent_days}</strong></div>
             <div className="card"><small>On leave / Holiday</small><strong>{st.summary.leave_days} / {st.summary.holiday_days}</strong></div>
