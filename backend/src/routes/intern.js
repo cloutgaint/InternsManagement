@@ -338,7 +338,7 @@ r.post("/attendance/verify", async (req, res) => {
         [p.id, alloc.batch_id],
       )).rows[0]
       : (await client.query(
-        `UPDATE attendance_daily ad SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-ad.check_in))/60)::int, status=CASE WHEN extract(epoch from(now()-ad.check_in))/60 >= 480 THEN CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END WHEN extract(epoch from(now()-ad.check_in))/60 >= 240 THEN 'HALF_DAY' ELSE 'ABSENT' END FROM batches b WHERE ad.intern_id=$1 AND ad.day=current_date AND ad.check_in IS NOT NULL AND ad.check_out IS NULL AND b.id=ad.batch_id RETURNING ad.*`,
+        `UPDATE attendance_daily ad SET check_out=now(),working_minutes=GREATEST(0,extract(epoch from(now()-ad.check_in))/60)::int, status=CASE WHEN extract(epoch from(now()-ad.check_in))/60 >= 420 THEN CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END WHEN extract(epoch from(now()-ad.check_in))/60 >= 240 THEN 'HALF_DAY' ELSE 'ABSENT' END FROM batches b WHERE ad.intern_id=$1 AND ad.day=current_date AND ad.check_in IS NOT NULL AND ad.check_out IS NULL AND b.id=ad.batch_id RETURNING ad.*`,
         [p.id],
       )).rows[0];
     if (!daily) throw new Error("Attendance daily record could not be updated");
