@@ -16,7 +16,7 @@ const REVIEW_STATUSES = ["SCHEDULED", "CONDUCTED", "MARKS_ENTERED", "PUBLISHED"]
 r.use(auth, permit("MENTOR"));
 r.use(taskPlans);
 
-const FACE_MINE = mentorOwnsIntern("fe.intern_id", "$2");
+const FACE_MINE = mentorOwnsIntern("fe.intern_id", "$1");
 r.get("/face-enrollments",async(req,res)=>{
  const m=await mid(req.user.id);
  if(!m)return res.status(403).json({error:"Mentor profile not found"});
