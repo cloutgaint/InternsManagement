@@ -1,8 +1,8 @@
--- One final status per intern per working day. Default policy: 8h full, 4h half.
+-- One final status per intern per working day. Default policy: 7h full, 4h half.
 -- Preserve manually approved corrections; recompute only completed camera sessions.
 UPDATE attendance_daily ad
 SET status = CASE
-  WHEN ad.working_minutes >= 480 THEN CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END
+  WHEN ad.working_minutes >= 420 THEN CASE WHEN (ad.check_in AT TIME ZONE b.timezone)::time > b.late_after THEN 'LATE' ELSE 'PRESENT' END
   WHEN ad.working_minutes >= 240 THEN 'HALF_DAY'
   ELSE 'ABSENT' END
 FROM batches b
