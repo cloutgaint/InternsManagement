@@ -9,7 +9,8 @@ r.use(auth,permit("ADMIN","SUPER_ADMIN","MENTOR"));
 const admin=req=>["ADMIN","SUPER_ADMIN"].includes(req.user.role);
 const klu=name=>/koneru lakshmaiah|\\bklu\\b/i.test(name||"");
 const fmt=d=>d.toISOString().slice(0,10);
-const add=(s,n)=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return fmt(d);};
+const iso=d=>d instanceof Date?fmt(d):String(d??"").slice(0,10);
+const add=(s,n)=>{const d=new Date(iso(s)+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return fmt(d);};
 const between=(a,b,c)=>a>=b&&a<=c;
 async function scope(req,internId){
  const row=(await q(`SELECT ip.id,ip.full_name,ip.roll_number,ip.branch,ip.program,ip.college_id,c.name college_name,
@@ -27,17 +28,17 @@ async function scope(req,internId){
  const access=(await q("SELECT 1 WHERE "+mentorHasInternInGroup("$1::uuid","$2::uuid"),[row.group_id,mentor])).rowCount;
  return access?row:null;
 }
-function dates(profile,no){if(!Number.isInteger(no)||no<1||no>52||!profile.intern_start||!profile.intern_end)return null;const from=add(profile.intern_start,(no-1)*14),to=add(from,13);if(from>profile.intern_end)return null;return {from,to:to>profile.intern_end?profile.intern_end:to};}
+function dates(profile,no){if(!Number.isInteger(no)||no<1||no>52||!profile.intern_start||!profile.intern_end)return null;const from=add(profile.intern_start,(no-1)*14),to=add(from,13),last=iso(profile.intern_end);if(from>last)return null;return {from,to:to>last?last:to};}
 async function attendance(profile,period){
- const start=profile.intern_start,end=period.to;
+ const start=iso(profile.intern_start),end=iso(period.to);
  const [daily,holidays,leaves]=(await Promise.all([
  q("SELECT day,status FROM attendance_daily WHERE intern_id=$1 AND day BETWEEN $2 AND $3",[profile.id,start,end]),
  q("SELECT day FROM holidays WHERE batch_id=$1 AND day BETWEEN $2 AND $3",[profile.batch_id,start,end]),
  q("SELECT from_date,to_date FROM leave_requests WHERE intern_id=$1 AND status='APPROVED' AND from_date<=$3 AND to_date>=$2",[profile.id,start,end])
  ])).map(x=>x.rows);
- const holidaySet=new Set(holidays.map(x=>x.day));
+ const holidaySet=new Set(holidays.map(x=>iso(x.day)));
  const isWork=day=>{const wd=new Date(day+"T12:00:00Z").getUTCDay();return wd!==0&&wd!==6&&!holidaySet.has(day);};
- const summary=(from,to)=>{let working=0,present=0,leave=0,unrecorded=0;const byDay=new Map(daily.map(x=>[x.day,String(x.status).toUpperCase()]));for(let day=from;day<=to;day=add(day,1)){if(!isWork(day))continue;working++;const status=byDay.get(day);if(["PRESENT","HALF_DAY","LATE"].includes(status))present+=status==="HALF_DAY"?0.5:1;else if(leaves.some(x=>between(day,x.from_date,x.to_date)))leave++;else if(!status)unrecorded++;}return {working,present,leave,unrecorded};};
+ const summary=(from,to)=>{let working=0,present=0,leave=0,unrecorded=0;const byDay=new Map(daily.map(x=>[iso(x.day),String(x.status).toUpperCase()]));for(let day=from;day<=to;day=add(day,1)){if(!isWork(day))continue;working++;const status=byDay.get(day);if(["PRESENT","HALF_DAY","LATE"].includes(status))present+=status==="HALF_DAY"?0.5:1;else if(leaves.some(x=>between(day,iso(x.from_date),iso(x.to_date))))leave++;else if(!status)unrecorded++;}return {working,present,leave,unrecorded};};
  const cutoff=fmt(new Date());const through=to=>to>cutoff?cutoff:to;
  return {fortnight:period.from>cutoff?{working:0,present:0,leave:0,unrecorded:0}:summary(period.from,through(period.to)),tillDate:summary(start,through(end))};
 }
