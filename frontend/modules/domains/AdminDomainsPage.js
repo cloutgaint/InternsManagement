@@ -8,7 +8,7 @@ export default function AdminDomainsPage() {
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(""),
     [domains, setDomains] = useState([]),
-    [other, setOther] = useState({});
+    [other, setOther] = useState({}),[feedbackId,setFeedbackId]=useState(null);
   const load = () =>
     Promise.all([api("/admin/domain-recommendations"), api("/admin/domains")])
       .then(([r, d]) => {
@@ -20,6 +20,7 @@ export default function AdminDomainsPage() {
     load();
   }, []);
   async function calculate(x) {
+    setFeedbackId(x.intern_id);setErr("");setMsg("");
     try {
       setBusy(x.intern_id);
       await api("/admin/domain-recommendations/" + x.intern_id + "/calculate", {
@@ -35,6 +36,7 @@ export default function AdminDomainsPage() {
     }
   }
   async function confirm(x, d) {
+    setFeedbackId(x.intern_id);setErr("");setMsg("");
     const top = x.recommendations?.[0]?.domainId;
     let reason;
     if (d.domainId !== top) {
@@ -80,11 +82,9 @@ export default function AdminDomainsPage() {
           </p>
         </div>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card workflow-section">
         {rows.map((x) => (
-          <div className="domain-rec-card" key={x.intern_id + "-" + x.batch_id}>
+          <div className="domain-rec-card" key={x.intern_id + "-" + x.batch_id}>{feedbackId===x.intern_id&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
             <div className="verification-title">
               <div>
                 <h3>{x.full_name}</h3>
