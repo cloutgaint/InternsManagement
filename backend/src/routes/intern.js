@@ -303,17 +303,17 @@ r.post("/attendance/verify", async (req, res) => {
     const failures = (await q("SELECT count(*)::int n FROM attendance_events WHERE intern_id=$1 AND event_type=$2 AND status='FAILED' AND event_time::date=current_date", [p.id, eventType])).rows[0].n;
     const maxRetries = Number(process.env.ATTENDANCE_MAX_RETRIES || 3);
     if (failures < maxRetries)
-      return res.status(422).json({ error: "Face match failed. Please retry.", retriesLeft: maxRetries - failures });
+      return res.status(422).json({ error: (verified.reason || "Biometric verification failed") + ". Please retry.", retriesLeft: maxRetries - failures });
     let ex = (await q("SELECT * FROM attendance_exceptions WHERE intern_id=$1 AND day=current_date AND kind='FAILED_MATCH' AND status='DETECTED' LIMIT 1", [p.id])).rows[0];
     if (!ex) {
       ex = (await q(
-        "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH','Live face did not meet the configured match threshold after retries','DETECTED',$2) RETURNING *",
-        [p.id, { eventType, requestedStatus: "PRESENT", attempts: failures, matchScore: Number(matchScore), livenessScore: Number(livenessScore), challengeType, challengePass }],
+        "INSERT INTO attendance_exceptions(intern_id,day,kind,reason,status,requested_value) VALUES($1,current_date,'FAILED_MATCH',$2,'DETECTED',$3) RETURNING *",
+        [p.id, verified.reason || "Biometric verification failed after retries", { eventType, requestedStatus: "PRESENT", attempts: failures, matchScore: Number(matchScore), livenessScore: Number(livenessScore), challengeType, challengePass }],
       )).rows[0];
       await notifyAdmins("ATTENDANCE_EXCEPTION", "Attendance exception", p.full_name + " could not be verified after " + failures + " attempts.", "/admin/attendance", "ATT-EX:" + ex.id);
     }
     return res.status(422).json({
-      error: "Face match failed. Attendance was not recorded; a correction request was sent to Admin.",
+      error: (verified.reason || "Biometric verification failed") + ". Attendance was not recorded; an exception was sent to Admin for review.",
       exception: ex,
       retriesLeft: 0,
     });
