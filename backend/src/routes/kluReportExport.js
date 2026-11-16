@@ -109,7 +109,9 @@ async function fetchReport(req, id) {
   };
   // Drafts use live uploaded assets; finalized reports preserve their signed snapshots.
   if(x.status!=="FINALIZED"){
-    const mentorUser=(await q("SELECT m.user_id FROM intern_mentor_assignments ima JOIN mentors m ON m.id=ima.mentor_id WHERE ima.intern_id=$1 AND ima.active LIMIT 1",[x.intern_id])).rows[0]?.user_id;
+    // A mentor signing a shared-project report uses their own uploaded signature.
+    // Admin previews use the assigned mentor's signature, never the admin's.
+    const mentorUser=req.user.role==="MENTOR"?req.user.id:(await q("SELECT m.user_id FROM intern_mentor_assignments ima JOIN mentors m ON m.id=ima.mentor_id WHERE ima.intern_id=$1 AND ima.active LIMIT 1",[x.intern_id])).rows[0]?.user_id;
     const [stamp,signature]=await Promise.all([
       q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='company_stamp' AND owner_user_id IS NULL"),
       mentorUser?q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='mentor_signature' AND owner_user_id=$1",[mentorUser]):Promise.resolve({rows:[]})
@@ -222,7 +224,7 @@ export function registerKluExports(r) {
       return res
         .status(404)
         .json({ error: "Report not found or access denied" });
-    if(x.branding_missing.length)return res.status(409).json({error:"Missing "+x.branding_missing.join(" and ")+". Upload the mentor signature and official company stamp, then reopen the report."});
+    if(x.branding_missing.length)return res.status(409).json({error:"Cannot generate report: missing "+x.branding_missing.join(" and ")+". "+(x.branding_missing.includes("mentor signature")?"Mentor: upload your signature under My Profile / Signature. ":"")+(x.branding_missing.includes("company stamp")?"Admin: upload the stamp under Company Settings.":"")});
     res.set("Cache-Control", "no-store");
     res.set(
       "Content-Disposition",
