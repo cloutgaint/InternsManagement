@@ -11,5 +11,6 @@ app.listen(port, () => {
   startTaskReleaseScheduler();
   startLocalBiometricVerifier();
 });
-\nprocess.once("SIGINT",()=>{stopLocalBiometricVerifier();process.exit(0);});
+
+process.once("SIGINT",()=>{stopLocalBiometricVerifier();process.exit(0);});
 process.once("SIGTERM",()=>{stopLocalBiometricVerifier();process.exit(0);});
