@@ -265,7 +265,7 @@ export default function InternAttendancePage() {
             <div className="card"><small>Absent</small><strong>{st.summary.absent_days}</strong></div>
             <div className="card"><small>On leave / Holiday</small><strong>{st.summary.leave_days} / {st.summary.holiday_days}</strong></div>
           </div>
-          <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted. Full day: 8 hours; half day: 4 hours. Late arrival is tracked separately.</p>
+          <p className="muted">Minimum required for completion: {st.allocation?.min_attendance ?? "—"}%. Holidays and approved leave are not counted. Full day: 7 hours; half day: 4 hours. Late arrival is tracked separately.</p>
           <div>
             {(st.history || []).filter((x, index, rows) => rows.findIndex((r) => r.day === x.day) === index).slice(0, 14).map((x, index) => (
               <div className="status-row" key={`${x.day}-${x.source || x.status}-${index}`}>
