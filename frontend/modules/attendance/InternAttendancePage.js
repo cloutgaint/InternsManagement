@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 import Link from "next/link";
-const challenges = ["TURN_LEFT", "TURN_RIGHT"];
+
 export default function InternAttendancePage() {
   const [correction, setCorrection] = useState({ day: "", requestedStatus: "PRESENT", reason: "" });
   const video = useRef(null),
@@ -50,15 +50,11 @@ export default function InternAttendancePage() {
     setMsg("");
     setPhase("STARTING");
     try {
-      // The baseline must be a real frame showing the student facing forward,
-      // otherwise the server cannot measure the head-turn challenge.
       await waitForFrame();
       await new Promise((r) => setTimeout(r, 700));
       await requireSingleFace();
       if (!stream.current) return;
-      baselineRef.current = capture();
-      if (!baselineRef.current) throw new Error("Camera is not ready.");
-      setChallenge(challenges[Math.floor(Math.random() * challenges.length)]);
+
       setPhase("CHALLENGE");
     } catch (e) {
       if (!stream.current) return;
@@ -107,14 +103,14 @@ export default function InternAttendancePage() {
   async function verify() {
     const imageData = capture();
     if (!imageData) return setErr("Camera is not ready.");
-    if (!baselineRef.current) return setErr("Initial face capture missing. Stop the camera and start again.");
+
     setPhase("VERIFYING");
     setErr("");
     try {
       await requireSingleFace();
       const x = await api("/intern/attendance/verify", {
         method: "POST",
-        body: JSON.stringify({ eventType, imageData, baselineImageData: baselineRef.current, challengeType: challenge }),
+        body: JSON.stringify({ eventType, imageData, challengeType: "FACE_ONLY" }),
       });
       setMsg(
         eventType === "CHECK_IN"
@@ -152,10 +148,7 @@ export default function InternAttendancePage() {
       setErr(x.message);
     }
   }
-  const instruction = {
-    TURN_LEFT: "Turn your head to the left",
-    TURN_RIGHT: "Turn your head to the right",
-  }[challenge];
+
   const approved = st?.face?.status === "APPROVED";
   const dayComplete = Boolean(st?.today?.check_in && st?.today?.check_out);
   const cameraOn = ["STARTING", "CHALLENGE", "VERIFYING"].includes(phase);
@@ -223,16 +216,15 @@ export default function InternAttendancePage() {
           {phase === "VERIFYING" && <div className="att-banner">Verifying your face…</div>}
           {phase === "CHALLENGE" && (
             <div className="liveness-challenge">
-              <small>LIVE CHALLENGE</small>
-              <strong>{instruction}</strong>
-              <span>Hold the turned position, then press Verify.</span>
+              <strong>Look straight at the camera</strong>
+              <span>Press Verify to compare your face with your approved registration.</span>
             </div>
           )}
         </div>
         <div className="attendance-side">
           <h2>{dayComplete ? "Attendance complete" : eventType === "CHECK_IN" ? "Check in" : "Check out"}</h2>
           <ol className="att-steps">
-            {["Start the camera and face it directly", "Follow the on-screen head turn", "Press Verify to record attendance"].map((label, i) => (
+            {["Start the camera and face it directly", "Keep your face clearly visible", "Press Verify to record attendance"].map((label, i) => (
               <li key={label} className={step === i + 1 ? "active" : step > i + 1 ? "done" : ""}>
                 <span>{i + 1}</span>
                 {label}
