@@ -6,6 +6,7 @@ import multer from "multer";import {documentUpload,validExternalDocumentUrl,vali
 import { q, tx } from "../common/database/index.js";
 import { sendOfferPdf } from "../services/offerLetterPdfService.js";
 import { verifyAttendanceBiometrics } from "../services/attendanceBiometricVerifier.js";
+import { validateFaceCapture } from "../services/faceCaptureQuality.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
 import { audit } from "../common/audit/audit.service.js";
 import { writeSecureFile } from "../common/storage/secureFiles.js";
@@ -141,6 +142,18 @@ r.post("/proofs", proofUpload.array("proofFiles", 2), async (req, res) => {
     throw error;
   }
 });
+r.post("/face-enrollment/request-reenrollment", async (req, res) => {
+  const p = await me(req.user.id);
+  const reason = String(req.body?.reason || "").trim();
+  if (reason.length < 5 || reason.length > 500) return res.status(400).json({ error: "Enter a reason (5–500 characters) for re-registration." });
+  const before = (await q("SELECT * FROM face_enrollments WHERE intern_id=$1 AND status='APPROVED' ORDER BY created_at DESC LIMIT 1", [p.id])).rows[0];
+  if (!before) return res.status(409).json({ error: "Only an approved face registration can be replaced. Complete or await the current review first." });
+  const after = (await q("UPDATE face_enrollments SET status='REENROLLMENT_REQUIRED',decision_reason=$2 WHERE id=$1 AND status='APPROVED' RETURNING *", [before.id, "Intern requested re-registration: " + reason])).rows[0];
+  if (!after) return res.status(409).json({ error: "Face registration changed. Refresh and try again." });
+  await audit(req, "FACE_REENROLLMENT_REQUESTED", "face_enrollment", before.id, before, after);
+  await notifyAdmins("FACE_REENROLLMENT_REQUESTED", "Face re-registration requested", p.full_name + " requested face re-registration.", "/admin/attendance");
+  res.json({ status: after.status, decision_reason: after.decision_reason });
+});
 r.post("/face-enrollment", async (req, res) => {
   const p = await me(req.user.id);
   const { consent, imageData } = req.body;
@@ -175,6 +188,8 @@ r.post("/face-enrollment", async (req, res) => {
         error:
           "Captured image quality/size is invalid. Retake the photo in good lighting.",
       });
+  const qualityError = await validateFaceCapture(buf);
+  if (qualityError) return res.status(400).json({ error: qualityError });
   const dir = path.resolve("uploads/face-enrollment");
   fs.mkdirSync(dir, { recursive: true });
   const ext = type === "png" ? "png" : "jpg",
