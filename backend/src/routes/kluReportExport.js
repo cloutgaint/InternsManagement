@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import PDFDocument from "pdfkit";
 import {
   Document,
@@ -128,7 +129,18 @@ async function fetchReport(req, id) {
     all: sum(x.intern_start || x.from_date, x.to_date),
   };
 }
-function makePdf(x){
+// Remove white paper/background from uploaded signatures and stamps before layering.
+async function transparentInk(data){
+ const input=Buffer.isBuffer(data)?data:Buffer.from(data);
+ const {data:raw,info}=await sharp(input).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+ for(let i=0;i<raw.length;i+=4){
+  const r=raw[i],g=raw[i+1],b=raw[i+2],white=Math.min(r,g,b);
+  const opacity=Math.max(0,Math.min(1,(255-white)/95));
+  raw[i+3]=Math.round(raw[i+3]*opacity);
+ }
+ return sharp(raw,{raw:{width:info.width,height:info.height,channels:4}}).png().toBuffer();
+}
+async function makePdf(x){
  const doc=new PDFDocument({size:"A4",margin:0,autoFirstPage:true});
  const L=51,W=493,R=L+W;let y=48;
  const font=(bold=false,size=7)=>doc.font(bold?"Helvetica-Bold":"Helvetica").fontSize(size).fillColor("#111");
@@ -156,22 +168,22 @@ function makePdf(x){
  area("16. Exceptions, if any (such as time over run, unanticipated problems, etc.)",x.exceptions||"No exceptions.",51);
  line([[275,"Date: "+date(x.to_date)],[218,"Signature of the Student: __________________"]],19);
  section("Evaluation by University Guide & Company Guide");
- const evalRow=(title,criteria,marks,height,extra,assets=false)=>{
+ const evalRow=async(title,criteria,marks,height,extra,assets=false)=>{
   const main=W-93;rect(L,y,main,height);rect(L+main,y,93,height,true);
-  put(title,L,y,main,17,{bold:true});put(criteria,L,y+16,main,36,{size:7});
-  if(extra)put(extra,L+2,y+49,main-4,assets?36:height-54);
+  put(title,L,y,main,17,{bold:true});put(criteria,L,y+16,main,49,{size:7});
+  if(extra)put(extra,L+2,y+65,main-4,assets?height-79:height-69);
   const [markLabel,markValue]=String(marks).split("\n");
   font(true,7);doc.text(markLabel,L+main+4,y+7,{width:85,align:"center",height:39});
   if(markValue?.trim()&&markValue.trim()!=="— / 10"&&markValue.trim()!=="— / 30"){font(true,16);doc.text(markValue,L+main+4,y+height/2+1,{width:85,align:"center",height:26});}
   if(assets){
-   if(x.signature_snapshot&&x.signature_mime)doc.image(x.signature_snapshot,L+main-146,y+height-76,{fit:[102,58]});
-   if(x.stamp_snapshot&&x.stamp_mime)doc.image(x.stamp_snapshot,L+main-102,y+height-84,{fit:[92,68]});
+   if(x.signature_snapshot&&x.signature_mime)doc.image(await transparentInk(x.signature_snapshot),L+main-126,y+height-70,{fit:[110,57]});
+   if(x.stamp_snapshot&&x.stamp_mime)doc.image(await transparentInk(x.stamp_snapshot),L+main-77,y+height-69,{fit:[100,65]});
    font(false,6);doc.text("(Signature of Company Guide)",L+main-175,y+height-12,{width:165,align:"center",lineBreak:false});
   }else{font(false,6);doc.text("(Signature of University Guide)",L+main-190,y+height-13,{width:185,align:"right",lineBreak:false});}
   y+=height;
  };
- evalRow("17. Criteria for evaluation:","a) student discipline, b) regularity, c) punctuality, d) commitment, e) willingness to work hard, f) attitude & behavior etc.","Assessed by UG for 10 M per fortnight\n"+(x.university_marks==null?"":x.university_marks+" / 10"),79,"");
- evalRow("18. Criteria for evaluation:","a) progress achieved during the fortnight on OJET, b) work engagement, c) ability to solve problems, d) knowledge application, e) professional behavior, f) teamwork, g) new ideas generated for the company, h) appreciations received etc.","Assessed by CG for 30 M per fortnight\n"+(x.company_marks==null?"":x.company_marks+" / 30"),107,x.company_comments,true);
+ await evalRow("17. Criteria for evaluation:","a) student discipline, b) regularity, c) punctuality, d) commitment, e) willingness to work hard, f) attitude & behavior etc.","Assessed by UG for 10 M per fortnight\n"+(x.university_marks==null?"":x.university_marks+" / 10"),79,"");
+ await evalRow("18. Criteria for evaluation:","a) progress achieved during the fortnight on OJET, b) work engagement, c) ability to solve problems, d) knowledge application, e) professional behavior, f) teamwork, g) new ideas generated for the company, h) appreciations received etc.","Assessed by CG for 30 M per fortnight\n"+(x.company_marks==null?"":x.company_marks+" / 30"),124,x.company_comments,true);
  const total=x.company_marks!=null&&x.university_marks!=null?Number(x.company_marks)+Number(x.university_marks):null;
  rect(L,y,W-93,58);rect(R-93,y,93,58,true);put("19. Feedback, if any, to the student",L,y,W-93,17,{bold:true});put(x.student_feedback||"—",L,y+17,W-93,31);put("Total Marks for the fortnight (10+30=40 M)\n"+(total==null?"":total+" / 40"),R-93,y,93,50,{bold:true,align:"center"});
  font(false,6);doc.text("(University Guide shall forward to the Director, Industrial Practice School)",L+30,y+48,{width:W-130,align:"center",lineBreak:false});y+=58;
@@ -246,7 +258,7 @@ export function registerKluExports(r) {
               "Report text is too long for one A4 page. Shorten the achievements, plan, exceptions, company comments or feedback before downloading.",
           });
       res.type("application/pdf");
-      makePdf(x).pipe(res);
+      (await makePdf(x)).pipe(res);
     } else {
       res.type(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
