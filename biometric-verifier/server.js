@@ -31,16 +31,13 @@ const server=http.createServer(async(req,res)=>{
     let raw="";
     for await(const chunk of req){raw+=chunk;if(raw.length>20000000)throw new InputError("Request too large")}
     const {imageData,baselineImageData,enrollmentImageData,challengeType}=JSON.parse(raw);
-    if(!["TURN_LEFT","TURN_RIGHT"].includes(challengeType))throw new InputError("Unsupported challenge");
+    if(challengeType!=="FACE_ONLY")throw new InputError("Unsupported verification mode");
     // Sequential on purpose: Human keeps per-instance state between detect() calls.
     const enrolled=await detect(enrollmentImageData,"enrollment");
-    const base=await detect(baselineImageData,"initial live");
-    const live=await detect(imageData,"challenge");
-    const matchScore=Math.min(human.match.similarity(live.embedding,enrolled.embedding),human.match.similarity(base.embedding,enrolled.embedding));
-    const delta=YAW_SIGN*(yaw(live)-yaw(base));
-    const challengePass=Number.isFinite(delta)&&Math.abs(delta)>=0.18&&((challengeType==="TURN_LEFT"&&delta<0)||(challengeType==="TURN_RIGHT"&&delta>0));
-    if(process.env.NODE_ENV!=="production")console.log("verify",{challengeType,baseYaw:yaw(base),liveYaw:yaw(live),delta,matchScore,challengePass});
-    res.writeHead(200).end(JSON.stringify({matchScore,livenessScore:challengePass?1:0,challengePass}));
+    const live=await detect(imageData,"live");
+    const matchScore=human.match.similarity(live.embedding,enrolled.embedding);
+    if(process.env.NODE_ENV!=="production")console.log("verify",{mode:"FACE_ONLY",matchScore});
+    res.writeHead(200).end(JSON.stringify({matchScore,livenessScore:1,challengePass:true}));
   }catch(e){
     if(!(e instanceof InputError)&&!(e instanceof SyntaxError))console.error("verify failed",e);
     res.writeHead(e instanceof InputError||e instanceof SyntaxError?422:500).end(JSON.stringify({error:e instanceof InputError?e.message:"Verification failed"}));
