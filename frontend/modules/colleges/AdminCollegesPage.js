@@ -7,7 +7,8 @@ export default function Page() {
     [edit, setEdit] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [feedbackArea,setFeedbackArea]=useState("add"),[feedbackId,setFeedbackId]=useState(null);
   const load = () =>
     api("/admin/colleges")
       .then(setRows)
@@ -17,7 +18,7 @@ export default function Page() {
   }, []);
   async function add(e) {
     e.preventDefault();
-    setErr("");
+    setFeedbackArea("add");setFeedbackId(null);setMsg("");setErr("");
     if (!form.name.trim()) return setErr("College name is required.");
     try {
       setBusy(true);
@@ -35,6 +36,7 @@ export default function Page() {
     }
   }
   async function save(c) {
+    setFeedbackArea("edit");setFeedbackId(c.id);setErr("");setMsg("");
     try {
       setBusy(true);
       await api("/admin/colleges/" + c.id, {
@@ -68,8 +70,6 @@ export default function Page() {
           {rows.filter((x) => x.active).length} active
         </span>
       </div>
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
       <section className="card">
         <h2>Add College</h2>
         <form className="form-grid" onSubmit={add}>
@@ -98,9 +98,10 @@ export default function Page() {
             </button>
           </div>
         </form>
+        {feedbackArea==="add"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
       </section>
       <section className="card workflow-section">
-        <h2>Managed Colleges</h2>
+        <h2>Managed Colleges</h2>{feedbackArea==="edit"&&feedbackId&&msg&&<p className="success" role="status">{msg}</p>}{feedbackArea==="edit"&&feedbackId&&err&&<p className="error" role="alert">{err}</p>}
         {!rows.length ? (
           <p className="muted">No colleges have been added yet.</p>
         ) : (
