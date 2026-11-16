@@ -177,7 +177,8 @@ async function makePdf(x){
   if(markValue?.trim()&&markValue.trim()!=="— / 10"&&markValue.trim()!=="— / 30"){font(true,16);doc.text(markValue,L+main+4,y+height/2+1,{width:85,align:"center",height:26});}
   if(assets){
    if(x.signature_snapshot&&x.signature_mime)doc.image(await transparentInk(x.signature_snapshot),L+main-126,y+height-70,{fit:[110,57]});
-   if(x.stamp_snapshot&&x.stamp_mime)doc.image(await transparentInk(x.stamp_snapshot),L+main-77,y+height-69,{fit:[100,65]});
+   // Draw the transparent stamp LAST, directly on top of the signature ink.
+   if(x.stamp_snapshot&&x.stamp_mime)doc.image(await transparentInk(x.stamp_snapshot),L+main-112,y+height-78,{fit:[106,75]});
    font(false,6);doc.text("(Signature of Company Guide)",L+main-175,y+height-12,{width:165,align:"center",lineBreak:false});
   }else{font(false,6);doc.text("(Signature of University Guide)",L+main-190,y+height-13,{width:185,align:"right",lineBreak:false});}
   y+=height;
