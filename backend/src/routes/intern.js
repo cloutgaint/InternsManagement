@@ -265,14 +265,14 @@ r.post("/attendance/verify", async (req, res) => {
   const { eventType, imageData, baselineImageData, challengeType } = req.body;
   if (!["CHECK_IN", "CHECK_OUT"].includes(eventType))
     return res.status(400).json({ error: "Invalid attendance event" });
-  if (!["TURN_LEFT", "TURN_RIGHT"].includes(challengeType))
+  if (challengeType !== "FACE_ONLY")
     return res.status(400).json({ error: "Invalid liveness challenge" });
   if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(imageData || "")))
     return res.status(400).json({ error: "Live camera capture is required" });
   const buf = Buffer.from(String(imageData).split(",")[1] || "", "base64");
   if (buf.length < 10000 || buf.length > 5 * 1024 * 1024)
     return res.status(400).json({ error: "Invalid camera capture" });
-  if (!/^data:image\/(jpeg|jpg|png);base64,/.test(String(baselineImageData || ""))) return res.status(400).json({ error: "Initial live face capture is required" });
+  
   // Reject impossible events before running (and logging failures from) the biometric check.
   const alloc = (
     await q(
