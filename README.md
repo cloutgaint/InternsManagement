@@ -35,7 +35,7 @@ docker compose up --build
 
 Open frontend at `http://localhost:3000`, API at `http://localhost:8000/api/health`, and connect pgAdmin to PostgreSQL on host port **5434** (`postgres` / `postgres`, DB `gaint_interns`). The health endpoint returns `503` unless the API can query PostgreSQL.
 
-Seed Super Admin: `admin@gaintclout.com` / `ChangeMe123!`. **Change this immediately.**
+Development seed Super Admin: `admin@gaintclout.com` / `ChangeMe123!`. **Change this immediately.** Production refuses this default; set `INITIAL_ADMIN_EMAIL` and a unique `INITIAL_ADMIN_PASSWORD` before deployment.
 
 ### Without Docker
 
@@ -72,7 +72,7 @@ See `REQUIREMENTS_CHECKLIST.md` for traceability.
 
 ## Production settings
 
-Before going live, set `NODE_ENV=production` and configure every production requirement documented in `.env.example`: a 64-byte `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `SMTP_*`, `CLAMAV_HOST`, an approved HTTPS biometric verifier, and proof/face retention periods. The API now refuses to start in production when any of these controls are absent or insecure.
+Before going live, set `NODE_ENV=production`, `NEXT_PUBLIC_API_URL` to the public HTTPS API URL, and configure every production requirement documented in `.env.example`: unique initial-admin credentials, a 64-byte `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, private S3 object storage, `SMTP_*`, `CLAMAV_HOST`, an approved HTTPS biometric verifier, and proof/face retention periods. Set `BACKEND_DATABASE_URL` when Docker should use a managed database instead of its bundled PostgreSQL service. Use a workload role/identity for S3 rather than long-lived access keys, keep the bucket public-access blocked, and apply lifecycle/backup policies appropriate to the retention requirements. The API refuses to start in production when any of these controls are absent or insecure. Because `NEXT_PUBLIC_API_URL` is compiled into the browser bundle, set it before building the frontend image.
 
 Run the full test suite against a disposable database whose name contains `intern_test`:
 

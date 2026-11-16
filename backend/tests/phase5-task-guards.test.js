@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const mentor=fs.readFileSync(new URL("../src/routes/mentor.js",import.meta.url),"utf8");
-const admin=fs.readFileSync(new URL("../src/routes/admin.js",import.meta.url),"utf8");
+const mentor=fs.readFileSync(new URL("../src/routes/mentor/mentor.routes.js",import.meta.url),"utf8");
+const admin=fs.readFileSync(new URL("../src/routes/admin/admin.routes.js",import.meta.url),"utf8");
 test("mentor grading locks submission and writes evaluation and status atomically",()=>{
  const route=mentor.split('r.post("/submissions/:id/evaluate"')[1]?.split('r.get("/assessment-evaluations"')[0];
  assert.ok(route);assert.match(route,/await tx\(async \(client\) =>/);

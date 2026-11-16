@@ -2,75 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/shared/api/client";
 import { useRouter } from "next/router";
-const PROGRAMS = [
-  "B.Tech",
-  "B.E.",
-  "BBA",
-  "B.Com",
-  "B.Des",
-  "B.Sc",
-  "M.Sc",
-  "BCA",
-  "MCA",
-  "M.Tech",
-  "MBA",
-  "Diploma",
-  "Other",
-];
-const BRANCHES = [
-  "CSE",
-  "IT",
-  "ECE",
-  "EEE",
-  "Mechanical",
-  "Civil",
-  "AI & ML",
-  "Data Science",
-  "Cyber Security",
-  "Other",
-];
-const PROOFS = [
-  "College Allotment Order",
-  "No Objection Certificate (NOC)",
-  "Internship Permission / Recommendation Letter",
-  "Bonafide Certificate with internship permission",
-  "Other",
-];
+import { BRANCHES, PROGRAMS, PROOFS, initialRegistrationForm, validateRegistration } from "./registrationForm";
 export default function RegisterPage() {
   const router=useRouter();
-  const [f, setF] = useState({
-      email: "",
-      password: "",
-      fullName: "",
-      mobile: "",
-      dob: "",
-      address: "",
-      collegeId: "",
-      collegeOther: "",
-      university: "",
-      program: "",
-      programOther: "",
-      branch: "",
-      branchOther: "",
-      yearSemester: "",
-      rollNumber: "",
-      preferredDomains: "",
-      preferredBatch: "",
-      skillsTools: "",
-      resumePortfolioUrl: "",
-      proofType: "",
-      issuingAuthority: "",
-      referenceNumber: "",
-      issueDate: "",
-      approvedFrom: "",
-      approvedTo: "",
-      coordinatorName: "",
-      coordinatorDesignation: "",
-      coordinatorEmail: "",
-      coordinatorPhone: "",
-      consentGenuine: false,
-      consentStorage: false,
-    }),
+  const [f, setF] = useState(initialRegistrationForm),
     [files, setFiles] = useState([]),
     [photo, setPhoto] = useState(null),
     [covered, setCovered] = useState(false),
@@ -98,92 +33,26 @@ export default function RegisterPage() {
     setResumeError("");
     setMsg("");
     try {
-      const email = f.email.trim().toLowerCase(),
-        mobile = f.mobile.replace(/\D/g, ""),
-        coordPhone = f.coordinatorPhone.replace(/\D/g, "");
-      if (f.fullName.trim().length < 3)
-        throw new Error(
-          "Enter the student full name as shown in college records.",
-        );
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-        throw new Error("Enter a valid student email address.");
-      if (!/^[6-9]\d{9}$/.test(mobile))
-        throw new Error("Enter a valid 10-digit Indian mobile number.");
-      let validResumeLink=!f.resumePortfolioUrl.trim();
-      try{const url=new URL(f.resumePortfolioUrl.trim());validResumeLink=url.protocol==="https:"&&!!url.hostname;}catch{/* The validation message below handles malformed URLs. */}
-      if (!validResumeLink) {
-        setResumeError("Enter a valid HTTPS link to your resume or portfolio.");
-        resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
-        resumeRef.current?.focus({preventScroll:true});
-        return;
-      }
-      if (!f.dob) throw new Error("Date of birth is required.");
-      const dob = new Date(f.dob),
-        today = new Date();
-      if (dob >= today) throw new Error("Date of birth must be in the past.");
-      if (
-        f.password.length < 10 ||
-        !/[A-Z]/.test(f.password) ||
-        !/[a-z]/.test(f.password) ||
-        !/[0-9]/.test(f.password) ||
-        !/[^A-Za-z0-9]/.test(f.password)
-      )
-        throw new Error(
-          "Password must be 10+ characters and include uppercase, lowercase, number and special character.",
-        );
-      if (!collegeChoice || (!f.collegeId && !f.collegeOther.trim()))
-        throw new Error(
-          "Select your college or choose Other and enter the college name.",
-        );
-      if (!f.university.trim() || !f.rollNumber.trim())
-        throw new Error("University and roll number are required.");
-      if (f.program === "Other" && !f.programOther.trim())
-        throw new Error("Enter your program name.");
-      if (f.branch === "Other" && !f.branchOther.trim())
-        throw new Error("Enter your branch / department.");
-      if (
-        f.approvedFrom &&
-        f.approvedTo &&
-        new Date(f.approvedTo) < new Date(f.approvedFrom)
-      )
-        throw new Error("Internship end date cannot be before the start date.");
-      if (f.issueDate && new Date(f.issueDate) > today)
-        throw new Error("Proof issue date cannot be in the future.");
-      if (!covered && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.coordinatorEmail.trim()))
-        throw new Error("Enter a valid faculty coordinator email.");
-      if (!covered && !/^\d{10}$/.test(coordPhone))
-        throw new Error(
-          "Enter a valid 10-digit faculty coordinator phone number.",
-        );
-      if (photo && !["image/jpeg", "image/png"].includes(photo.type))
-        throw new Error("Student photo must be JPG or PNG.");
-      if (photo && photo.size > 5 * 1024 * 1024)
-        throw new Error("Student photo must be 5 MB or smaller.");
-      if (!covered && !files.length)
-        throw new Error("Please upload the college permission proof.");
-      if (files.length > 2)
-        throw new Error("Maximum 2 proof files are allowed.");
-      if (files.some((x) => x.size > 5 * 1024 * 1024))
-        throw new Error("Each proof file must be 5 MB or smaller.");
-      const prefs = f.preferredDomains
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-      if (prefs.length > 3)
-        throw new Error("Choose up to 3 preferred domains only.");
+      const { preferredDomains } = validateRegistration({
+        form: f,
+        files,
+        photo,
+        covered,
+        collegeChoice,
+      });
       setBusy(true);
       const body = new FormData();
       Object.entries(f).forEach(([k, v]) => body.append(k, String(v)));
-      body.set("preferredDomains", JSON.stringify(prefs));
+      body.set("preferredDomains", JSON.stringify(preferredDomains));
       if (!covered) files.forEach((x) => body.append("proofFiles", x));
       if (photo) body.append("photo", photo);
       await api("/auth/register", { method: "POST", body });
       form.reset();
-      setF(x=>Object.fromEntries(Object.entries(x).map(([key,value])=>[key,typeof value==="boolean"?false:""])));
+      setF(initialRegistrationForm);
       setFiles([]);setPhoto(null);setCollegeChoice("");setShowPassword(false);
       await router.replace("/login?registered=1");
     } catch (x) {
-      if (/resume or portfolio link/i.test(x.message)) {
+      if (x.field === "resumePortfolioUrl") {
         setResumeError(x.message);
         resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
         resumeRef.current?.focus({preventScroll:true});

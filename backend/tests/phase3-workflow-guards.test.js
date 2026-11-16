@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const intern = fs.readFileSync(new URL("../src/routes/intern.js", import.meta.url), "utf8");
-const admin = fs.readFileSync(new URL("../src/routes/admin.js", import.meta.url), "utf8");
+const intern = fs.readFileSync(new URL("../src/routes/intern/intern.routes.js", import.meta.url), "utf8");
+const admin = fs.readFileSync(new URL("../src/routes/admin/admin.routes.js", import.meta.url), "utf8");
 const submit = intern.split('r.post("/assessments/:id/submit"')[1]?.split('r.get("/group"')[0];
 test("assessment submission uses one transaction and locks the attempt", () => {
   assert.ok(submit, "submission route exists");

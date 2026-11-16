@@ -15,7 +15,7 @@ test("attendance fails closed without a trusted biometric provider", async () =>
   }
 });
 test("attendance route does not use user-supplied match and liveness scores", () => {
-  const source = fs.readFileSync(new URL("../src/routes/intern.js", import.meta.url), "utf8");
+  const source = fs.readFileSync(new URL("../src/routes/intern/intern.routes.js", import.meta.url), "utf8");
   const route = source.split('r.post("/attendance/verify"')[1]?.split('r.get("/work-log"')[0];
   assert.ok(route);
   assert.match(route, /await verifyAttendanceBiometrics/);

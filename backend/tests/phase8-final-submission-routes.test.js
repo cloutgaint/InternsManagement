@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const intern=readFileSync(new URL("../src/routes/intern.js",import.meta.url),"utf8");
-const mentor=readFileSync(new URL("../src/routes/mentor.js",import.meta.url),"utf8");
+const intern=readFileSync(new URL("../src/routes/intern/intern.routes.js",import.meta.url),"utf8");
+const mentor=readFileSync(new URL("../src/routes/mentor/mentor.routes.js",import.meta.url),"utf8");
 const schema=readFileSync(new URL("../migrations/001_init.sql",import.meta.url),"utf8");
 test("final submissions require assigned project and group-scoped evidence",()=>{
  const route=intern.slice(intern.indexOf('r.post("/final-project-submission"'));
@@ -13,7 +13,7 @@ test("final submissions require assigned project and group-scoped evidence",()=>
 test("mentor reviews require active assignment and explicit feedback",()=>{
  const route=mentor.slice(mentor.indexOf('r.post("/final-project-submissions/:id/review"'));
  assert.match(route,/REVISION_REQUESTED/);assert.match(route,/ACCEPTED/);
- assert.match(route,/mentorHasInternInGroup\("fps\.group_id","\$2::uuid"\)/);
+ assert.match(route,/mentorHasInternInGroup\("fps\.group_id",\s*"\$2::uuid"\)/);
  assert.match(route,/feedback\.trim\(\)/);
 });
 test("schema restricts final submission states and one row per project group",()=>{

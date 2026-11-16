@@ -1,9 +1,13 @@
 import bcrypt from "bcryptjs";
 import { q, pool } from "./common/database/index.js";
-const pw = await bcrypt.hash("ChangeMe123!", 12);
+const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || "admin@gaintclout.com")
+  .trim()
+  .toLowerCase();
+const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || "ChangeMe123!";
+const pw = await bcrypt.hash(adminPassword, 12);
 await q(
   `INSERT INTO users(email,password_hash,role,status,is_active,must_change_password) SELECT $1,$2,'SUPER_ADMIN','ACTIVE',true,true WHERE NOT EXISTS(SELECT 1 FROM users WHERE lower(btrim(email))=$1 AND status<>'DELETED')`,
-  ["admin@gaintclout.com", pw],
+  [adminEmail, pw],
 );
 for (const [name, code, cat] of [
   ["Full Stack", "FULLSTACK", "Technology"],
@@ -18,6 +22,6 @@ for (const [name, code, cat] of [
     [name, code, cat],
   );
 console.log(
-  "Seed complete; admin@gaintclout.com / ChangeMe123! (change immediately)",
+  `Seed complete; initial admin: ${adminEmail} (change the password immediately)`,
 );
 await pool.end();

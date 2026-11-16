@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const admin = fs.readFileSync(new URL("../src/routes/admin.js", import.meta.url), "utf8");
+const admin = fs.readFileSync(new URL("../src/routes/admin/admin.routes.js", import.meta.url), "utf8");
 test("face enrollment review only transitions pending enrollments", () => {
   const route = admin.split('r.post("/face-enrollments/:id/decision"')[1]?.split('r.get("/attendance-exceptions"')[0];
   assert.ok(route);

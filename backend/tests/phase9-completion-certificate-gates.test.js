@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const admin=readFileSync(new URL("../src/routes/adminWorkflow.js",import.meta.url),"utf8")+readFileSync(new URL("../src/routes/admin.js",import.meta.url),"utf8");
+const admin=readFileSync(new URL("../src/routes/admin/workflow.routes.js",import.meta.url),"utf8")+readFileSync(new URL("../src/routes/admin/admin.routes.js",import.meta.url),"utf8");
 test("admin completion approval requires mentor recommendation",()=>{
  const route=admin.slice(admin.indexOf('r.post("/completions/:internId/decision"'),admin.indexOf('r.post("/certificates/:internId/issue"'));
  assert.match(route,/evaluation\.recommendation !== "COMPLETED"/);

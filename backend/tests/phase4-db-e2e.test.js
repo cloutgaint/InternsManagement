@@ -43,7 +43,7 @@ test("Phase 4 PostgreSQL attendance concurrency, holidays, leave and trusted ver
     await q("INSERT INTO batch_allocations(batch_id,intern_id,intern_start,intern_end) VALUES($1,$2,current_date-interval '10 days',current_date+interval '90 days')",[batch.id,profile.id]);
     await q("INSERT INTO face_enrollments(intern_id,template_ref,raw_image_path,status,approved_by,approved_at) VALUES($1,'capture:test',$3,'APPROVED',$2,now())",[profile.id,admin.id,enrollmentFile]);
     const imageData="data:image/jpeg;base64,"+Buffer.alloc(11000,42).toString("base64");
-    const attendance=(eventType)=>req("INTERN","POST","/api/intern/attendance/verify",{eventType,imageData,baselineImageData:imageData,challengeType:"TURN_LEFT",matchScore:0,livenessScore:0,challengePass:false});
+    const attendance=(eventType)=>req("INTERN","POST","/api/intern/attendance/verify",{eventType,imageData,baselineImageData:imageData,challengeType:"FACE_ONLY",matchScore:0,livenessScore:0,challengePass:false});
     const noProvider=process.env.BIOMETRIC_VERIFY_URL;delete process.env.BIOMETRIC_VERIFY_URL;
     try{const blocked=await attendance("CHECK_IN");assert.equal(blocked.status,503);}finally{process.env.BIOMETRIC_VERIFY_URL=noProvider;}
     const first=await Promise.all([attendance("CHECK_IN"),attendance("CHECK_IN")]);

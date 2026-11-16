@@ -13,7 +13,7 @@ WHERE source='CAMERA' AND check_in IS NOT NULL AND check_out IS NULL;
 
 CREATE OR REPLACE VIEW attendance_calendar AS
 WITH dates AS (
-  SELECT ba.id allocation_id,ba.intern_id,ba.batch_id,d::date day,
+  SELECT ba.id allocation_id,ba.intern_id,ba.batch_id,d::date AS day,
          row_number() OVER (PARTITION BY ba.intern_id,d::date ORDER BY ba.intern_start DESC NULLS LAST,ba.id DESC) allocation_rank
   FROM batch_allocations ba
   JOIN batches b ON b.id=ba.batch_id

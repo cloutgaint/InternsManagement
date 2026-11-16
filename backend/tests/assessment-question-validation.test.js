@@ -132,7 +132,7 @@ test("AI generation forwards Admin instructions and parses provider drafts", asy
 });
 
 test("AI MCQ persistence is atomic, deduplicated, retrievable, and assessment-eligible", () => {
-  const admin = fs.readFileSync(new URL("../src/routes/admin.js", import.meta.url), "utf8");
+  const admin = fs.readFileSync(new URL("../src/routes/admin/admin.routes.js", import.meta.url), "utf8");
   const save = admin.split('r.post("/questions/ai-save"')[1]?.split('r.post("/questions/:id/review"')[0];
   assert.ok(save);
   assert.match(save, /await tx\(async \(client\)/);

@@ -1,48 +1,48 @@
-import taskPlans from "./taskPlans.js";
-import { claimInternsForGroup } from "../services/groupMembership.js";
-import { mentorHasInternInGroup, mentorOwnsIntern } from "../services/mentorScope.js";
+import taskPlans from "../shared/task-plans.routes.js";
+import { claimInternsForGroup } from "../../services/groupMembership.js";
+import { mentorHasInternInGroup, mentorOwnsIntern } from "../../services/mentorScope.js";
 import {
   DEFAULT_WEIGHTS,
   validateWeights,
   calculatePerformance,
-} from "../services/performanceScoreService.js";
+} from "../../services/performanceScoreService.js";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
-import batchAllotmentOrders from "./batchAllotmentOrders.js";
-import adminWorkflow from "./adminWorkflow.js";
-import { offerSnapshot } from "../services/offerLetterSnapshot.js";
+import batchAllotmentOrders from "./batch-allotment-orders.routes.js";
+import adminWorkflow from "./workflow.routes.js";
+import { offerSnapshot } from "../../services/offerLetterSnapshot.js";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { q, tx } from "../common/database/index.js";
-import { auth, permit } from "../common/security/auth.middleware.js";
-import { audit } from "../common/audit/audit.service.js";
-import { sendProofFile, latestProof } from "../services/proofService.js";
+import { q, tx } from "../../common/database/index.js";
+import { auth, permit } from "../../common/security/auth.middleware.js";
+import { audit } from "../../common/audit/audit.service.js";
+import { sendProofFile, latestProof } from "../../services/proofService.js";
 import {
   decideAttendanceException,
   decideLeave,
   notifyFaceDecision,
-} from "../services/attendanceService.js";
+} from "../../services/attendanceService.js";
 import {
   detectFileType,
-  readSecureFile,
-} from "../common/storage/secureFiles.js";
-import { adminResetPassword } from "../modules/auth/auth.service.js";
-import { generateQuestions } from "../services/aiQuestionService.js";
+} from "../../common/storage/secureFiles.js";
+import { readSecureStoredBuffer, removeStoredObject } from "../../common/storage/storage.service.js";
+import { adminResetPassword } from "../../modules/auth/auth.service.js";
+import { generateQuestions } from "../../services/aiQuestionService.js";
 import {
   QUESTION_TYPES,
   isObjectiveQuestion,
   questionValidationError,
-} from "../services/questionTypes.js";
-import { questionSelectionError } from "../services/assessmentValidation.js";
-import { generateCertificate } from "../services/certificateService.js";
-import { generateCompletionReport } from "../services/completionReportService.js";
+} from "../../services/questionTypes.js";
+import { questionSelectionError } from "../../services/assessmentValidation.js";
+import { generateCertificate } from "../../services/certificateService.js";
+import { generateCompletionReport } from "../../services/completionReportService.js";
 import {
   notify,
   notifyGroup,
   notifyWithEmail,
-} from "../common/notifications/notification.service.js";
+} from "../../common/notifications/notification.service.js";
 const r = Router();
 const aiGenerationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -1540,9 +1540,11 @@ r.get("/face-enrollments/:id/image", async (req, res) => {
       [req.params.id],
     )
   ).rows[0];
-  if (!x?.raw_image_path || !fs.existsSync(path.resolve(x.raw_image_path)))
+  if (!x?.raw_image_path)
     return res.status(404).json({ error: "Enrollment image not found" });
-  const image = readSecureFile(path.resolve(x.raw_image_path));
+  let image;
+  try { image = await readSecureStoredBuffer(x.raw_image_path); }
+  catch (error) { if (error.code === "ENOENT" || error?.$metadata?.httpStatusCode === 404) return res.status(404).json({ error: "Enrollment image not found" }); throw error; }
   await audit(
     req,
     "FACE_ENROLLMENT_IMAGE_VIEWED",
@@ -1569,7 +1571,7 @@ r.delete("/face-enrollments/:id", async (req, res) => {
     )
   ).rows[0];
   if (!x) return res.status(409).json({ error: "Enrollment changed; reload" });
-  if (before.raw_image_path) fs.unlink(before.raw_image_path, () => {});
+  if (before.raw_image_path) await removeStoredObject(before.raw_image_path).catch(() => {});
   await audit(req, "FACE_ENROLLMENT_DELETED", "face_enrollment", x.id, before, {
     status: "DELETED",
   });
@@ -1720,7 +1722,7 @@ r.get("/proofs/:id/file", async (req, res) => {
   await audit(req, "PROOF_FILE_VIEWED", "college_proof", p.id, null, {
     index: Number(req.query.index) || 0,
   });
-  sendProofFile(res, p, req.query.index);
+  await sendProofFile(res, p, req.query.index);
 });
 r.get("/proofs/:id/history", async (req, res) => {
   const p = (
@@ -3315,9 +3317,10 @@ r.get("/certificates/:id/file", async (req, res) => {
       req.params.id,
     ])
   ).rows[0];
-  if (!x?.file_path || !fs.existsSync(x.file_path))
+  if (!x?.file_path)
     return res.status(404).json({ error: "Certificate file not found" });
-  res.download(path.resolve(x.file_path), x.certificate_id + ".pdf");
+  try { const data = await readSecureStoredBuffer(x.file_path); res.type("application/pdf"); res.attachment(x.certificate_id + ".pdf"); res.send(data); }
+  catch (error) { if (error.code === "ENOENT" || error?.$metadata?.httpStatusCode === 404) return res.status(404).json({ error: "Certificate file not found" }); throw error; }
 });
 r.get("/reports", async (req, res) => {
   const rows = (
@@ -3402,9 +3405,10 @@ r.get("/reports/completion/:id/file", async (req, res) => {
       [req.params.id],
     )
   ).rows[0];
-  if (!x?.file_path || !fs.existsSync(x.file_path))
+  if (!x?.file_path)
     return res.status(404).json({ error: "Report file not found" });
-  res.download(path.resolve(x.file_path), "college-completion-report.pdf");
+  try { const data = await readSecureStoredBuffer(x.file_path); res.type("application/pdf"); res.attachment("college-completion-report.pdf"); res.send(data); }
+  catch (error) { if (error.code === "ENOENT" || error?.$metadata?.httpStatusCode === 404) return res.status(404).json({ error: "Report file not found" }); throw error; }
 });
 r.get("/reports/export.csv", async (req, res) => {
   const rows = (

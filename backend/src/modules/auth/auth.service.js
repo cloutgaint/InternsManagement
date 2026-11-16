@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import fs from "fs";
 import jwt from "jsonwebtoken";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
@@ -8,7 +7,8 @@ import { tx, q } from "../../common/database/index.js";
 import * as repository from "./auth.repository.js";
 import { passwordSchema } from "./auth.schema.js";
 import { sendMail } from "../../common/notifications/mail.service.js";
-import { detectFileType } from "../../common/storage/secureFiles.js";
+import { acceptUpload } from "../../common/storage/secureFiles.js";
+import { persistUploadedFile, removeStoredObject } from "../../common/storage/storage.service.js";
 import { findCoveringOrder, linkInternToOrder, storeProofFiles, validateProofDetails, latestProof } from "../../services/proofService.js";
 
 // Accept the adjacent 30-second steps so typing delay or phone clock drift does not reject a valid code.
@@ -39,8 +39,6 @@ export async function registerIntern(input, files) {
   }
   const proofs = files?.proofFiles || [];
   const photoFile = files?.photo?.[0];
-  if (photoFile && !["image/jpeg","image/png"].includes(detectFileType(fs.readFileSync(photoFile.path))?.mime))
-    throw badRequest("Student photo must be a JPG or PNG image");
   if (input.program === "Other" && !input.programOther?.trim())
     throw badRequest("Program name is required when Other is selected");
   if (input.branch === "Other" && !input.branchOther?.trim())
@@ -56,10 +54,19 @@ export async function registerIntern(input, files) {
   if (!input.collegeId && !input.collegeOther?.trim())
     throw badRequest("Select a college or enter the college name under Other");
 
-  const stored = proofs.length ? await storeProofFiles(proofs) : null;
-  if (stored) validateProofDetails(input);
+  if (proofs.length) validateProofDetails(input);
+  let photoReference = null;
+  if (photoFile) {
+    const acceptedPhoto = await acceptUpload(photoFile);
+    if (!["image/jpeg", "image/png"].includes(acceptedPhoto.mime)) throw badRequest("Student photo must be a JPG or PNG image");
+    photoReference = await persistUploadedFile(photoFile, { prefix: "registration/photos" });
+  }
+  let stored;
+  try { stored = proofs.length ? await storeProofFiles(proofs) : null; }
+  catch (error) { if (photoReference) await removeStoredObject(photoReference).catch(() => {}); throw error; }
 
-  return tx(async (client) => {
+  try {
+    return await tx(async (client) => {
     const run = client.query.bind(client);
     let college;
     if (input.collegeId) {
@@ -84,7 +91,7 @@ export async function registerIntern(input, files) {
     const user=await repository.createInternUser(client,email,passwordHash);
     const profile = await repository.createInternProfile(client, {
       userId: user.id, fullName: input.fullName, mobile: input.mobile,
-      dob: input.dob, address: input.address, photo: photoFile?.path || null,
+      dob: input.dob, address: input.address, photo: photoReference,
       collegeId: college.id, university: input.university, program, branch,
       yearSemester: input.yearSemester, rollNumber,
       preferredDomains: JSON.stringify(preferredDomains),
@@ -114,7 +121,12 @@ export async function registerIntern(input, files) {
       await client.query("UPDATE users SET status='PENDING_APPROVAL' WHERE id=$1", [user.id]);
     }
     return { ...user, internId: profile.id, proof, coveredByBatchOrder: !stored };
-  });
+    });
+  } catch (error) {
+    const proofReferences = stored ? JSON.parse(stored.filePaths) : [];
+    await Promise.allSettled([photoReference, ...proofReferences].filter(Boolean).map(removeStoredObject));
+    throw error;
+  }
 }
 
 async function credentialedApplicant({ email, password }) {
@@ -149,16 +161,21 @@ export async function reuploadProof(input, files) {
   validateProofDetails(input);
   const stored = await storeProofFiles(files || []);
   const previous = await latestProof(profile.id);
-  return tx(async (client) => {
-    const proof = await repository.createCollegeProof(client, {
-      internId: profile.id, proofType: input.proofType, issuingAuthority: input.issuingAuthority,
-      referenceNumber: input.referenceNumber, issueDate: input.issueDate, approvedFrom: input.approvedFrom,
-      approvedTo: input.approvedTo, coordinatorId: previous?.coordinator_id || null, ...stored,
-      version: Number(previous?.version || 0) + 1,
+  try {
+    return await tx(async (client) => {
+      const proof = await repository.createCollegeProof(client, {
+        internId: profile.id, proofType: input.proofType, issuingAuthority: input.issuingAuthority,
+        referenceNumber: input.referenceNumber, issueDate: input.issueDate, approvedFrom: input.approvedFrom,
+        approvedTo: input.approvedTo, coordinatorId: previous?.coordinator_id || null, ...stored,
+        version: Number(previous?.version || 0) + 1,
+      });
+      await client.query("UPDATE users SET status='PROOF_UNDER_REVIEW',status_reason=NULL,updated_at=now() WHERE id=$1", [user.id]);
+      return proof;
     });
-    await client.query("UPDATE users SET status='PROOF_UNDER_REVIEW',status_reason=NULL,updated_at=now() WHERE id=$1", [user.id]);
-    return proof;
-  });
+  } catch (error) {
+    await Promise.allSettled(JSON.parse(stored.filePaths).map(removeStoredObject));
+    throw error;
+  }
 }
 
 export async function submitCorrection(input) {

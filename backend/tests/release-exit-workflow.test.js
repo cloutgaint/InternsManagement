@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const admin=readFileSync(new URL("../src/routes/admin.js",import.meta.url),"utf8");
+const admin=readFileSync(new URL("../src/routes/admin/admin.routes.js",import.meta.url),"utf8");
 const page=readFileSync(new URL("../../frontend/modules/certificates/AdminCompletionPage.js",import.meta.url),"utf8");
 test("exit endpoint validates type and reason, records audit and notifies",()=>{
  const route=admin.slice(admin.indexOf('r.post("/completions/:internId/exit"'),admin.indexOf('r.post("/completions/:internId/decision"'));

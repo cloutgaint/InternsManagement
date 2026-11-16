@@ -3,64 +3,16 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import "@/shared/globals.css";
-import { api, apiBlob } from "@/shared/api/client";
+import { useAppSession } from "@/shared/auth/useAppSession";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   const pageHistory = useRef([]);
-  const [session, setSession] = useState({ token: null, role: null });
-  const [profileOpen, setProfileOpen] = useState(false),
-    [profile, setProfile] = useState(null),
-    [photo, setPhoto] = useState("");
+  const { session, profile, photo, clearSession } = useAppSession(router.asPath);
+  const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
-  useEffect(() => {
-    const sync = () =>
-      setSession({
-        token: sessionStorage.getItem("token"),
-        role: sessionStorage.getItem("role"),
-      });
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("focus", sync);
-    };
-  }, [router.asPath]);
   useEffect(() => {
     setProfileOpen(false);
   }, [router.asPath]);
-  useEffect(() => {
-    if (!session.token) {
-      setProfile(null);
-      setPhoto("");
-      return;
-    }
-    let active = true,
-      url = "";
-    api("/auth/me")
-      .then((u) => {
-        if (active) setProfile(u);
-      })
-      .catch(() => {});
-    if (session.role === "INTERN") {
-      api("/intern/dashboard")
-        .then((d) => {
-          if (active) setProfile((x) => ({ ...x, ...d.profile }));
-        })
-        .catch(() => {});
-      apiBlob("/intern/profile-photo")
-        .then((b) => {
-          url = URL.createObjectURL(b);
-          if (active) setPhoto(url);
-          else URL.revokeObjectURL(url);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      active = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [session.token, session.role]);
   useEffect(() => {
     if (!profileOpen) return;
     const close = (e) => {
@@ -132,11 +84,7 @@ export default function App({ Component, pageProps }) {
   function logout() {
     pageHistory.current = [];
     setProfileOpen(false);
-    setProfile(null);
-    setPhoto("");
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("role");
-    setSession({ token: null, role: null });
+    clearSession();
     router.replace("/login");
   }
   return (

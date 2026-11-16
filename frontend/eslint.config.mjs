@@ -7,7 +7,7 @@ const compat = new FlatCompat({
 });
 
 const config = [
-  { ignores: [".next/**", "node_modules/**"] },
+  { ignores: [".next/**", ".next-dev/**", "node_modules/**"] },
   ...compat.config({ extends: ["eslint:recommended", "next/core-web-vitals"] }),
   {
     rules: {

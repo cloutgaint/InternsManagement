@@ -10,6 +10,9 @@ const validProductionEnvironment = {
   JWT_SECRET: "x".repeat(64),
   FRONTEND_URL: "https://interns.example.test",
   FILE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
+  STORAGE_DRIVER: "s3",
+  S3_BUCKET: "private-intern-files",
+  S3_REGION: "ap-south-1",
   SMTP_HOST: "smtp.example.test",
   SMTP_USER: "mailer",
   SMTP_PASSWORD: "secret",
@@ -17,6 +20,8 @@ const validProductionEnvironment = {
   CLAMAV_HOST: "clamav.example.test",
   BIOMETRIC_VERIFY_URL: "https://biometric.example.test/verify",
   BIOMETRIC_VERIFY_TOKEN: "verifier-secret",
+  INITIAL_ADMIN_EMAIL: "admin@example.test",
+  INITIAL_ADMIN_PASSWORD: "unique-production-password",
   PROOF_RETENTION_DAYS: "365",
   FACE_RETENTION_DAYS: "90",
 };
@@ -45,6 +50,18 @@ test("production refuses malformed encryption keys", () => {
   const result = validate({ ...validProductionEnvironment, FILE_ENCRYPTION_KEY: "!".repeat(44) });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /FILE_ENCRYPTION_KEY must be valid base64/);
+});
+
+test("production requires private object storage configuration", () => {
+  const result = validate({ ...validProductionEnvironment, STORAGE_DRIVER: "local" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /STORAGE_DRIVER must be s3 in production/);
+});
+
+test("production refuses an insecure object storage endpoint", () => {
+  const result = validate({ ...validProductionEnvironment, S3_ENDPOINT: "http://objects.example.test" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /S3_ENDPOINT must use HTTPS in production/);
 });
 
 test("production refuses insecure public service URLs", () => {

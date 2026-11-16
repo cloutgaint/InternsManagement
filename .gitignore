@@ -29,3 +29,6 @@ Thumbs.db
 
 # Uploaded personal and biometric data never belongs in version control
 backend/uploads/
+
+# Generated/downloaded documents in the public directory
+frontend/public/*.pdf
