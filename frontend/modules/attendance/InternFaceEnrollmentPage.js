@@ -10,16 +10,23 @@ export default function InternFaceEnrollmentPage() {
     [consent, setConsent] = useState(false),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [reason,setReason]=useState("");
   useEffect(() => {
     api("/intern/dashboard")
       .then((x) => setStatus(x.face))
       .catch((e) => setErr(e.message));
     return () => stream.current?.getTracks().forEach((t) => t.stop());
   }, []);
+  function stopCamera() {stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;if(video.current){video.current.pause();video.current.srcObject=null;}}
+  async function requestReenrollment() {
+    setErr("");setMsg("");
+    try {setBusy(true);await api("/intern/face-enrollment/request-reenrollment",{method:"POST",body:JSON.stringify({reason})});setStatus({status:"REENROLLMENT_REQUIRED"});setShot("");setMsg("Re-registration enabled. Capture a clear new photo for fresh approval.");setReason("");}
+    catch(e){setErr(e.message);}finally{setBusy(false);}
+  }
   async function camera() {
     try {
-      setErr("");
+      setErr("");stopCamera();
       stream.current = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
@@ -36,7 +43,7 @@ export default function InternFaceEnrollmentPage() {
       );
     }
   }
-  function capture() {
+  async function capture() {
     const v = video.current,
       c = canvas.current;
     if (!v?.videoWidth) return setErr("Start the camera first.");
@@ -46,7 +53,16 @@ export default function InternFaceEnrollmentPage() {
     c.width = 640;
     c.height = 640;
     c.getContext("2d").drawImage(v, sx, sy, size, size, 0, 0, 640, 640);
-    setShot(c.toDataURL("image/jpeg", 0.9));
+    setErr("");setMsg("");
+    try {
+      setBusy(true);
+      const {default:Human}=await import("@vladmandic/human");
+      const human=new Human({backend:"webgl",modelBasePath:"https://vladmandic.github.io/human-models/models/",face:{enabled:true,detector:{enabled:true},mesh:{enabled:false},description:{enabled:false},emotion:{enabled:false},iris:{enabled:false}},body:{enabled:false},hand:{enabled:false},object:{enabled:false},gesture:{enabled:false}});
+      await human.load();
+      const faces=(await human.detect(c)).face||[];
+      if(faces.length!==1)throw new Error(faces.length?"Multiple faces detected. Only one face should be visible.":"No clear face detected. Face the camera and improve lighting.");
+      setShot(c.toDataURL("image/jpeg",0.9));
+    }catch(e){setShot("");setErr(e.message||"Could not validate face capture. Retake the photo.");}finally{setBusy(false);}
   }
   async function submit() {
     if (!shot || !consent) return;
@@ -61,8 +77,8 @@ export default function InternFaceEnrollmentPage() {
         }),
       });
       setStatus(x);
-      setMsg("Face registration submitted for Admin approval.");
-      stream.current?.getTracks().forEach((t) => t.stop());
+      setMsg("Face registration submitted for Admin or Mentor approval.");
+      stopCamera();
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -77,8 +93,8 @@ export default function InternFaceEnrollmentPage() {
         <div>
           <h1>Face Registration</h1>
           <p className="muted">
-            Register your face once for camera-based internship attendance.
-            Admin approval is required before attendance can use it.
+            Register a clear face image for camera-based internship attendance.
+            Admin or Mentor approval is required before attendance can use it.
           </p>
         </div>
         {status && <span className="status-pill">{status.status}</span>}
@@ -97,6 +113,7 @@ export default function InternFaceEnrollmentPage() {
               ? "Your approved face registration is ready for attendance verification."
               : "Your capture has been submitted. You cannot replace it while review is pending."}
           </p>
+          {status.status==="APPROVED"&&<div className="form-field"><label htmlFor="face-reason">Need to register your face again?</label><input id="face-reason" className="input" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Reason for re-registration"/><button className="btn secondary" disabled={busy||reason.trim().length<5} onClick={requestReenrollment}>Request Re-registration</button><p className="muted">Your existing face approval will be suspended immediately. The new capture must be approved before attendance resumes.</p></div>}
         </section>
       ) : (
         <>
@@ -116,7 +133,7 @@ export default function InternFaceEnrollmentPage() {
                   <button className="btn secondary" onClick={camera}>
                     Start Camera
                   </button>
-                  <button className="btn" onClick={capture}>
+                  <button className="btn" disabled={busy} onClick={capture}>
                     Capture Face
                   </button>
                 </div>
@@ -139,7 +156,7 @@ export default function InternFaceEnrollmentPage() {
               />
               <span>
                 I consent to the use of this face capture for internship
-                attendance verification and understand that it requires Admin
+                attendance verification and understand that it requires Admin or Mentor
                 approval.
               </span>
             </label>
