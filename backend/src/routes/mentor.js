@@ -9,10 +9,45 @@ import { documentUpload, validExternalDocumentUrl, validateUploadedDocument } fr
 import { notify, notifyGroup } from "../common/notifications/notification.service.js";
 import { decideAttendanceException, decideLeave } from "../services/attendanceService.js";
 import { auth, permit } from "../common/security/auth.middleware.js";
+import { readSecureFile, detectFileType } from "../common/storage/secureFiles.js";
+import { notifyFaceDecision } from "../services/attendanceService.js";
 const r = Router();
 const REVIEW_STATUSES = ["SCHEDULED", "CONDUCTED", "MARKS_ENTERED", "PUBLISHED"];
 r.use(auth, permit("MENTOR"));
 r.use(taskPlans);
+
+const FACE_MINE = mentorOwnsIntern("fe.intern_id", "$2");
+r.get("/face-enrollments",async(req,res)=>{
+ const m=await mid(req.user.id);
+ if(!m)return res.status(403).json({error:"Mentor profile not found"});
+ const rows=(await q("SELECT fe.id,fe.status,fe.created_at,fe.decision_reason,ip.full_name,ip.roll_number FROM face_enrollments fe JOIN intern_profiles ip ON ip.id=fe.intern_id WHERE fe.status='PENDING_ADMIN_APPROVAL' AND "+FACE_MINE+" ORDER BY fe.created_at DESC",[m])).rows;
+ res.json(rows);
+});
+r.get("/face-enrollments/:id/image",async(req,res)=>{
+ const m=await mid(req.user.id);
+ if(!m)return res.status(403).json({error:"Mentor profile not found"});
+ const x=(await q("SELECT fe.raw_image_path FROM face_enrollments fe WHERE fe.id=$1 AND fe.status='PENDING_ADMIN_APPROVAL' AND "+mentorOwnsIntern("fe.intern_id","$2"),[req.params.id,m])).rows[0];
+ if(!x)return res.status(404).json({error:"Pending enrollment not found for your intern"});
+ if(!x.raw_image_path||!fs.existsSync(path.resolve(x.raw_image_path)))return res.status(404).json({error:"Enrollment image unavailable"});
+ const data=readSecureFile(path.resolve(x.raw_image_path));
+ await audit(req,"FACE_ENROLLMENT_IMAGE_VIEWED","face_enrollment",req.params.id);
+ res.set("Content-Type",detectFileType(data)?.mime||"image/jpeg");res.set("Cache-Control","private, no-store");res.send(data);
+});
+r.post("/face-enrollments/:id/decision",async(req,res)=>{
+ const status=req.body?.status,reason=String(req.body?.reason||"").trim();
+ if(!["APPROVED","REJECTED","REENROLLMENT_REQUIRED"].includes(status))return res.status(400).json({error:"Invalid face decision"});
+ if(status!=="APPROVED"&&!reason)return res.status(400).json({error:"Provide a rejection or retake reason"});
+ const m=await mid(req.user.id);
+ if(!m)return res.status(403).json({error:"Mentor profile not found"});
+ const before=(await q("SELECT fe.* FROM face_enrollments fe WHERE fe.id=$1 AND fe.status='PENDING_ADMIN_APPROVAL' AND "+mentorOwnsIntern("fe.intern_id","$2"),[req.params.id,m])).rows[0];
+ if(!before)return res.status(404).json({error:"Pending enrollment not found for your intern"});
+ const after=(await q("UPDATE face_enrollments SET status=$1,decision_reason=$2,approved_by=$3,approved_at=CASE WHEN $1='APPROVED' THEN now() ELSE NULL END WHERE id=$4 AND status='PENDING_ADMIN_APPROVAL' RETURNING *",[status,reason||null,req.user.id,before.id])).rows[0];
+ if(!after)return res.status(409).json({error:"Enrollment already reviewed"});
+ await audit(req,"FACE_ENROLLMENT_"+status,"face_enrollment",after.id,before,after);
+ await notifyFaceDecision(after.intern_id,status,reason);
+ res.json({id:after.id,status:after.status});
+});
+
 const SUBMISSION_INTERN_IS_MINE = mentorOwnsIntern("ts.intern_id", "$1");
 const INTERN_IS_MINE = mentorOwnsIntern("ip.id", "$1");
 const MY_GROUP = mentorHasInternInGroup("g.id", "$1");
