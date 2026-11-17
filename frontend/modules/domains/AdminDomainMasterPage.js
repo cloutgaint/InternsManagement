@@ -51,38 +51,20 @@ export default function AdminDomainMasterPage() {
       setErr(e.message);
     }
   }
-  async function sub(d) {
-    const name = prompt("Sub-domain name:");
-    if (!name) return;
-    const code = prompt("Sub-domain code:");
-    if (!code) return;
+  function openSubdomain(d) { setDialog({ type: "subdomain", domain: d, name: "", code: "" }); setDialogError(""); }
+  function openCapacity(d, b) { const current = d.batch_capacities?.find((x) => x.batch_id === b.id)?.capacity ?? d.default_capacity; setDialog({ type: "capacity", domain: d, batch: b, capacity: String(current) }); setDialogError(""); }
+  function closeDialog() { if (dialogBusy) return; setDialog(null); setDialogError(""); }
+  async function submitDialog(e) {
+    e.preventDefault(); if (!dialog) return; setDialogError("");
+    if (dialog.type === "subdomain" && (!dialog.name.trim() || !dialog.code.trim())) { setDialogError("Enter both the sub-domain name and code."); return; }
+    if (dialog.type === "capacity" && (!Number.isInteger(Number(dialog.capacity)) || Number(dialog.capacity) < 1)) { setDialogError("Enter a whole number greater than zero."); return; }
+    setDialogBusy(true);
     try {
-      await api("/admin/domains/" + d.id + "/subdomains", {
-        method: "POST",
-        body: JSON.stringify({ name, code }),
-      });
-      setMsg("Sub-domain added.");
-      load();
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
-  async function capacity(d, b) {
-    const current =
-      d.batch_capacities?.find((x) => x.batch_id === b.id)?.capacity ??
-      d.default_capacity;
-    const v = prompt("Capacity for " + d.name + " in " + b.name + ":", current);
-    if (v === null) return;
-    try {
-      await api("/admin/batches/" + b.id + "/domains/" + d.id, {
-        method: "PUT",
-        body: JSON.stringify({ capacity: Number(v) }),
-      });
-      setMsg("Batch/domain capacity updated.");
-      load();
-    } catch (e) {
-      setErr(e.message);
-    }
+      if (dialog.type === "subdomain") { await api("/admin/domains/" + dialog.domain.id + "/subdomains", { method: "POST", body: JSON.stringify({ name: dialog.name.trim(), code: dialog.code.trim().toUpperCase() }) }); setMsg("Sub-domain added."); }
+      else { await api("/admin/batches/" + dialog.batch.id + "/domains/" + dialog.domain.id, { method: "PUT", body: JSON.stringify({ capacity: Number(dialog.capacity) }) }); setMsg("Batch/domain capacity updated."); }
+      setDialog(null); await load();
+    } catch (e) { setDialogError(e.message || "Unable to save changes. Please try again."); }
+    finally { setDialogBusy(false); }
   }
   return (
     <main className="wrap admin-domain-master">
@@ -182,7 +164,7 @@ export default function AdminDomainMasterPage() {
                 {d.default_capacity}
               </p>
             </div>
-            <button className="btn secondary" onClick={() => sub(d)}>
+            <button className="btn secondary" onClick={() => openSubdomain(d)}>
               + Sub-domain
             </button>
           </div>
@@ -220,7 +202,7 @@ export default function AdminDomainMasterPage() {
               <button
                 className="capacity-btn"
                 key={b.id}
-                onClick={() => capacity(d, b)}
+                onClick={() => openCapacity(d, b)}
               >
                 {b.name}
                 <strong>
