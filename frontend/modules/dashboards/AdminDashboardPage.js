@@ -92,6 +92,7 @@ const modules = [
   ],
   ["🔔", "Notifications", "Requests and system alerts", "/notifications"],
 ];
+const ArrowIcon=()=> <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>;
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState(null),
@@ -230,7 +231,7 @@ export default function AdminDashboardPage() {
                 {x.icon}
               </span>
               <span className="admin-card-chevron" aria-hidden="true">
-                ↗
+                <ArrowIcon />
               </span>
             </div>
             <span className="admin-overview-title">{x.title}</span>
@@ -241,7 +242,7 @@ export default function AdminDashboardPage() {
       </section>
       {!loading && pending>0 && <section className="card" aria-label="Pending operations breakdown" style={{marginTop:14,padding:16}}>
         <h2 style={{margin:"0 0 10px",fontSize:16}}>Pending Operations Breakdown</h2>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{pendingItems.filter(item=>count(item.key)>0).map(item=><Link key={item.key} href={item.href} style={{display:"inline-flex",alignItems:"center",gap:8,border:"1px solid #dce6e0",borderRadius:10,padding:"9px 12px",color:"inherit",textDecoration:"none"}}><strong style={{color:"#b91c1c"}}>{count(item.key)}</strong><span>{item.label}</span><span aria-hidden="true">↗</span></Link>)}</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{pendingItems.filter(item=>count(item.key)>0).map(item=><Link key={item.key} href={item.href} style={{display:"inline-flex",alignItems:"center",gap:8,border:"1px solid #dce6e0",borderRadius:10,padding:"9px 12px",color:"inherit",textDecoration:"none"}}><strong style={{color:"#b91c1c"}}>{count(item.key)}</strong><span>{item.label}</span><span aria-hidden="true"><ArrowIcon /></span></Link>)}</div>
       </section>}
       <section className="admin-queue-section">
         <div className="admin-section-heading">
@@ -262,7 +263,7 @@ export default function AdminDashboardPage() {
                 accounts and face verification
               </small>
             </span>
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/attendance" className="admin-queue-link">
             <span aria-hidden="true">📅</span>
@@ -275,7 +276,7 @@ export default function AdminDashboardPage() {
                 · Face approvals and records
               </small>
             </span>
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/leave" className="admin-queue-link">
             <span aria-hidden="true">🌴</span>
@@ -286,7 +287,7 @@ export default function AdminDashboardPage() {
                 Review leave applications
               </small>
             </span>
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/completion" className="admin-queue-link">
             <span aria-hidden="true">🎓</span>
@@ -299,7 +300,7 @@ export default function AdminDashboardPage() {
                 · Final decisions and certificates
               </small>
             </span>
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
         </div>
       </section>
@@ -324,12 +325,50 @@ export default function AdminDashboardPage() {
               </span>
               {pendingBadge(modulePending[href] || 0)}
               <span className="admin-card-chevron" aria-hidden="true" style={modulePending[href]>0?{marginRight:25}:undefined}>
-                ↗
+                <ArrowIcon />
               </span>
             </Link>
           ))}
         </div>
       </section>
+      <style jsx global>{`
+.admin-home{max-width:1320px;padding:28px 28px 60px;color:#172c21}
+.admin-home-header{margin-bottom:25px;align-items:center}
+.admin-home-header h1{font-size:clamp(28px,2.7vw,36px);letter-spacing:-1.1px;margin:7px 0 8px}
+.admin-home-header .muted{font-size:13px;color:#6a7b70}
+.admin-home .admin-live{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:1px solid #cce7d8;background:#e8f6ee;color:#09633f;font-size:11px}
+.admin-home .admin-live span{color:#0f9d64;font-size:12px;margin:0}
+.admin-home .admin-overview-grid{gap:16px;margin-bottom:31px}
+.admin-home .admin-overview-card{min-height:184px;padding:20px 21px;border-radius:17px;box-shadow:0 5px 15px #153d2708;overflow:hidden}
+.admin-home .admin-overview-top{margin-bottom:16px}
+.admin-home .admin-overview-icon{width:42px;height:42px;font-size:22px;border-radius:12px;background:#ffffffb8}
+.admin-home .admin-overview-title{font-size:12px;font-weight:750;color:#395448}
+.admin-home .admin-overview-card strong{font-size:37px;letter-spacing:-1.4px;line-height:1.22;margin:4px 0}
+.admin-home .admin-overview-card small{font-size:11px;line-height:1.5}
+.admin-home .admin-card-chevron{display:grid;place-items:center;width:29px;height:29px;flex:none;border-radius:9px;color:#48705b;background:#ffffffa3}
+.admin-home .admin-section-heading{margin-bottom:15px}
+.admin-home .admin-section-heading h2{font-size:19px;font-weight:800;letter-spacing:-.5px;margin-bottom:5px}
+.admin-home .admin-section-heading p{font-size:12px;color:#6a7d71}
+.admin-home .admin-queue-section{margin-bottom:32px}
+.admin-home .admin-queue-grid{gap:12px}
+.admin-home .admin-queue-link{min-height:84px;padding:16px 18px;border:1px solid #dce9e1;border-radius:14px;box-shadow:0 3px 10px #1a4b3108}
+.admin-home .admin-queue-link>span:first-child{display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:12px;background:#eef6f1;font-size:22px}
+.admin-home .admin-queue-link>span:last-child{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:#f2f8f4;color:#0a6945}
+.admin-home .admin-queue-link b{font-size:13px;color:#21392a}
+.admin-home .admin-queue-link small{font-size:11px}
+.admin-home .admin-workspace-grid{gap:12px}
+.admin-home .admin-workspace-card{min-height:82px;padding:14px 16px;gap:13px;border:1px solid #dce9e1;border-radius:14px;box-shadow:0 3px 10px #1a4b3107}
+.admin-home .admin-workspace-icon{width:43px;height:43px;font-size:21px;border-radius:12px;background:#eff7f2}
+.admin-home .admin-workspace-copy{gap:5px}
+.admin-home .admin-workspace-copy b{font-size:12.5px;color:#20372a}
+.admin-home .admin-workspace-copy small{font-size:11px;color:#738177;line-height:1.45}
+.admin-home .admin-workspace-card .admin-card-chevron{align-self:center;width:27px;height:27px}
+.admin-home .admin-workspace-card:hover,.admin-home .admin-queue-link:hover,.admin-home .admin-overview-card:hover{border-color:#a9d7bd;box-shadow:0 11px 25px #17452d16}
+@media(max-width:980px){.admin-home{padding:24px 20px 48px}.admin-home .admin-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-home .admin-workspace-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.admin-home{padding:18px 14px 40px}.admin-home-header{align-items:flex-start;gap:12px}.admin-home .admin-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-home .admin-overview-card{min-height:155px;padding:14px}.admin-home .admin-overview-card strong{font-size:31px}.admin-home .admin-queue-grid,.admin-home .admin-workspace-grid{grid-template-columns:1fr}.admin-home .admin-queue-link,.admin-home .admin-workspace-card{min-height:76px}.admin-home .admin-live{font-size:10px;padding:7px 9px}}
+@media(max-width:390px){.admin-home .admin-overview-grid{grid-template-columns:1fr}.admin-home-header{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.admin-home .admin-overview-card,.admin-home .admin-workspace-card,.admin-home .admin-queue-link{transition:none}}
+`}</style>
     </main>
   );
 }
