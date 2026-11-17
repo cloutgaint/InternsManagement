@@ -288,6 +288,18 @@ export default function App({ Component, pageProps }) {
           .top .nav-profile-menu{right:0;max-width:100%}
         }
         @media(max-width:600px){.top.glass-top{min-height:64px;padding:8px 14px}.top .glass-nav-shell{min-height:46px}.top .glass-brand-logo{width:135px;height:40px}.top .glass-nav{top:calc(100% + 9px)}}
+        /* SkillBridge brand hierarchy: prominent product name, legible tagline. */
+        .top.glass-top{min-height:82px}
+        .top .glass-nav-shell{max-width:1380px;min-height:60px;gap:20px}
+        .top .glass-brand{gap:14px;flex-shrink:0}
+        .top .glass-brand-logo{width:145px;height:49px}
+        .top .skillbridge-wordmark{padding-left:15px;gap:5px}
+        .top .skillbridge-wordmark strong{font-size:25px;line-height:1.05;letter-spacing:-.8px;font-weight:850}
+        .top .skillbridge-wordmark small{display:block;font-size:11px;line-height:1.3;font-weight:650;letter-spacing:.08px;color:#527b64}
+        .top .glass-nav-link{font-size:12.5px}
+        @media(max-width:1280px){.top .glass-brand-logo{width:125px}.top .skillbridge-wordmark strong{font-size:21px}.top .skillbridge-wordmark small{font-size:10px}}
+        @media(max-width:1080px){.top.glass-top{min-height:72px}.top .glass-nav-shell{min-height:52px}.top .glass-brand-logo{width:130px;height:43px}.top .skillbridge-wordmark strong{font-size:22px}.top .skillbridge-wordmark small{display:block;font-size:10px}}
+        @media(max-width:520px){.top.glass-top{min-height:68px}.top .glass-brand{gap:8px}.top .glass-brand-logo{width:86px;height:35px}.top .skillbridge-wordmark{padding-left:9px;gap:3px}.top .skillbridge-wordmark strong{font-size:18px}.top .skillbridge-wordmark small{font-size:8px;max-width:150px;white-space:normal}.top .glass-mobile-toggle{width:39px;height:39px}}
         @media(prefers-reduced-motion:reduce){.top .glass-nav-link{transition:none}}
         .login-back-bar{position:relative;z-index:1;background:#eef7f1;padding:14px 24px 10px;border:0;box-shadow:none}
         .login-back-bar .page-back-inner{max-width:1000px}
