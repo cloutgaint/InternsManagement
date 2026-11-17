@@ -246,14 +246,14 @@ export default function AdminAttendancePage() {
               </article>
             ))}
           </div>
-          {exceptions.length > pageSize && <nav className="exception-pagination" aria-label="Exception pages">
-            <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, exceptions.length)} of {exceptions.length}</span>
+          <nav className="exception-pagination" aria-label="Exception pages">
+            <span>Showing {exceptions.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, exceptions.length)} of {exceptions.length}</span>
             <div className="exception-pagination-actions">
               <button type="button" className="btn secondary" disabled={page === 1} onClick={() => setExceptionPage(page - 1)}>Previous</button>
               <span aria-live="polite">Page {page} of {totalPages}</span>
               <button type="button" className="btn secondary" disabled={page === totalPages} onClick={() => setExceptionPage(page + 1)}>Next</button>
             </div>
-          </nav>}
+          </nav>
         </section>
       )}
       <style jsx global>{`
