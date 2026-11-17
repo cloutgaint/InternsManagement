@@ -73,7 +73,7 @@ export default function RegisterPage() {
           </div>
           <span className="badge">Student Registration</span>
         </div>
-        <form onSubmit={submit} className="registration-form">
+        <form onSubmit={submit} className="registration-form" autoComplete="off">
           <h3 className="form-section-title">Personal Details</h3>
           <div className="form-grid">
             <div className="form-field">
@@ -90,6 +90,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="email"
+                autoComplete="off"
                 value={f.email}
                 onChange={(e) => set("email", e.target.value)}
                 required
@@ -460,6 +461,7 @@ export default function RegisterPage() {
                 <input
                   className="input"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   minLength="10"
                   value={f.password}
                   onChange={(e) => set("password", e.target.value)}
