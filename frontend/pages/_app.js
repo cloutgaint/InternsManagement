@@ -9,9 +9,11 @@ export default function App({ Component, pageProps }) {
   const pageHistory = useRef([]);
   const { session, profile, photo, clearSession } = useAppSession(router.asPath);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
   const profileRef = useRef(null);
   useEffect(() => {
     setProfileOpen(false);
+    setMobileNavOpen(false);
   }, [router.asPath]);
   useEffect(() => {
     if (!profileOpen) return;
@@ -112,7 +114,8 @@ export default function App({ Component, pageProps }) {
               className="glass-brand-logo"
             />
           </Link>
-          <nav className="nav glass-nav" aria-label="Main navigation">
+          <button className="glass-mobile-toggle" type="button" aria-label={mobileNavOpen?"Close navigation":"Open navigation"} aria-expanded={mobileNavOpen} aria-controls="gaint-primary-navigation" onClick={()=>setMobileNavOpen(v=>!v)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">{mobileNavOpen?<><path d="M5 5l14 14M19 5L5 19"/></>:<><path d="M4 7h16M4 12h16M4 17h16"/></>}</svg></button>
+          <nav id="gaint-primary-navigation" className={"nav glass-nav"+(mobileNavOpen?" mobile-open":"")} aria-label="Main navigation">
             {links.map(({ href, label }) => (
               <Link
                 key={href}
@@ -252,6 +255,34 @@ export default function App({ Component, pageProps }) {
         </div>
       </header>
       <style jsx global>{`
+        /* Compact, balanced desktop header with a real mobile navigation. */
+        .top.glass-top{min-height:72px;padding:9px 24px;background:#f9fcfa;border-bottom:1px solid #dceae2;box-shadow:0 3px 16px #16452d0c;backdrop-filter:blur(16px)}
+        .top .glass-nav-shell{max-width:1200px;min-height:52px;gap:24px}
+        .top .glass-brand{flex:none}
+        .top .glass-brand-logo{width:155px;height:47px;object-fit:contain}
+        .top .glass-nav{margin-left:auto;gap:3px;padding:4px;border:1px solid #e3ece6;border-radius:13px;background:#fff;box-shadow:none}
+        .top .glass-nav-link{min-height:38px;padding:9px 12px;border-radius:9px;font-size:12px;font-weight:700;color:#385548}
+        .top .glass-nav-link:hover{background:#f0f7f3;color:#075b3b}
+        .top .glass-nav-link.is-active:not(.glass-nav-cta){background:#e3f2e9;color:#075b3b}
+        .top .glass-nav-cta{background:#086443;color:white;box-shadow:none;margin-left:6px}
+        .top .glass-nav-cta:hover{background:#064d34;color:white;transform:none}
+        .glass-mobile-toggle{display:none;align-items:center;justify-content:center;width:42px;height:42px;border:1px solid #d5e5dc;border-radius:11px;background:white;color:#0a6040;cursor:pointer}
+        .glass-mobile-toggle:focus-visible{outline:3px solid #2c8e65;outline-offset:2px}
+        @media(max-width:1080px){
+          .top.glass-top{padding:9px 18px}
+          .top .glass-nav-shell{position:relative;max-width:100%;gap:12px}
+          .top .glass-brand-logo{width:145px;height:43px}
+          .glass-mobile-toggle{display:inline-flex;margin-left:auto}
+          .top .glass-nav{display:none;position:absolute;top:calc(100% + 12px);left:0;right:0;z-index:110;flex-direction:column;align-items:stretch;gap:4px;margin:0;padding:12px;background:#fff;border:1px solid #dceae2;border-radius:15px;box-shadow:0 16px 38px #174c3420}
+          .top .glass-nav.mobile-open{display:flex}
+          .top .glass-nav-link{justify-content:flex-start;min-height:43px;padding:11px 14px;font-size:13px}
+          .top .glass-nav-cta{margin:6px 0 0;justify-content:center}
+          .top .nav-profile{width:100%}
+          .top .nav-profile-trigger{width:100%;justify-content:flex-start}
+          .top .nav-profile-menu{right:0;max-width:100%}
+        }
+        @media(max-width:600px){.top.glass-top{min-height:64px;padding:8px 14px}.top .glass-nav-shell{min-height:46px}.top .glass-brand-logo{width:135px;height:40px}.top .glass-nav{top:calc(100% + 9px)}}
+        @media(prefers-reduced-motion:reduce){.top .glass-nav-link{transition:none}}
         .login-back-bar{position:relative;z-index:1;background:#eef7f1;padding:14px 24px 10px;border:0;box-shadow:none}
         .login-back-bar .page-back-inner{max-width:1000px}
         .page-back-button .back-arrow{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#e5f4eb;color:#087449;flex:none}
