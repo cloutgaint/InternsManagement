@@ -529,6 +529,18 @@ export default function AdminVerificationPage() {
 @media(max-width:1200px){.verification-page .verification-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.verification-page .verification-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:430px){.verification-page .verification-actions{grid-template-columns:1fr}}
+/* Distinct action colors; consistent dimensions and accessible hover states. */
+.verification-page .verification-actions>.btn:not(.verification-action-override):not(.verification-action-reject):not(.verification-action-reupload):not(.verification-action-correction){background:#087443!important;border-color:#087443!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reupload{background:#d97706!important;border-color:#d97706!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reject:not(:nth-last-child(2)){background:#7e22ce!important;border-color:#7e22ce!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-correction{background:#0891b2!important;border-color:#0891b2!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reject{background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reject:nth-child(3){background:#7e22ce!important;border-color:#7e22ce!important}
+.verification-page .verification-actions>.verification-action-override{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important}
+.verification-page .verification-actions>.btn:hover:not(:disabled){filter:brightness(.86);color:#fff!important}
+.verification-page .verification-actions>.verification-action-reject:hover:not(:disabled){background:#b91c1c!important;border-color:#b91c1c!important}
+.verification-page .verification-actions>.verification-action-reject:nth-child(3):hover:not(:disabled){background:#6b21a8!important;border-color:#6b21a8!important}
+.verification-page .verification-actions>.verification-action-override:hover:not(:disabled){background:#1d4ed8!important;border-color:#1d4ed8!important}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
