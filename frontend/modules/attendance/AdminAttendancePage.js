@@ -6,6 +6,7 @@ export default function AdminAttendancePage() {
   const [faces, setFaces] = useState([]),
     [exceptions, setExceptions] = useState([]),
     [exceptionPage, setExceptionPage] = useState(1),
+    [attendancePage, setAttendancePage] = useState(1),
     [records, setRecords] = useState([]),
     [tab, setTab] = useState("faces"),
     [reason, setReason] = useState({}),
@@ -78,6 +79,11 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
+  const attendancePageSize = 10;
+  const attendanceTotalPages = Math.max(1, Math.ceil(records.length / attendancePageSize));
+  const currentAttendancePage = Math.min(attendancePage, attendanceTotalPages);
+  const pagedRecords = records.slice((currentAttendancePage - 1) * attendancePageSize, currentAttendancePage * attendancePageSize);
+  useEffect(() => { setAttendancePage(1); }, [filters]);
   const pageSize = 8;
   const totalPages = Math.max(1, Math.ceil(exceptions.length / pageSize));
   const page = Math.min(exceptionPage, totalPages);
@@ -192,7 +198,7 @@ export default function AdminAttendancePage() {
             <b>Check Out</b>
             <b>Minutes</b>
             <b>Status</b>
-            {records.map((x) => (
+            {pagedRecords.map((x) => (
               <>
                 <span>{String(x.day).slice(0, 10)}</span>
                 <span>{x.full_name}</span>
@@ -209,6 +215,14 @@ export default function AdminAttendancePage() {
               </>
             ))}
           </div>
+          <nav className="exception-pagination" aria-label="Attendance record pages">
+            <span>Showing {records.length ? (currentAttendancePage - 1) * attendancePageSize + 1 : 0}–{Math.min(currentAttendancePage * attendancePageSize, records.length)} of {records.length} records</span>
+            <div className="exception-pagination-actions">
+              <button type="button" className="btn secondary" disabled={currentAttendancePage === 1} onClick={() => setAttendancePage(currentAttendancePage - 1)}>Previous</button>
+              <span aria-live="polite">Page {currentAttendancePage} of {attendanceTotalPages}</span>
+              <button type="button" className="btn secondary" disabled={currentAttendancePage === attendanceTotalPages} onClick={() => setAttendancePage(currentAttendancePage + 1)}>Next</button>
+            </div>
+          </nav>
         </section>
       )}
       {tab === "exceptions" && (
