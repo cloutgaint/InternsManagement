@@ -513,6 +513,42 @@ export default function RegisterPage() {
           {err&&<p className="error" role="alert">{err}</p>}
         </form>
       </div>
+      <style jsx global>{`
+.registration-card{max-width:1120px;margin:16px auto 40px;padding:32px 36px;background:#fff;border:1px solid #e0e9e4;border-radius:20px;box-shadow:0 18px 55px rgba(18,52,35,.07)}
+.registration-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 0 24px;margin:0 0 8px;border-bottom:1px solid #e7eeea}
+.registration-head h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.8px;line-height:1.2;color:#14291f;margin:0 0 8px}
+.registration-head .muted{font-size:13px;line-height:1.6;color:#6a7c72}
+.registration-head .badge{padding:9px 14px;border:1px solid #cfe8db;background:#e9f7ef;color:#09633d;font-size:11px;font-weight:800;white-space:nowrap}
+.registration-form{display:block}
+.registration-form .form-section-title{position:relative;display:flex;align-items:center;min-height:42px;margin:25px 0 16px;padding:10px 15px;border:1px solid #e0ebe5;border-radius:10px;background:linear-gradient(90deg,#e8f5ef,#f3f8ff);color:#174b35;font-size:14px;font-weight:800;letter-spacing:-.15px}
+.registration-form .form-section-title:nth-of-type(3n){background:linear-gradient(90deg,#eef0ff,#f7f8ff);border-color:#e4e7f8;color:#343c78}
+.registration-form .form-section-title:nth-of-type(4n){background:linear-gradient(90deg,#fff3e2,#fffaf1);border-color:#f4e5ce;color:#81501e}
+.registration-form .form-subtitle{margin:21px 0 12px;padding-left:10px;border-left:3px solid #0d7850;color:#244b38;font-size:13px;font-weight:800}
+.registration-form .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;row-gap:12px}
+.registration-form .form-field{min-width:0;display:flex;flex-direction:column}
+.registration-form .form-field>label{font-size:12px;font-weight:750;color:#253b2e;line-height:1.5;margin-bottom:6px}
+.registration-form .form-field .input{width:100%;min-height:44px;margin:0;padding:10px 13px;background:#fff;border:1px solid #cddbd2;border-radius:9px;font:inherit;font-size:13px;color:#172e22;transition:border-color .16s,box-shadow .16s}
+.registration-form .form-field .input:hover{border-color:#9db8a7}
+.registration-form .form-field .input:focus-visible{outline:0;border-color:#18825b;box-shadow:0 0 0 3px rgba(24,130,91,.12)}
+.registration-form .form-field .input:disabled,.registration-form .form-field .input:read-only{background:#f3f7f5;color:#52675a}
+.registration-form .form-field textarea.input{min-height:82px;resize:vertical}
+.registration-form .form-field input[type=file].input{padding:9px 11px;min-height:46px}
+.registration-form .form-field input[type=file]::file-selector-button{border:0;border-radius:6px;background:#e7f3ec;color:#135b3d;font-weight:700;padding:7px 10px;margin-right:12px;cursor:pointer}
+.registration-form .form-field .muted,.registration-form .field-help{font-size:11px;line-height:1.5;color:#718176;margin:5px 0 0}
+.registration-form .form-grid-final{margin-top:18px}
+.registration-form .password-wrap{position:relative}
+.registration-form .password-wrap .input{padding-right:50px}
+.registration-form .password-wrap .eye-btn{right:6px;top:50%;transform:translateY(-50%);color:#315845;background:#eff6f1}
+.registration-form .consent-box{margin-top:22px;padding:16px 18px;border:1px solid #cce7d8;border-radius:12px;background:#f0f9f4}
+.registration-form .consent-box label{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.6;font-weight:500;color:#2d4636;margin:7px 0}
+.registration-form .consent-box input[type=checkbox]{accent-color:#087448;width:15px;height:15px;flex:none;margin:2px 0 0}
+.registration-form .form-actions{margin-top:18px;display:flex;justify-content:flex-end}
+.registration-form .form-actions .btn{min-height:44px;min-width:190px;padding:11px 22px;border-radius:10px;background:#08643e;color:white;font-size:13px;font-weight:800;box-shadow:0 5px 14px rgba(8,100,62,.14)}
+.registration-form .form-actions .btn:hover{background:#074e32}
+.registration-form .error,.registration-form .success{margin-top:12px;padding:12px 14px;border-radius:9px;font-size:12px}
+@media(max-width:760px){.registration-card{padding:22px 18px;border-radius:16px;margin:10px auto 24px}.registration-form .form-grid{grid-template-columns:1fr;gap:13px}.registration-head{align-items:flex-start;flex-wrap:wrap;gap:10px}.registration-head .badge{margin:0}.registration-form .form-actions .btn{width:100%}}
+@media(prefers-reduced-motion:reduce){.registration-form .form-field .input,.registration-form .form-actions .btn{transition:none}}
+`}</style>
     </main>
   );
 }
