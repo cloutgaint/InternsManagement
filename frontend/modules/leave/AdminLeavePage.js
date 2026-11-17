@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/shared/api/client";
+const displayStatus = (value) => String(value || "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 export default function AdminLeavePage() {
   const [requests, setRequests] = useState([]),
@@ -71,7 +72,7 @@ export default function AdminLeavePage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-leave-page">
       <div className="intern-head">
         <div>
           <h1>Leave & Holiday Management</h1>
@@ -81,7 +82,7 @@ export default function AdminLeavePage() {
           </p>
         </div>
       </div>
-      <section className="card">
+      <section className="card leave-panel">
         <h2>Batch Leave Policy</h2>{["saveLimit"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {batches.map((b) => (
           <div className="workflow-row" key={b.id}>
@@ -110,7 +111,7 @@ export default function AdminLeavePage() {
           </div>
         ))}
       </section>
-      <section className="card">
+      <section className="card leave-panel">
         <h2>Holiday Calendar</h2>{["addHoliday"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form className="form-grid" onSubmit={addHoliday}>
           <label>
@@ -164,8 +165,9 @@ export default function AdminLeavePage() {
           ))}
         </div>
       </section>
-      <section className="card workflow-section">
-        <h2>Leave Approval Queue</h2>{["decide"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+      <section className="card workflow-section leave-panel">
+        <h2>Leave approval queue</h2>{["decide"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        {!requests.length && <p className="muted">No leave requests to review.</p>}
         {requests.map((x) => (
           <div className="leave-admin-row" key={x.id}>
             <div>
@@ -180,7 +182,7 @@ export default function AdminLeavePage() {
                 days
               </small>
             </div>
-            <span className="status-pill">{x.status}</span>
+            <span className="status-pill">{displayStatus(x.status)}</span>
             {x.status === "REQUESTED" && (
               <div className="face-admin-actions">
                 <input
@@ -207,6 +209,7 @@ export default function AdminLeavePage() {
           </div>
         ))}
       </section>
+      <style jsx global>{`.admin-leave-page{max-width:1200px;margin-inline:auto;padding-bottom:72px;color:#111}.admin-leave-page .intern-head{margin:28px 0 26px}.admin-leave-page .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:650;color:#111}.admin-leave-page .intern-head .muted{font-size:16px;color:#333}.admin-leave-page .leave-panel{background:#fff;border:1px solid #dce6e2;border-radius:20px;padding:26px 28px;margin-bottom:20px;box-shadow:0 8px 28px rgba(20,40,30,.035)}.admin-leave-page .leave-panel h2{font-size:22px;font-weight:650;color:#111;margin:0 0 20px}.admin-leave-page .workflow-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0;border-bottom:1px solid #e3eae6}.admin-leave-page .workflow-row:last-child{border-bottom:0}.admin-leave-page .workflow-row .action-row{display:flex;align-items:center;gap:12px;flex-shrink:0}.admin-leave-page .workflow-row .leave-limit{width:90px;min-width:90px;text-align:center}.admin-leave-page .input{min-height:46px;border:1px solid #75a7ff;border-radius:10px;color:#111;background:#fff;font-size:15px;padding:10px 13px}.admin-leave-page .input:hover{border-color:#2563eb}.admin-leave-page .input:focus{outline:0;border:2px solid #2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}.admin-leave-page .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 20px;border-radius:999px;font-size:14px;font-weight:600;white-space:normal;text-align:center}.admin-leave-page .btn.secondary{background:#e8f0ff;color:#1645a4}.admin-leave-page .btn.secondary:hover{background:#2563eb;color:#fff}.admin-leave-page form.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 20px;align-items:end}.admin-leave-page form.form-grid>label{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:14px;font-weight:600;color:#111}.admin-leave-page form.form-grid .input{width:100%;box-sizing:border-box}.admin-leave-page form.form-grid .form-actions{display:flex;align-items:end;justify-content:flex-end;margin:0}.admin-leave-page .master-tags{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}.admin-leave-page .master-tags span{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:999px;background:#f3f7f5;border:1px solid #dce6e2;color:#111}.admin-leave-page .leave-admin-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:20px 0;border-bottom:1px solid #e3eae6}.admin-leave-page .leave-admin-row:last-child{border-bottom:0}.admin-leave-page .leave-admin-row>div:first-child{flex:1;min-width:220px}.admin-leave-page .leave-admin-row .status-pill{font-size:13px;text-transform:none;letter-spacing:normal}.admin-leave-page .leave-admin-row .face-admin-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.admin-leave-page .leave-admin-row .face-admin-actions .input{min-width:210px;flex:1}@media(max-width:720px){.admin-leave-page .leave-panel{padding:20px 16px}.admin-leave-page .workflow-row{align-items:stretch;flex-direction:column}.admin-leave-page form.form-grid{grid-template-columns:1fr}.admin-leave-page form.form-grid .form-actions{justify-content:stretch}.admin-leave-page form.form-grid .form-actions .btn{width:100%}}`}</style>
     </main>
   );
 }
