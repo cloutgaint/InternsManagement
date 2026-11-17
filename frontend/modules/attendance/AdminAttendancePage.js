@@ -136,7 +136,7 @@ export default function AdminAttendancePage() {
                 <b>{x.full_name}</b>
                 <p className="muted">
                   {x.roll_number || ""} · {x.batch_name || "No batch"} ·{" "}
-                  {x.status}
+                  {displayLabel(x.status)}
                 </p>
                 {x.decision_reason && <p>{x.decision_reason}</p>}
               </div>
@@ -211,7 +211,7 @@ export default function AdminAttendancePage() {
                     : "—"}
                 </span>
                 <span>{x.working_minutes || 0}</span>
-                <span>{String(x.status).replace("_", " ")}{x.source === "MANUAL" ? " (corrected)" : ""}</span>
+                <span>{displayLabel(x.status)}{x.source === "MANUAL" ? " (corrected)" : ""}</span>
               </>
             ))}
           </div>
