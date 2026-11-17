@@ -13,7 +13,10 @@ export default function AdminDomainMasterPage() {
       allowedDeliverables: "",
     }),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [dialog, setDialog] = useState(null),
+    [dialogBusy, setDialogBusy] = useState(false),
+    [dialogError, setDialogError] = useState("");
   const load = () =>
     Promise.all([api("/admin/domain-master"), api("/admin/batches")])
       .then(([d, b]) => {
