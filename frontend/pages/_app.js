@@ -251,6 +251,8 @@ export default function App({ Component, pageProps }) {
       <style jsx global>{`
         .login-back-bar{position:relative;z-index:1;background:#eef7f1;padding:14px 24px 10px;border:0;box-shadow:none}
         .login-back-bar .page-back-inner{max-width:1000px}
+        .page-back-button .back-arrow{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#e5f4eb;color:#087449;flex:none}
+        .page-back-button .back-arrow svg{display:block}
         .login-back-bar .page-back-button{display:inline-flex;align-items:center;gap:9px;min-height:38px;padding:5px 14px 5px 7px;border:1px solid #cde3d5;border-radius:999px;background:#ffffffd9;color:#09583a;font-size:13px;font-weight:750;box-shadow:0 3px 12px #154c3210;transition:background .16s,border-color .16s,transform .16s}
         .login-back-bar .page-back-button .back-arrow{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#e5f4eb;color:#087449;font-size:18px;line-height:1}
         .login-back-bar .page-back-button:hover{background:#fff;border-color:#8bc6a6;transform:translateX(-2px)}
@@ -288,7 +290,7 @@ export default function App({ Component, pageProps }) {
               onClick={goBack}
               aria-label="Go back to previous page"
             >
-              <span className="back-arrow" aria-hidden="true">←</span><span>Back</span>
+              <span className="back-arrow" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m14 6-6 6 6 6"/><path d="M9 12h11"/></svg></span><span>Back</span>
             </button>
           </div>
         </div>
