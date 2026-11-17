@@ -207,7 +207,28 @@ export default function LoginPage() {
       .premium-login-panel .success,.premium-login-panel .error{margin-bottom:20px}
       @media(max-width:850px){.premium-login-layout{grid-template-columns:1fr;max-width:560px}.premium-login-story{padding:25px 30px}.premium-login-story h2{font-size:28px;margin:15px 0 10px}.premium-login-story p,.premium-login-story-steps,.premium-login-story-foot{display:none}.premium-login-layout .premium-login-panel{padding:35px 32px}}
       @media(max-width:480px){.premium-login-shell{padding:16px 12px 28px}.premium-login-layout{border-radius:17px;min-height:0}.premium-login-story{padding:20px}.premium-login-story h2{font-size:24px}.premium-login-layout .premium-login-panel{padding:27px 22px}.premium-login-panel .auth-brand h1{font-size:28px}}
-      @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
+
+      /* Keep the entire login panel in the available viewport without horizontal scrolling. */
+      html,body{max-width:100%;overflow-x:clip}
+      .premium-login-shell{box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-height:0;padding:20px 20px 28px;overflow-x:clip;align-items:flex-start}
+      .premium-login-shell *{box-sizing:border-box}
+      .premium-login-layout{width:min(100%,1000px);max-width:100%;min-width:0;min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:0 auto;align-self:start}
+      .premium-login-story,.premium-login-layout .premium-login-panel{min-width:0}
+      .premium-login-story{padding:34px 38px}
+      .premium-login-story h2{font-size:clamp(30px,3vw,43px);margin:18px 0 12px}
+      .premium-login-story-steps{margin-top:23px;gap:8px}
+      .premium-login-story-steps>div{padding:9px 12px}
+      .premium-login-story-foot{margin-top:22px}
+      .premium-login-layout .premium-login-panel{padding:30px 36px}
+      .premium-login-panel .auth-brand{margin-bottom:18px}
+      .premium-login-panel .auth-brand h1{margin:7px 0}
+      .premium-login-panel form{gap:13px}
+      .premium-login-panel .form-field{margin:0}
+      .premium-login-panel .input{margin:0;min-width:0}
+      .premium-login-panel .auth-login-switch{margin:8px 0 0;overflow-wrap:anywhere}
+      @media(max-width:850px){.premium-login-layout{grid-template-columns:minmax(0,1fr);max-width:560px}.premium-login-story{padding:22px 28px}.premium-login-story h2{font-size:27px;margin:12px 0 0}.premium-login-story p,.premium-login-story-steps,.premium-login-story-foot{display:none}.premium-login-layout .premium-login-panel{padding:28px}}
+      @media(max-width:480px){.premium-login-shell{padding:12px 10px 20px}.premium-login-story{padding:18px}.premium-login-story h2{font-size:23px}.premium-login-layout .premium-login-panel{padding:23px 18px}}
+            @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
       `}</style>
     </main>
   );
