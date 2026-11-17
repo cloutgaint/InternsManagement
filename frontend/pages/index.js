@@ -38,7 +38,6 @@ export default function Home(){return <main className="simple-home premium-home"
 @media(max-width:900px){.premium-home .premium-hero-grid{grid-template-columns:1fr;gap:0}.premium-home .simple-home-hero-content{padding:60px 0 20px}.premium-home .premium-hero-visual{min-height:350px;margin-bottom:30px}.premium-home .simple-home-steps{gap:12px}.premium-home .simple-home-step{padding:16px;gap:10px;align-items:flex-start;flex-direction:column}.premium-step-icon{width:48px;height:48px;font-size:24px}}
 @media(max-width:640px){.premium-home .simple-home-container{padding-left:18px;padding-right:18px}.premium-home .simple-home-hero h1{font-size:40px;letter-spacing:-1.8px}.premium-home .simple-home-hero-content{padding-top:40px}.premium-home .simple-home-hero p{font-size:14px}.premium-home .simple-home-actions{flex-direction:column}.premium-home .simple-home-actions a{width:100%}.premium-home .premium-hero-visual{min-height:315px}.premium-orbit-one{width:270px;height:270px}.premium-orbit-two{width:220px;height:220px}.premium-visual-panel{padding:17px}.premium-floating-badge{right:0;top:0}.premium-home .simple-home-steps{grid-template-columns:1fr}.premium-home .simple-home-step{flex-direction:row;align-items:center;min-height:125px}.premium-home .simple-home-process{padding:40px 0}.premium-home .simple-home-bottom{padding:0 14px 20px}.premium-home .simple-home-bottom-inner{padding:22px;flex-wrap:wrap;gap:12px}.premium-bottom-icon{display:none}.premium-home .simple-home-bottom .simple-home-primary{width:100%;margin:6px 0 0}}
 @media(prefers-reduced-motion:reduce){.premium-home .simple-home-primary,.premium-home .simple-home-secondary{transition:none}}
-`}
 /* Approved visual reference alignment: photo-led hero and polished step cards */
 .premium-home .premium-hero-grid{min-height:490px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
 .premium-home .simple-home-hero{background:radial-gradient(ellipse at 78% 38%,#d6f7e8 0%,transparent 42%),linear-gradient(110deg,#fbfcff 0%,#f3fbf7 100%)}
@@ -57,5 +56,5 @@ export default function Home(){return <main className="simple-home premium-home"
 .premium-home .simple-home-bottom{padding-bottom:26px}
 @media(max-width:900px){.premium-home .premium-hero-grid{grid-template-columns:1fr}.premium-home .simple-home-hero-content{padding:52px 0 20px}.premium-home .premium-hero-visual{min-height:390px;max-width:600px;width:100%;margin:0 auto 24px}.premium-home .premium-students-photo{inset:18px 20px 0}}
 @media(max-width:640px){.premium-home .simple-home-hero h1{font-size:39px}.premium-home .premium-hero-visual{min-height:310px}.premium-home .premium-students-photo{inset:18px 8px 0;border-width:4px}.premium-home .premium-orbit-one{width:270px;height:270px}.premium-home .premium-orbit-two{width:210px;height:210px}.premium-home .premium-floating-badge{top:0;right:0;padding:10px}.premium-home .premium-floating-badge small{font-size:9px}}
-</style>
+`}</style>
 </main>;}
