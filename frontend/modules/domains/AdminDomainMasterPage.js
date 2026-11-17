@@ -54,6 +54,12 @@ export default function AdminDomainMasterPage() {
       setErr(e.message);
     }
   }
+  useEffect(() => {
+    if (!dialog) return;
+    function handleDialogKeyDown(e) { if (e.key === "Escape" && !dialogBusy) closeDialog(); }
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => document.removeEventListener("keydown", handleDialogKeyDown);
+  }, [dialog, dialogBusy]);
   function openSubdomain(d) { setDialog({ type: "subdomain", domain: d, name: "", code: "" }); setDialogError(""); }
   function openCapacity(d, b) { const current = d.batch_capacities?.find((x) => x.batch_id === b.id)?.capacity ?? d.default_capacity; setDialog({ type: "capacity", domain: d, batch: b, capacity: String(current) }); setDialogError(""); }
   function closeDialog() { if (dialogBusy) return; setDialog(null); setDialogError(""); }
