@@ -18,7 +18,9 @@ export default function AdminVerificationPage() {
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false),
-    [role, setRole] = useState("");
+    [role, setRole] = useState(""),
+    [query,setQuery]=useState(""),
+    [statusFilter,setStatusFilter]=useState("ALL");
   useEffect(() => {
     setRole(sessionStorage.getItem("role") || "");
   }, []);
@@ -146,9 +148,10 @@ export default function AdminVerificationPage() {
       (x) => !["VERIFIED", "REJECTED"].includes(x.status),
     ),
     done = rows.filter((x) => ["VERIFIED", "REJECTED"].includes(x.status));
+  const filteredRows=rows.filter(p=>(statusFilter==="ALL"||(statusFilter==="PENDING"?!["VERIFIED","REJECTED"].includes(p.status):p.status===statusFilter))&&[p.full_name,p.college_name,p.roll_number,p.email].some(v=>String(v||"").toLowerCase().includes(query.trim().toLowerCase())));
   return (
-    <main className="wrap">
-      <div className="intern-head">
+    <main className="wrap verification-page">
+      <div className="intern-head verification-page-head">
         <div>
           <h1>College Proof Verification</h1>
           <p className="muted">
@@ -156,15 +159,16 @@ export default function AdminVerificationPage() {
             activating an intern.
           </p>
         </div>
-        <span className="badge">{pending.length} pending</span>
+        <span className="badge verification-pending-badge">{pending.length} pending</span>
       </div>
       <div className="verification-layout">
-        <section className="card">
-          <h2>Verification Queue</h2>{!selected&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-          {!rows.length ? (
-            <p className="muted">No proof submissions found.</p>
+        <section className="card verification-queue">
+          <div className="verification-queue-heading"><div><h2>Verification Queue</h2><p className="muted">{filteredRows.length} of {rows.length} applications</p></div><span className="verification-queue-count">{pending.length} awaiting review</span></div>
+          <div className="verification-filters"><label className="verification-search"><span className="sr-only">Search applications</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search student, college or roll no." /></label><select aria-label="Filter verification status" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="ALL">All statuses</option><option value="PENDING">Pending</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option><option value="REUPLOAD_REQUESTED">Re-upload requested</option></select></div>{!selected&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+          {!filteredRows.length ? (
+            <p className="muted verification-no-results">{rows.length?"No applications match your filters.":"No proof submissions found."}</p>
           ) : (
-            rows.map((p) => (
+            filteredRows.map((p) => (
               <button
                 type="button"
                 className={
@@ -292,7 +296,7 @@ export default function AdminVerificationPage() {
                   )}
                 </div>
               )}
-              <h3>Verification Checklist</h3>
+              <div className="verification-checklist-heading"><h3>Verification Checklist</h3><span>{ITEMS.filter(([k])=>checks[k]===true).length} / {ITEMS.length} completed</span></div>
               <div className="checklist">
                 {ITEMS.map(([k, label]) => (
                   <label key={k}>
@@ -399,6 +403,62 @@ export default function AdminVerificationPage() {
           decision stores the checklist, reason, Admin identity and timestamp.
         </p>
       )}
+      <style jsx global>{`
+.verification-page{max-width:1380px;padding:28px 28px 64px;color:#172e23}
+.verification-page-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}
+.verification-page-head h1{font-size:clamp(26px,2.5vw,34px);letter-spacing:-.9px;margin:0 0 8px;font-weight:800}
+.verification-page-head p{font-size:13px;line-height:1.6;max-width:680px}
+.verification-pending-badge{background:#e5f5eb;color:#07643f;border:1px solid #c6e8d2;border-radius:999px;padding:9px 14px;white-space:nowrap;font-size:12px;font-weight:800}
+.verification-page .verification-layout{display:grid;grid-template-columns:minmax(310px,.85fr) minmax(0,1.65fr);gap:18px;align-items:start}
+.verification-page .verification-layout>.card{min-width:0;background:#fff;border:1px solid #dae8df;border-radius:18px;box-shadow:0 6px 24px #1c493010;padding:22px}
+.verification-page .verification-queue{position:sticky;top:88px;max-height:calc(100vh - 108px);overflow-y:auto}
+.verification-queue-heading{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:18px}
+.verification-queue-heading h2{font-size:18px;letter-spacing:-.4px;margin:0 0 5px}
+.verification-queue-heading p{font-size:11px;margin:0}
+.verification-queue-count{font-size:10px;font-weight:750;color:#0d754b;background:#e9f6ee;border-radius:999px;padding:7px 9px;white-space:nowrap}
+.verification-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;margin-bottom:16px}
+.verification-search{display:flex;align-items:center;gap:9px;padding:0 12px;background:#f8fbf9;border:1px solid #d7e7dd;border-radius:10px;color:#6a8273;min-height:43px}
+.verification-search:focus-within{border-color:#08754b;box-shadow:0 0 0 3px #0b85501a}
+.verification-search input{border:0;outline:0;background:transparent;width:100%;min-width:0;font:inherit;font-size:12px;color:#1c3729}
+.verification-filters select{width:100%;min-height:42px;border:1px solid #d7e7dd;border-radius:10px;background:#fff;color:#345344;padding:0 12px;font-size:12px}
+.verification-page .proof-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;margin:0 0 9px;padding:14px;border:1px solid #e0eae3;border-radius:12px;background:#fff;text-align:left;transition:background .15s,border-color .15s,box-shadow .15s}
+.verification-page .proof-row:hover{background:#f5faf7;border-color:#b4d9c3}
+.verification-page .proof-row.active{background:#eaf7ef;border-color:#7ec8a0;box-shadow:inset 3px 0 #08734a}
+.verification-page .proof-row>span:first-child{min-width:0;display:grid;gap:6px}
+.verification-page .proof-row b{font-size:13px;overflow-wrap:anywhere}
+.verification-page .proof-row small{font-size:11px;color:#6d8073;line-height:1.5}
+.verification-page .status-pill{flex:none;font-size:10px;font-weight:800;max-width:140px;text-align:center;line-height:1.4}
+.verification-no-results{padding:24px 12px;text-align:center;font-size:12px}
+.verification-page .verification-detail{min-height:420px}
+.verification-page .empty-state{display:flex;min-height:330px;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:28px;background:radial-gradient(circle at 50% 38%,#e9f6ee,transparent 52%);border-radius:14px}
+.verification-page .empty-state h2{font-size:20px;margin:0 0 10px}
+.verification-page .empty-state p{max-width:370px;font-size:13px;line-height:1.7}
+.verification-page .verification-title{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid #e4ece6}
+.verification-page .verification-title>div{flex:1 1 100%;min-width:0}
+.verification-page .verification-title h2{font-size:23px;letter-spacing:-.6px;margin:0 0 6px}
+.verification-page .verification-title .muted{font-size:12px;overflow-wrap:anywhere}
+.verification-page .verification-title .btn{min-height:37px;padding:8px 12px;font-size:12px;border-radius:9px;max-width:100%;overflow-wrap:anywhere}
+.verification-page .proof-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:24px}
+.verification-page .proof-meta>div{min-width:0;display:flex;flex-direction:column;gap:7px;padding:13px 15px;background:#f7faf8;border:1px solid #e8efe9;border-radius:11px}
+.verification-page .proof-meta b{font-size:10px;letter-spacing:.3px;color:#668071;text-transform:uppercase}
+.verification-page .proof-meta span{font-size:12px;font-weight:650;color:#233c2d;line-height:1.5;overflow-wrap:anywhere}
+.verification-page .verification-checklist-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 12px}
+.verification-page .verification-checklist-heading h3{margin:0;font-size:17px}
+.verification-page .verification-checklist-heading span{color:#0b724b;background:#e8f5ec;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800}
+.verification-page .checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.verification-page .checklist label{display:flex;align-items:center;gap:10px;min-height:54px;padding:12px;background:#f9fbfa;border:1px solid #e0eae3;border-radius:10px;font-size:12px;line-height:1.5;cursor:pointer}
+.verification-page .checklist label:has(input:checked){background:#edf8f1;border-color:#a8dabb}
+.verification-page .checklist input{accent-color:#086b45;width:17px;height:17px;flex:none}
+.verification-page .form-field textarea{min-height:92px;border-radius:10px;background:#fafcfb;border:1px solid #d5e4da}
+.verification-page .coordinator-box{border:1px solid #d9e9de;background:#f3faf5;border-radius:12px;padding:15px;margin:20px 0}
+.verification-page .verification-actions{display:flex;flex-wrap:wrap;gap:9px;padding-top:18px;border-top:1px solid #e5eee7}
+.verification-page .verification-actions .btn{min-height:39px;padding:9px 13px;border-radius:9px;font-size:12px;font-weight:750}
+.verification-page .verification-foot{font-size:11px;margin-top:16px;line-height:1.6}
+@media(max-width:1000px){.verification-page{padding:22px 18px 45px}.verification-page .verification-layout{grid-template-columns:minmax(280px,.85fr) minmax(0,1.3fr);gap:12px}.verification-page .verification-layout>.card{padding:17px}.verification-page .proof-meta,.verification-page .checklist{grid-template-columns:1fr}}
+@media(max-width:720px){.verification-page{padding:18px 12px 36px}.verification-page-head{align-items:flex-start}.verification-page .verification-layout{grid-template-columns:minmax(0,1fr)}.verification-page .verification-queue{position:static;max-height:400px}.verification-page .proof-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.verification-page .checklist{grid-template-columns:1fr}}
+@media(max-width:440px){.verification-page-head{flex-direction:column}.verification-page .proof-meta{grid-template-columns:1fr}.verification-page .verification-title .btn{width:100%}.verification-queue-heading{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
+`}</style>
     </main>
   );
 }
