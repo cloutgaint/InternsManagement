@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+const displayLabel = (value) => String(value || "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 export default function AdminAttendancePage() {
   const [faces, setFaces] = useState([]),
     [exceptions, setExceptions] = useState([]),
@@ -205,48 +206,40 @@ export default function AdminAttendancePage() {
         </section>
       )}
       {tab === "exceptions" && (
-        <section className="card workflow-section">{["exception"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-          {exceptions.map((x) => (
-            <div className="workflow-row attendance-exception-row" key={x.id}>
-              <div>
-                <b>
-                  {x.full_name} · {x.kind}
-                </b>
-                <div className="muted">
-                  {String(x.day || "").slice(0, 10)} · {x.status}
-                </div>
-                <p>{x.reason}</p>
-                {x.requested_value?.requestedStatus && <small className="muted">Requested: {x.requested_value.requestedStatus}</small>}
-                {x.decision_reason && <p className="muted">Decision: {x.decision_reason}</p>}
-              </div>
-              {["DETECTED", "REQUESTED"].includes(x.status) && (
-                <div className="face-admin-actions">
-                  <input
-                    className="input"
-                    placeholder="Admin decision reason"
-                    value={reason[x.id] || ""}
-                    onChange={(e) =>
-                      setReason((r) => ({ ...r, [x.id]: e.target.value }))
-                    }
-                  />
-                  <div className="action-row">
-                    <button
-                      className="btn"
-                      onClick={() => exception(x, "CLOSED")}
-                    >
-                      Resolve
-                    </button>
-                    <button
-                      className="btn secondary"
-                      onClick={() => exception(x, "REJECTED")}
-                    >
-                      Reject Request
-                    </button>
+        <section className="card attendance-exceptions-panel">
+          <div className="attendance-exceptions-heading">
+            <div><h2>Attendance exceptions</h2><p className="muted">Review face matching issues and attendance correction requests.</p></div>
+            <span className="attendance-exceptions-count">{exceptions.length} records</span>
+          </div>
+          {feedbackArea === "exception" && <>{err && <p className="error" role="alert">{err}</p>}{msg && <p className="success" role="status">{msg}</p>}</>}
+          {!exceptions.length && <div className="attendance-exceptions-empty">No attendance exceptions to display.</div>}
+          <div className="attendance-exceptions-list">
+            {exceptions.map((x) => (
+              <article className="attendance-exception-card" key={x.id}>
+                <div className="attendance-exception-top">
+                  <div className="attendance-exception-identity">
+                    <h3>{x.full_name}</h3>
+                    <span className="attendance-exception-type">{displayLabel(x.kind)}</span>
                   </div>
+                  <span className={"attendance-exception-status " + (x.status === "CLOSED" ? "is-closed" : x.status === "REJECTED" ? "is-rejected" : "is-pending")}>{displayLabel(x.status)}</span>
                 </div>
-              )}
-            </div>
-          ))}
+                <div className="attendance-exception-date">{String(x.day || "").slice(0, 10)}</div>
+                <p className="attendance-exception-reason">{x.reason || "No additional details provided."}</p>
+                {(x.requested_value?.requestedStatus || x.decision_reason) && <div className="attendance-exception-details">
+                  {x.requested_value?.requestedStatus && <div><span>Requested attendance</span><strong>{displayLabel(x.requested_value.requestedStatus)}</strong></div>}
+                  {x.decision_reason && <div><span>Admin decision</span><strong>{x.decision_reason}</strong></div>}
+                </div>}
+                {["DETECTED", "REQUESTED"].includes(x.status) && <div className="attendance-exception-review">
+                  <label htmlFor={"exception-reason-" + x.id}>Admin note</label>
+                  <input id={"exception-reason-" + x.id} className="input" placeholder="Enter a reason for your decision" value={reason[x.id] || ""} onChange={(e) => setReason((r) => ({ ...r, [x.id]: e.target.value }))} />
+                  <div className="attendance-exception-buttons">
+                    <button type="button" className="btn" onClick={() => exception(x, "CLOSED")}>Resolve</button>
+                    <button type="button" className="btn secondary" onClick={() => exception(x, "REJECTED")}>Reject request</button>
+                  </div>
+                </div>}
+              </article>
+            ))}
+          </div>
         </section>
       )}
       <style jsx global>{`
@@ -284,6 +277,32 @@ export default function AdminAttendancePage() {
         .attendance-admin-page .attendance-exception-row p{font-size:15px;line-height:1.6}
         .attendance-admin-page .attendance-exception-row .muted{font-size:14px}
         @media(max-width:700px){.attendance-admin-page .attendance-face-row{grid-template-columns:90px minmax(0,1fr)}.attendance-admin-page .attendance-face-row .attendance-delete-btn{grid-column:2;justify-self:start}.attendance-admin-page .attendance-face-action-row,.attendance-admin-page .attendance-face-row>.face-admin-actions{grid-column:1/-1}.attendance-admin-page .attendance-exception-row{flex-direction:column}.attendance-admin-page .attendance-filter-card{grid-template-columns:1fr}}
+
+        .attendance-admin-page .attendance-exceptions-panel{padding:28px;background:#fff}
+        .attendance-admin-page .attendance-exceptions-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding-bottom:20px;border-bottom:1px solid #e4ece8}
+        .attendance-admin-page .attendance-exceptions-heading h2{font-size:23px;font-weight:650;letter-spacing:-.02em;margin:0 0 7px}
+        .attendance-admin-page .attendance-exceptions-heading p{font-size:15px;line-height:1.5;margin:0}
+        .attendance-admin-page .attendance-exceptions-count{flex:none;padding:8px 13px;border-radius:999px;background:#edf5f0;color:#205a3d;font-size:13px;font-weight:600}
+        .attendance-admin-page .attendance-exceptions-list{display:grid;gap:14px;padding-top:20px}
+        .attendance-admin-page .attendance-exception-card{padding:22px 24px;border:1px solid #dce8e1;border-radius:16px;background:#fff;box-shadow:0 3px 12px rgba(16,57,36,.035)}
+        .attendance-admin-page .attendance-exception-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+        .attendance-admin-page .attendance-exception-identity{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+        .attendance-admin-page .attendance-exception-identity h3{font-size:18px;font-weight:650;letter-spacing:-.01em;margin:0}
+        .attendance-admin-page .attendance-exception-type{font-size:13px;font-weight:600;padding:6px 11px;background:#eff6ff;color:#1d4ed8;border-radius:8px}
+        .attendance-admin-page .attendance-exception-status{font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px;background:#fef3c7;color:#92400e}
+        .attendance-admin-page .attendance-exception-status.is-closed{background:#e7f5ec;color:#166534}
+        .attendance-admin-page .attendance-exception-status.is-rejected{background:#fef0f0;color:#b42318}
+        .attendance-admin-page .attendance-exception-date{font-size:14px;color:#667d70;margin-top:10px}
+        .attendance-admin-page .attendance-exception-reason{font-size:15px;line-height:1.65;color:#2b4336;margin:16px 0}
+        .attendance-admin-page .attendance-exception-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+        .attendance-admin-page .attendance-exception-details>div{display:flex;flex-direction:column;gap:7px;padding:13px 15px;background:#f7faf8;border:1px solid #e8efe9;border-radius:10px;overflow-wrap:anywhere}
+        .attendance-admin-page .attendance-exception-details span{font-size:13px;color:#667d70}
+        .attendance-admin-page .attendance-exception-details strong{font-size:15px;font-weight:600}
+        .attendance-admin-page .attendance-exception-review{border-top:1px solid #e4ece8;margin-top:20px;padding-top:18px;display:grid;gap:10px}
+        .attendance-admin-page .attendance-exception-review label{font-size:14px;font-weight:600}
+        .attendance-admin-page .attendance-exception-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+        .attendance-admin-page .attendance-exceptions-empty{padding:36px 12px;text-align:center;color:#667d70;font-size:15px}
+        @media(max-width:600px){.attendance-admin-page .attendance-exceptions-panel{padding:16px}.attendance-admin-page .attendance-exception-card{padding:17px}.attendance-admin-page .attendance-exception-details{grid-template-columns:1fr}.attendance-admin-page .attendance-exceptions-heading{flex-direction:column}}
       `}</style>
     </main>
   );
