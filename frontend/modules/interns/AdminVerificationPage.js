@@ -463,6 +463,35 @@ export default function AdminVerificationPage() {
 @media(max-width:1000px){.verification-page{padding:22px 18px 45px}.verification-page .verification-layout{grid-template-columns:minmax(280px,.85fr) minmax(0,1.3fr);gap:12px}.verification-page .verification-layout>.card{padding:17px}.verification-page .proof-meta,.verification-page .checklist{grid-template-columns:1fr}}
 @media(max-width:720px){.verification-page{padding:18px 12px 36px}.verification-page-head{align-items:flex-start}.verification-page .verification-layout{grid-template-columns:minmax(0,1fr)}.verification-page .verification-queue{position:static;max-height:400px}.verification-page .proof-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.verification-page .checklist{grid-template-columns:1fr}}
 @media(max-width:440px){.verification-page-head{flex-direction:column}.verification-page .proof-meta{grid-template-columns:1fr}.verification-page .verification-title .btn{width:100%}.verification-queue-heading{flex-wrap:wrap}}
+/* Readability pass: consistent 14–16px body text and clear status hierarchy. */
+.verification-page-head p{font-size:15px;line-height:1.65}
+.verification-pending-badge{font-size:13px;padding:10px 16px}
+.verification-queue-heading h2{font-size:21px}
+.verification-queue-heading p{font-size:14px}
+.verification-queue-count{font-size:12px;padding:8px 12px}
+.verification-search{min-height:48px}
+.verification-search input{font-size:14px}
+.verification-filters select{font-size:14px;min-height:47px}
+.verification-page .proof-row{padding:16px;gap:12px;min-height:88px}
+.verification-page .proof-row b{font-size:15px}
+.verification-page .proof-row small{font-size:13px;line-height:1.55}
+.verification-page .status-pill{font-size:11px;padding:7px 10px}
+.verification-no-results{font-size:14px}
+.verification-page .empty-state h2{font-size:24px}
+.verification-page .empty-state p{font-size:15px;line-height:1.65}
+.verification-page .verification-title h2{font-size:25px}
+.verification-page .verification-title .muted{font-size:14px}
+.verification-page .verification-title .btn{font-size:13px;border-radius:999px}
+.verification-page .proof-meta b{font-size:12px}
+.verification-page .proof-meta span{font-size:14px}
+.verification-page .verification-checklist-heading h3{font-size:19px}
+.verification-page .verification-checklist-heading span{font-size:12px}
+.verification-page .checklist label{font-size:14px;min-height:60px}
+.verification-page .coordinator-box span{font-size:14px;line-height:1.6}
+.verification-page .verification-actions .btn{font-size:13px;min-height:42px;padding:10px 16px;border-radius:999px}
+.verification-page .verification-foot{font-size:13px;line-height:1.65}
+.verification-page .btn{font-size:13px}
+@media(max-width:440px){.verification-page .proof-row{padding:13px}.verification-page .proof-row b{font-size:14px}.verification-page .proof-row small{font-size:12px}.verification-page .status-pill{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
