@@ -231,7 +231,7 @@ export default function LoginPage() {
             .premium-login-brand{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;padding:11px 16px;max-width:235px;box-shadow:0 8px 22px #002b1b24}.premium-login-brand img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain}
       @media(max-width:480px){.premium-login-brand{padding:8px 12px;max-width:185px}.premium-login-brand img{width:155px}}
       /* Continuous background through the bottom of the viewport. */
-      .premium-login-shell{min-height:calc(100dvh - 120px);background:radial-gradient(circle at 12% 24%,#e2f5ea 0,transparent 42%),linear-gradient(130deg,#f5faf7,#edf5f1);align-items:flex-start}
+      .premium-login-shell{min-height:calc(100dvh - 145px);background:#eef7f1;align-items:flex-start;padding-top:12px}
       .premium-login-layout{margin-top:0}
       /* Remove white logo badge; blend white pixels of existing opaque PNG into green. */
       .premium-login-brand{background:transparent;box-shadow:none;border-radius:0;padding:0;max-width:235px}
