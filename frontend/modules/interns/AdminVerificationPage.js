@@ -584,6 +584,12 @@ export default function AdminVerificationPage() {
 @media(max-width:800px){.verification-page .verification-layout{grid-template-columns:1fr}.verification-page .verification-queue{position:static;max-height:none}}
 @media(max-width:520px){.verification-page{padding-inline:16px}.verification-page .proof-meta{grid-template-columns:1fr}.verification-page .verification-page-head{align-items:flex-start;flex-direction:column}}
 `}</style>
+      <style jsx global>{`.verification-page .verification-search{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 13px;border:1.5px solid #60a5fa;border-radius:11px;background:#f8fbff;box-sizing:border-box}
+.verification-page .verification-search input,.verification-page .verification-search input[type=search]{display:block;flex:1 1 auto;width:100%;min-width:0;height:42px;min-height:42px;margin:0!important;padding:0 2px!important;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:#111;font:inherit;font-size:14px;appearance:none;-webkit-appearance:none;box-sizing:border-box}
+.verification-page .verification-search input:focus,.verification-page .verification-search input:focus-visible{border:0!important;outline:0!important;box-shadow:none!important}
+.verification-page .verification-search:focus-within{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+.verification-page .verification-search input::placeholder{color:#737373;opacity:1}
+@media(max-width:520px){.verification-page .verification-search{min-height:46px;padding-inline:11px}.verification-page .verification-search input{font-size:14px}}`}</style>
     </main>
   );
 }
