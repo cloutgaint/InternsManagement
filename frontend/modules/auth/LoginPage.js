@@ -230,6 +230,13 @@ export default function LoginPage() {
       @media(max-width:480px){.premium-login-shell{padding:12px 10px 20px}.premium-login-story{padding:18px}.premium-login-story h2{font-size:23px}.premium-login-layout .premium-login-panel{padding:23px 18px}}
             .premium-login-brand{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;padding:11px 16px;max-width:235px;box-shadow:0 8px 22px #002b1b24}.premium-login-brand img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain}
       @media(max-width:480px){.premium-login-brand{padding:8px 12px;max-width:185px}.premium-login-brand img{width:155px}}
+      /* Continuous background through the bottom of the viewport. */
+      .premium-login-shell{min-height:calc(100dvh - 120px);background:radial-gradient(circle at 12% 24%,#e2f5ea 0,transparent 42%),linear-gradient(130deg,#f5faf7,#edf5f1);align-items:flex-start}
+      .premium-login-layout{margin-top:0}
+      /* Remove white logo badge; blend white pixels of existing opaque PNG into green. */
+      .premium-login-brand{background:transparent;box-shadow:none;border-radius:0;padding:0;max-width:235px}
+      .premium-login-brand img{mix-blend-mode:multiply;width:190px;height:auto}
+      @media(max-width:480px){.premium-login-brand{padding:0}.premium-login-brand img{width:155px}}
       @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
       `}</style>
     </main>
