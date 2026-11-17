@@ -85,7 +85,7 @@ export default function AdminDomainMasterPage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-domain-master">
       <div className="intern-head">
         <div>
           <h1>Domain Master</h1>
@@ -232,6 +232,40 @@ export default function AdminDomainMasterPage() {
           </div>
         </section>
       ))}
+      <style jsx global>{`.admin-domain-master{max-width:1240px;margin-inline:auto;padding:24px 28px 72px;color:#111}
+.admin-domain-master .intern-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:16px 0 25px}
+.admin-domain-master .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:700;letter-spacing:-.035em;color:#111;margin:0 0 8px}
+.admin-domain-master .intern-head p{max-width:760px;font-size:15px;line-height:1.6;color:#525252;margin:0}
+.admin-domain-master>.card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;padding:24px 26px;margin-bottom:17px;box-shadow:0 5px 20px rgba(15,23,42,.035)}
+.admin-domain-master h2{font-size:19px;font-weight:700;letter-spacing:-.02em;color:#111;margin:0 0 18px}
+.admin-domain-master .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;align-items:end}
+.admin-domain-master .form-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.admin-domain-master .form-field label{font-size:12px;font-weight:650;color:#262626}
+.admin-domain-master .input{display:block;width:100%;min-width:0;height:44px;min-height:44px;margin:0;padding:10px 12px;box-sizing:border-box;border:1.5px solid #93b4ed;border-radius:9px;background:#fff;color:#111;font-size:14px}
+.admin-domain-master .input:hover{border-color:#2563eb}
+.admin-domain-master .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+.admin-domain-master .form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;margin-top:4px}
+.admin-domain-master .btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:650;line-height:1.2;box-sizing:border-box}
+.admin-domain-master .btn:not(.secondary){background:#075b3b;border:1px solid #075b3b;color:#fff}
+.admin-domain-master .btn:not(.secondary):hover{background:#06472f;border-color:#06472f}
+.admin-domain-master .btn.secondary{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
+.admin-domain-master .btn.secondary:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+.admin-domain-master button:focus-visible,.admin-domain-master input:focus-visible{outline:3px solid #bfdbfe;outline-offset:2px}
+.admin-domain-master .domain-master-card{padding:22px 24px}
+.admin-domain-master .verification-title{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.admin-domain-master .verification-title h2{font-size:20px;margin:0 0 6px}
+.admin-domain-master .verification-title h2 small{font-size:12px;font-weight:650;color:#64748b;letter-spacing:.02em}
+.admin-domain-master .verification-title p{font-size:13px;color:#525252;margin:0;line-height:1.5}
+.admin-domain-master .domain-master-card>p{font-size:13px;line-height:1.6;color:#525252;margin:12px 0 17px}
+.admin-domain-master .master-tags{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:12px 13px;border:1px solid #edf0f4;border-radius:11px;background:#fafbfc;font-size:12px;color:#525252}
+.admin-domain-master .master-tags>b{color:#111;font-weight:700;margin-right:3px}
+.admin-domain-master .master-tags>span{display:inline-flex;align-items:center;padding:6px 9px;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:600}
+.admin-domain-master .capacity-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #edf0f4}
+.admin-domain-master .capacity-grid>b{grid-column:1/-1;font-size:13px;color:#111;margin-bottom:3px}
+.admin-domain-master .capacity-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 12px;border:1px solid #dbe5ef;border-radius:10px;background:#fff;color:#374151;font-size:12px;text-align:left}
+.admin-domain-master .capacity-btn:hover{border-color:#60a5fa;background:#f8fbff}
+.admin-domain-master .capacity-btn strong{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:28px;padding:0 7px;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-size:13px}
+@media(max-width:700px){.admin-domain-master{padding:18px 14px 48px}.admin-domain-master>.card{padding:20px 16px}.admin-domain-master .form-grid{grid-template-columns:1fr}.admin-domain-master .verification-title{flex-direction:column}.admin-domain-master .form-actions{justify-content:stretch}.admin-domain-master .form-actions .btn{width:100%}}`}</style>
     </main>
   );
 }
