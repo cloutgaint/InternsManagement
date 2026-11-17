@@ -373,6 +373,7 @@ export default function AdminBatchesPage() {
 .admin-batches-page .form-field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .admin-batches-page .form-field label{font-size:12px;font-weight:650;color:#262626}
 .admin-batches-page .input{width:100%;min-width:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border:1.5px solid #93b4ed;border-radius:9px;background:#fff;color:#111;font-size:14px}
+.admin-batches-page .form-grid .input{display:block;margin:0;height:44px;min-height:44px;max-height:44px}
 .admin-batches-page .input:hover{border-color:#2563eb}
 .admin-batches-page .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
 .admin-batches-page .form-actions{grid-column:2;display:flex;align-items:flex-end;justify-content:stretch;align-self:end;margin:0;min-width:0}
