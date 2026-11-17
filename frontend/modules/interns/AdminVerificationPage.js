@@ -556,6 +556,33 @@ export default function AdminVerificationPage() {
 .verification-page .verification-actions>.verification-action-correction:hover:not(:disabled){background:#1769aa!important;border-color:#1769aa!important}
 .verification-page .verification-actions>.verification-action-reupload:hover:not(:disabled){background:#16814d!important;border-color:#16814d!important}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
+
+.verification-page{width:100%;max-width:1380px;margin-inline:auto}
+.verification-page .verification-page-head h1{font-size:clamp(30px,2.8vw,38px);font-weight:650;letter-spacing:-.025em}
+.verification-page .verification-page-head p{font-size:16px;line-height:1.6}
+.verification-page .verification-queue-heading h2{font-size:21px;font-weight:650}
+.verification-page .verification-queue-heading p{font-size:14px}
+.verification-page .verification-queue-count{font-size:12px}
+.verification-page .verification-filters{gap:13px;margin-bottom:22px}
+.verification-page .verification-search{min-height:48px;border:1.5px solid #60a5fa;border-radius:11px}
+.verification-page .verification-search:focus-within{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+.verification-page .verification-search input{font-size:15px}
+.verification-page .verification-filters select{min-height:48px;border:1.5px solid #60a5fa;border-radius:11px;font-size:15px}
+.verification-page .verification-filters select:focus{outline:3px solid #dbeafe;border-color:#2563eb}
+.verification-page .proof-row{padding:16px;gap:12px}
+.verification-page .proof-row b{font-size:16px;font-weight:650}
+.verification-page .proof-row small{font-size:13px}
+.verification-page .status-pill{font-size:11px}
+.verification-page .empty-state h2{font-size:23px;font-weight:650}
+.verification-page .empty-state p{font-size:15px}
+.verification-page .proof-meta b{font-size:12px;font-weight:600;letter-spacing:0}
+.verification-page .proof-meta span{font-size:15px;font-weight:500}
+.verification-page .verification-title .muted{font-size:14px}
+.verification-page .btn{font-size:14px;font-weight:600;min-height:44px}
+.verification-page .verification-title .btn{font-size:14px;min-height:44px;border-radius:999px}
+.verification-page .verification-pending-badge{font-size:13px}
+@media(max-width:800px){.verification-page .verification-layout{grid-template-columns:1fr}.verification-page .verification-queue{position:static;max-height:none}}
+@media(max-width:520px){.verification-page{padding-inline:16px}.verification-page .proof-meta{grid-template-columns:1fr}.verification-page .verification-page-head{align-items:flex-start;flex-direction:column}}
 `}</style>
     </main>
   );
