@@ -90,10 +90,10 @@ export default function LoginPage() {
     }
   }
   return (
-    <main className="auth-shell auth-login-shell premium-login-shell"><div className="premium-login-layout"><aside className="premium-login-story"><div className="premium-login-story-inner"><div className="premium-login-brand"><img src="/Interns-logo.png" alt="GAINT Interns Hub" /></div><h2>One place for your <em>internship journey.</em></h2><p>Access your workspace, stay connected with your college and mentors, and follow your progress through every stage.</p><div className="premium-login-story-steps"><div><span>01</span><strong>Register &amp; verify</strong></div><div><span>02</span><strong>Learn &amp; collaborate</strong></div><div><span>03</span><strong>Track your progress</strong></div></div><div className="premium-login-story-foot">Your next chapter starts here <span aria-hidden="true">↗</span></div></div></aside>
+    <main className="auth-shell auth-login-shell premium-login-shell"><div className="premium-login-layout"><aside className="premium-login-story"><div className="premium-login-story-inner"><div className="premium-login-brand"><img src="/Interns-logo.png" alt="GAINT SkillBridge" /></div><h2>One place for your <em>internship journey.</em></h2><p>Connecting Education with Industry. Access your workspace, stay connected with your college and mentors, and follow your progress through every stage.</p><div className="premium-login-story-steps"><div><span>01</span><strong>Register &amp; verify</strong></div><div><span>02</span><strong>Learn &amp; collaborate</strong></div><div><span>03</span><strong>Track your progress</strong></div></div><div className="premium-login-story-foot">Your next chapter starts here <span aria-hidden="true">↗</span></div></div></aside>
       <section className="auth-panel auth-login-panel premium-login-panel">
         <div className="auth-brand">
-          <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":collegeMode?"COLLEGE COORDINATOR PORTAL":mentorMode?"GAINT MENTOR PORTAL":"GAINT STUDENT PORTAL"}</span>
+          <span className="eyebrow">{adminMode?"GAINT SKILLBRIDGE · ADMIN":collegeMode?"GAINT SKILLBRIDGE · COORDINATOR":mentorMode?"GAINT SKILLBRIDGE · MENTOR":"GAINT SKILLBRIDGE · STUDENT"}</span>
           <h1>{mfa ? "Secure verification" : adminMode ? "Admin sign in" : collegeMode ? "College coordinator sign in" : mentorMode ? "Mentor sign in" : "Welcome back"}</h1>
           <p>
             {mfa
