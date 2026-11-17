@@ -510,6 +510,10 @@ export default function AdminVerificationPage() {
 .verification-page .verification-delete-student:hover:not(:disabled){background:#dc2626!important;border-color:#dc2626!important}
 .verification-page .verification-delete-student:focus-visible{outline:3px solid #fecaca;outline-offset:2px}
 .verification-page .verification-delete-student:disabled{opacity:.55;cursor:not-allowed}
+.verification-page .verification-title>.btn{min-height:42px!important;padding:10px 18px!important;border-radius:999px!important;font-size:13px!important;font-weight:600!important;line-height:1.3!important;display:inline-flex!important;align-items:center;justify-content:center;box-sizing:border-box;transition:background-color .16s,border-color .16s,color .16s}
+.verification-page .verification-title>.btn:hover:not(:disabled){color:#fff!important}
+.verification-page .verification-title>.btn.secondary:hover:not(:disabled){background:#086443!important;border-color:#086443!important}
+.verification-page .verification-title>.btn.verification-delete-student:hover:not(:disabled){background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
