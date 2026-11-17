@@ -83,7 +83,7 @@ export default function AdminLeavePage() {
         </div>
       </div>
       <section className="card leave-panel">
-        <h2>Batch Leave Policy</h2>{["saveLimit"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        <div className="leave-section-heading"><div><h2>Batch leave policy</h2><p>Set the maximum approved working-day leave for each batch.</p></div><span className="leave-section-count">{batches.length} {batches.length === 1 ? "batch" : "batches"}</span></div>{["saveLimit"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         {batches.map((b) => (
           <div className="workflow-row" key={b.id}>
             <div>
@@ -96,6 +96,7 @@ export default function AdminLeavePage() {
             <div className="action-row">
               <input
                 className="input leave-limit"
+                aria-label={"Maximum leave days for " + b.name}
                 type="number"
                 min="0"
                 max="60"
@@ -112,7 +113,7 @@ export default function AdminLeavePage() {
         ))}
       </section>
       <section className="card leave-panel">
-        <h2>Holiday Calendar</h2>{["addHoliday"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        <div className="leave-section-heading"><div><h2>Holiday calendar</h2><p>Add holidays that should be excluded from working-day attendance calculations.</p></div><span className="leave-section-count">{holidays.length} {holidays.length === 1 ? "holiday" : "holidays"}</span></div>{["addHoliday"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
         <form className="form-grid" onSubmit={addHoliday}>
           <label>
             Batch
@@ -157,17 +158,18 @@ export default function AdminLeavePage() {
             <button className="btn">Add / Update Holiday</button>
           </div>
         </form>
-        <div className="master-tags">
-          {holidays.map((h) => (
-            <span key={h.id}>
-              {h.batch_name}: {fmt(h.day)} · {h.name}
-            </span>
-          ))}
+        <div className="holiday-list" aria-label="Configured holidays">
+          {holidays.length ? holidays.map((h) => (
+            <article className="holiday-item" key={h.id}>
+              <div className="holiday-date"><span>{fmt(h.day).slice(8, 10)}</span><small>{fmt(h.day).slice(0, 7)}</small></div>
+              <div className="holiday-details"><strong>{h.name}</strong><span>{h.batch_name || "All batches"}</span></div>
+            </article>
+          )) : <p className="leave-empty">No holidays have been added yet.</p>}
         </div>
       </section>
       <section className="card workflow-section leave-panel">
-        <h2>Leave approval queue</h2>{["decide"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-        {!requests.length && <p className="muted">No leave requests to review.</p>}
+        <div className="leave-section-heading"><div><h2>Leave approval queue</h2><p>Review intern requests and record an approval decision.</p></div><span className="leave-section-count">{requests.filter((x) => x.status === "REQUESTED").length} pending</span></div>{["decide"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        {!requests.length && <div className="leave-empty"><strong>No leave requests</strong><span>New intern requests will appear here for review.</span></div>}
         {requests.map((x) => (
           <div className="leave-admin-row" key={x.id}>
             <div>
@@ -182,11 +184,12 @@ export default function AdminLeavePage() {
                 days
               </small>
             </div>
-            <span className="status-pill">{displayStatus(x.status)}</span>
+            <span className={"leave-status " + String(x.status || "").toLowerCase().replaceAll("_", "-")}>{displayStatus(x.status)}</span>
             {x.status === "REQUESTED" && (
               <div className="face-admin-actions">
                 <input
                   className="input"
+                  aria-label={"Decision reason for " + x.full_name}
                   placeholder="Reason required when rejecting"
                   value={reason[x.id] || ""}
                   onChange={(e) =>
