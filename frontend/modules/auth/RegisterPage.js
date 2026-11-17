@@ -83,6 +83,7 @@ export default function RegisterPage() {
               <label>Full Name (as in college records)</label>
               <input
                 className="input"
+                name="fullName"
                 value={f.fullName}
                 onChange={(e) => set("fullName", e.target.value)}
                 required
@@ -94,6 +95,7 @@ export default function RegisterPage() {
                 className="input"
                 type="email"
                 autoComplete="off"
+                name="email"
                 value={f.email}
                 onChange={(e) => set("email", e.target.value)}
                 required
@@ -105,6 +107,7 @@ export default function RegisterPage() {
                 className="input"
                 inputMode="numeric"
                 maxLength="10"
+                name="mobile"
                 value={f.mobile}
                 onChange={(e) =>
                   set("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))
@@ -118,6 +121,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="date"
+                name="dob"
                 value={f.dob}
                 onChange={(e) => set("dob", e.target.value)}
                 required
@@ -127,6 +131,7 @@ export default function RegisterPage() {
               <label>Address</label>
               <textarea
                 className="input"
+                name="address"
                 value={f.address}
                 onChange={(e) => set("address", e.target.value)}
                 required
@@ -149,6 +154,7 @@ export default function RegisterPage() {
               <label htmlFor="student-college">Select Your College</label>
               <select
                 id="student-college"
+                name="collegeChoice"
                 className="input"
                 value={collegeChoice}
                 onChange={(e) => {
@@ -184,6 +190,7 @@ export default function RegisterPage() {
                 <label>College Name (Other)</label>
                 <input
                   className="input"
+                  name="collegeOther"
                   value={f.collegeOther}
                   onChange={(e) => set("collegeOther", e.target.value)}
                   required
@@ -195,6 +202,7 @@ export default function RegisterPage() {
               <label>University</label>
               <input
                 className="input"
+                name="university"
                 value={f.university}
                 onChange={(e) => set("university", e.target.value)}
                 required
@@ -205,6 +213,7 @@ export default function RegisterPage() {
               <label>Program</label>
               <select
                 className="input"
+                name="program"
                 value={f.program}
                 onChange={(e) => {
                   set("program", e.target.value);
@@ -223,6 +232,7 @@ export default function RegisterPage() {
                 <label>Enter Program Name</label>
                 <input
                   className="input"
+                  name="programOther"
                   value={f.programOther}
                   onChange={(e) => set("programOther", e.target.value)}
                   required
@@ -233,6 +243,7 @@ export default function RegisterPage() {
               <label>Branch / Department</label>
               <select
                 className="input"
+                name="branch"
                 value={f.branch}
                 onChange={(e) => {
                   set("branch", e.target.value);
@@ -251,6 +262,7 @@ export default function RegisterPage() {
                 <label>Enter Branch / Department</label>
                 <input
                   className="input"
+                  name="branchOther"
                   value={f.branchOther}
                   onChange={(e) => set("branchOther", e.target.value)}
                   required
@@ -261,6 +273,7 @@ export default function RegisterPage() {
               <label>Year / Semester</label>
               <input
                 className="input"
+                name="yearSemester"
                 value={f.yearSemester}
                 onChange={(e) => set("yearSemester", e.target.value)}
                 required
@@ -270,6 +283,7 @@ export default function RegisterPage() {
               <label>Roll / Registration Number</label>
               <input
                 className="input"
+                name="rollNumber"
                 value={f.rollNumber}
                 onChange={(e) => set("rollNumber", e.target.value)}
                 required
@@ -282,6 +296,7 @@ export default function RegisterPage() {
               <label>Preferred Domains (up to 3, in preference order)</label>
               <input
                 className="input"
+                name="preferredDomains"
                 value={f.preferredDomains}
                 onChange={(e) => set("preferredDomains", e.target.value)}
                 placeholder="Example: Data Analytics, AI/ML, Full Stack"
@@ -291,6 +306,7 @@ export default function RegisterPage() {
               <label>Preferred Batch / Start Month</label>
               <input
                 className="input"
+                name="preferredBatch"
                 value={f.preferredBatch}
                 onChange={(e) => set("preferredBatch", e.target.value)}
               />
@@ -299,6 +315,7 @@ export default function RegisterPage() {
               <label>Skills & Tools Known</label>
               <textarea
                 className="input"
+                name="skillsTools"
                 value={f.skillsTools}
                 onChange={(e) => set("skillsTools", e.target.value)}
               />
@@ -309,10 +326,12 @@ export default function RegisterPage() {
                 className="input"
                 type="url"
                 id="resume-drive-link"
+                name="resumePortfolioUrl"
                 ref={resumeRef}
                 aria-invalid={!!resumeError}
                 aria-describedby={resumeError?"resume-drive-error":undefined}
                 placeholder="https://drive.google.com/... or https://yourportfolio.com"
+                name="resumePortfolioUrl"
                 value={f.resumePortfolioUrl}
                 onChange={(e) => {set("resumePortfolioUrl",e.target.value);if(resumeError)setResumeError("");}}
               />
@@ -332,6 +351,7 @@ export default function RegisterPage() {
               <label>Proof Type</label>
               <select
                 className="input"
+                name="proofType"
                 value={f.proofType}
                 onChange={(e) => set("proofType", e.target.value)}
                 required
@@ -346,6 +366,7 @@ export default function RegisterPage() {
               <label>Issuing Authority / Signatory Designation</label>
               <input
                 className="input"
+                name="issuingAuthority"
                 value={f.issuingAuthority}
                 onChange={(e) => set("issuingAuthority", e.target.value)}
                 required
@@ -356,6 +377,7 @@ export default function RegisterPage() {
               <label>Letter / Reference Number</label>
               <input
                 className="input"
+                name="referenceNumber"
                 value={f.referenceNumber}
                 onChange={(e) => set("referenceNumber", e.target.value)}
                 required
@@ -366,6 +388,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="date"
+                name="issueDate"
                 value={f.issueDate}
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => set("issueDate", e.target.value)}
@@ -377,6 +400,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="date"
+                name="approvedFrom"
                 value={f.approvedFrom}
                 onChange={(e) => set("approvedFrom", e.target.value)}
                 required
@@ -387,6 +411,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="date"
+                name="approvedTo"
                 value={f.approvedTo}
                 min={f.approvedFrom || undefined}
                 onChange={(e) => set("approvedTo", e.target.value)}
@@ -400,6 +425,7 @@ export default function RegisterPage() {
               <label>Name</label>
               <input
                 className="input"
+                name="coordinatorName"
                 value={f.coordinatorName}
                 onChange={(e) => set("coordinatorName", e.target.value)}
                 required
@@ -409,6 +435,7 @@ export default function RegisterPage() {
               <label>Designation</label>
               <input
                 className="input"
+                name="coordinatorDesignation"
                 value={f.coordinatorDesignation}
                 onChange={(e) => set("coordinatorDesignation", e.target.value)}
                 required
@@ -419,6 +446,7 @@ export default function RegisterPage() {
               <input
                 className="input"
                 type="email"
+                name="coordinatorEmail"
                 value={f.coordinatorEmail}
                 onChange={(e) => set("coordinatorEmail", e.target.value)}
                 required
@@ -430,6 +458,7 @@ export default function RegisterPage() {
                 className="input"
                 inputMode="numeric"
                 maxLength="10"
+                name="coordinatorPhone"
                 value={f.coordinatorPhone}
                 onChange={(e) =>
                   set(
@@ -466,6 +495,7 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   minLength="10"
+                  name="password"
                   value={f.password}
                   onChange={(e) => set("password", e.target.value)}
                   required
