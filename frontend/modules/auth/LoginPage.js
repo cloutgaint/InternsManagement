@@ -17,6 +17,7 @@ export default function LoginPage() {
     [mfa, setMfa] = useState(null),
     [code, setCode] = useState(""),
     [setup, setSetup] = useState(null);
+  const EyeIcon=({visible})=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>{visible&&<path d="M3 3l18 18" strokeWidth="2.2"/>}</svg>;
   function finish(d) {
     sessionStorage.setItem("token", d.token);
     sessionStorage.setItem("role", d.user.role);
@@ -34,8 +35,9 @@ export default function LoginPage() {
     const email = e.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return setErr("Enter a valid email address.");
-    if (p.length < 10)
-      return setErr("Password must contain at least 10 characters.");
+    if (!p)
+      return setErr("Enter your password.");
+    if(busy)return;
     try {
       setBusy(true);
       const d = await api("/auth/login", {
@@ -57,6 +59,7 @@ export default function LoginPage() {
       }
       if(adminMode&&!d.user?.role?.includes("ADMIN"))return setErr("This account does not have administrator access.");
       if(collegeMode&&d.user?.role!=="COLLEGE_COORDINATOR")return setErr("This account does not have college coordinator access.");
+      if(mentorMode&&d.user?.role!=="MENTOR")return setErr("This account does not have mentor access.");
       finish(d);
     } catch (x) {
       const isPending=/pending Admin verification|pending.*approval|not approved\/active/i.test(x.message);
@@ -68,6 +71,9 @@ export default function LoginPage() {
   }
   async function verify(ev) {
     ev.preventDefault();
+    if(busy)return;
+    setErr("");
+    if(!/^\d{6}$/.test(code))return setErr("Enter the 6-digit authentication code.");
     try {
       setBusy(true);
       const d = await api("/auth/mfa/verify", {
@@ -128,8 +134,9 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShow((x) => !x)}
                   aria-label={show ? "Hide password" : "Show password"}
+                  aria-pressed={show}
                 >
-                  {show ? "Hide" : "Show"}
+                  <EyeIcon visible={show} />
                 </button>
               </div>
             </div>
@@ -237,6 +244,7 @@ export default function LoginPage() {
       .premium-login-brand{background:transparent;box-shadow:none;border-radius:0;padding:0;max-width:235px}
       .premium-login-brand img{mix-blend-mode:multiply;width:190px;height:auto}
       @media(max-width:480px){.premium-login-brand{padding:0}.premium-login-brand img{width:155px}}
+      .premium-login-panel .password-eye{display:grid;place-items:center;width:35px;height:35px;padding:0;color:#075c3e;background:#e8f3ec}.premium-login-panel .password-eye:hover{background:#d5eadd}.premium-login-panel .password-eye:focus-visible{outline:2px solid #087449;outline-offset:2px}
       @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
       `}</style>
     </main>
