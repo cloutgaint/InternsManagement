@@ -118,7 +118,7 @@ const DashboardIcon=({name})=>{const drawing=()=>{switch(name){
     case "🪪": return <><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M4 16c1-3 7-3 8 0M15 9h4M15 13h4"/></>;
     default:return <circle cx="12" cy="12" r="8"/>;
   }};return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{drawing()}</svg>};
-const ArrowIcon=()=> <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>;
+const ArrowIcon=()=> <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>;
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState(null),
