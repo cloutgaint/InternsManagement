@@ -124,7 +124,7 @@ export default function AdminCompletionPage() {
         .completion-dialog-overlay{position:fixed;inset:0;z-index:9999;background:rgba(13,31,25,.52);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
         .completion-dialog{width:min(100%,490px);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border:1px solid #dbe7e0;border-radius:20px;padding:26px;box-shadow:0 28px 80px rgba(8,39,26,.22);color:#182d23}
         .completion-dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-        .completion-dialog-brand{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:#075f3e;font-weight:700}
+        .completion-dialog-brand{font-size:12px;letter-spacing:0;text-transform:none;color:#075f3e;font-weight:650}
         .completion-dialog-close{width:32px;height:32px;border:0;border-radius:50%;background:#eef5f0;color:#254535;font-size:24px;cursor:pointer;line-height:1}
         .completion-dialog h2{font-size:23px;font-weight:650;margin:0 0 9px}
         .completion-dialog p.muted{font-size:14px;line-height:1.6;margin:0 0 22px}
