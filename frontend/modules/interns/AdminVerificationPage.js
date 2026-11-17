@@ -212,7 +212,7 @@ export default function AdminVerificationPage() {
                     {selected.email} · {selected.mobile || "No mobile"}
                   </p>
                 </div>
-                <button type="button" className="btn danger" disabled={busy} onClick={() => removeStudent(selected)}>Delete Student</button>
+                <button type="button" className="btn danger verification-delete-student" disabled={busy} onClick={() => removeStudent(selected)}>Delete Student</button>
                 {(Array.isArray(selected.file_names) && selected.file_names.length > 1 ? selected.file_names : [null]).map((name, i) => (
                   <button
                     key={i}
@@ -506,6 +506,10 @@ export default function AdminVerificationPage() {
 .verification-page .proof-meta span{font-weight:500}
 .verification-page .verification-actions .btn,.verification-page .btn{font-weight:600}
 .verification-page .verification-foot{font-weight:400}
+.verification-page .verification-delete-student{background:#ef4444!important;border:1px solid #ef4444!important;color:#fff!important;border-radius:999px!important;font-weight:600}
+.verification-page .verification-delete-student:hover:not(:disabled){background:#dc2626!important;border-color:#dc2626!important}
+.verification-page .verification-delete-student:focus-visible{outline:3px solid #fecaca;outline-offset:2px}
+.verification-page .verification-delete-student:disabled{opacity:.55;cursor:not-allowed}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
