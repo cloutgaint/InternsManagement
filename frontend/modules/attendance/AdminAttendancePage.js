@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
 const displayLabel = (value) => String(value || "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 export default function AdminAttendancePage() {
@@ -184,7 +184,7 @@ export default function AdminAttendancePage() {
       {tab === "attendance" && (
         <section className="card form-grid attendance-filter-card">
           <div className="form-field"><label>Batch</label><select className="input" value={filters.batchId} onChange={(e) => setFilters((x) => ({ ...x, batchId: e.target.value }))}><option value="">All batches</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-          <div className="form-field"><label>Status</label><select className="input" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "HOLIDAY"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}</select></div>
+          <div className="form-field"><label>Status</label><select className="input" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "HOLIDAY"].map((s) => <option key={s} value={s}>{displayLabel(s)}</option>)}</select></div>
           <div className="form-field"><label>From</label><input className="input" type="date" value={filters.from} onChange={(e) => setFilters((x) => ({ ...x, from: e.target.value }))} /></div>
           <div className="form-field"><label>To</label><input className="input" type="date" value={filters.to} onChange={(e) => setFilters((x) => ({ ...x, to: e.target.value }))} /></div>
         </section>
@@ -199,7 +199,7 @@ export default function AdminAttendancePage() {
             <b>Minutes</b>
             <b>Status</b>
             {pagedRecords.map((x) => (
-              <>
+              <Fragment key={x.id}>
                 <span>{String(x.day).slice(0, 10)}</span>
                 <span>{x.full_name}</span>
                 <span>
@@ -212,7 +212,7 @@ export default function AdminAttendancePage() {
                 </span>
                 <span>{x.working_minutes || 0}</span>
                 <span>{displayLabel(x.status)}{x.source === "MANUAL" ? " (corrected)" : ""}</span>
-              </>
+              </Fragment>
             ))}
           </div>
           <nav className="exception-pagination" aria-label="Attendance record pages">
