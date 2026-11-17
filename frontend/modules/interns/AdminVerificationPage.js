@@ -355,14 +355,14 @@ export default function AdminVerificationPage() {
                   Verify Proof
                 </button>
                 <button
-                  className="btn warning"
+                  className="btn warning verification-action-reupload"
                   disabled={busy}
                   onClick={() => decision("REUPLOAD_REQUESTED")}
                 >
                   Request Re-upload
                 </button>
                 <button
-                  className="btn danger"
+                  className="btn danger verification-action-reject"
                   disabled={busy}
                   onClick={() => decision("REJECTED")}
                 >
@@ -379,14 +379,14 @@ export default function AdminVerificationPage() {
                 )}
                 {!selected.is_active && (
                   <>
-                    <button className="btn secondary" disabled={busy} onClick={() => accountDecision(selected, "request-correction", "Correction requested from the student.")}>
+                    <button className="btn secondary verification-action-correction" disabled={busy} onClick={() => accountDecision(selected, "request-correction", "Correction requested from the student.")}>
                       Request Correction
                     </button>
-                    <button className="btn danger" disabled={busy} onClick={() => accountDecision(selected, "reject", "Application rejected.")}>
+                    <button className="btn danger verification-action-reject" disabled={busy} onClick={() => accountDecision(selected, "reject", "Application rejected.")}>
                       Reject Application
                     </button>
                     {role === "SUPER_ADMIN" && !["VERIFIED", "OVERRIDE"].includes(selected.status) && (
-                      <button className="btn warning" disabled={busy} onClick={() => override(selected)}>
+                      <button className="btn warning verification-action-override" disabled={busy} onClick={() => override(selected)}>
                         Super Admin Override &amp; Approve
                       </button>
                     )}
@@ -514,6 +514,21 @@ export default function AdminVerificationPage() {
 .verification-page .verification-title>.btn:hover:not(:disabled){color:#fff!important}
 .verification-page .verification-title>.btn.secondary:hover:not(:disabled){background:#086443!important;border-color:#086443!important}
 .verification-page .verification-title>.btn.verification-delete-student:hover:not(:disabled){background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}
+/* Equal-width action grid with GAINT green primary palette and blue override. */
+.verification-page .verification-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:stretch}
+.verification-page .verification-actions>.btn{width:100%;min-width:0;min-height:48px;padding:10px 12px;border-radius:999px!important;white-space:normal;line-height:1.35;text-align:center;font-size:12px;font-weight:600;box-sizing:border-box;border:1px solid transparent;transition:background-color .16s,color .16s,border-color .16s}
+.verification-page .verification-actions>.btn:not(.verification-action-override):not(.verification-action-reject):not(.verification-action-reupload):not(.verification-action-correction){background:#075e42;color:#fff;border-color:#075e42}
+.verification-page .verification-actions>.verification-action-reupload{background:#177c57;color:#fff;border-color:#177c57}
+.verification-page .verification-actions>.verification-action-correction{background:#e4f3e9;color:#075c3d;border-color:#b9ddc8}
+.verification-page .verification-actions>.verification-action-reject{background:#a73737;color:#fff;border-color:#a73737}
+.verification-page .verification-actions>.verification-action-override{background:#2563eb;color:#fff;border-color:#2563eb;grid-column:1/-1;justify-self:stretch}
+.verification-page .verification-actions>.btn:hover:not(:disabled){background:#064b35!important;border-color:#064b35!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reject:hover:not(:disabled){background:#8f2929!important;border-color:#8f2929!important}
+.verification-page .verification-actions>.verification-action-override:hover:not(:disabled){background:#1d4ed8!important;border-color:#1d4ed8!important}
+.verification-page .verification-actions>.btn:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:1200px){.verification-page .verification-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.verification-page .verification-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:430px){.verification-page .verification-actions{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
