@@ -77,7 +77,7 @@ export default function AdminAttendancePage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap attendance-admin-page">
       <div className="intern-head">
         <div>
           <h1>Face & Attendance Control</h1>
@@ -117,7 +117,7 @@ export default function AdminAttendancePage() {
       {tab === "faces" && (
         <section className="card workflow-section">{["face","requireReenrollment","deleteFace"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {faces.map((x) => (
-            <div className="face-admin-row" key={x.id}>
+            <div className="face-admin-row attendance-face-row" key={x.id}>
               <div className="face-admin-image">{images[x.id]?<img src={images[x.id]} alt={"Face enrollment of "+x.full_name}/>:<div className="face-admin-photo-fallback" role="img" aria-label="Enrollment image unavailable">Photo unavailable</div>}<button type="button" className="btn secondary" disabled={!images[x.id]} onClick={()=>setPreview({name:x.full_name,url:images[x.id]})}>View Image</button></div>
               <div>
                 <b>{x.full_name}</b>
@@ -127,9 +127,9 @@ export default function AdminAttendancePage() {
                 </p>
                 {x.decision_reason && <p>{x.decision_reason}</p>}
               </div>
-              <button type="button" className="btn secondary" onClick={()=>deleteFace(x)}>Delete Record</button>
+              <button type="button" className="btn danger attendance-delete-btn" onClick={()=>deleteFace(x)}>Delete Record</button>
               {x.status === "APPROVED" && (
-                <div className="action-row">
+                <div className="action-row attendance-face-action-row">
                   <input className="input" aria-label={"Re-enrollment reason for " + x.full_name} placeholder="Reason for re-enrollment" value={reason[x.id] || ""} onChange={(e) => setReason((r) => ({ ...r, [x.id]: e.target.value }))} />
                   <button type="button" className="btn warning" onClick={() => requireReenrollment(x)}>Require Re-enrollment</button>
                 </div>
@@ -169,7 +169,7 @@ export default function AdminAttendancePage() {
       )}
       {preview&&<div className="face-preview-backdrop" role="presentation" onClick={()=>setPreview(null)}><section className="face-preview-modal" role="dialog" aria-modal="true" aria-label={"Face enrollment image for "+preview.name} onClick={e=>e.stopPropagation()}><div className="face-preview-header"><h2>{preview.name} — Face Registration</h2><button type="button" className="btn secondary" onClick={()=>setPreview(null)}>Close</button></div><img src={preview.url} alt={"Face enrollment capture for "+preview.name}/></section></div>}
       {tab === "attendance" && (
-        <section className="card form-grid">
+        <section className="card form-grid attendance-filter-card">
           <div className="form-field"><label>Batch</label><select className="input" value={filters.batchId} onChange={(e) => setFilters((x) => ({ ...x, batchId: e.target.value }))}><option value="">All batches</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
           <div className="form-field"><label>Status</label><select className="input" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "HOLIDAY"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}</select></div>
           <div className="form-field"><label>From</label><input className="input" type="date" value={filters.from} onChange={(e) => setFilters((x) => ({ ...x, from: e.target.value }))} /></div>
@@ -177,7 +177,7 @@ export default function AdminAttendancePage() {
         </section>
       )}
       {tab === "attendance" && (
-        <section className="card">
+        <section className="card attendance-record-card">
           <div className="attendance-table">
             <b>Date</b>
             <b>Intern</b>
@@ -207,7 +207,7 @@ export default function AdminAttendancePage() {
       {tab === "exceptions" && (
         <section className="card workflow-section">{["exception"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {exceptions.map((x) => (
-            <div className="workflow-row" key={x.id}>
+            <div className="workflow-row attendance-exception-row" key={x.id}>
               <div>
                 <b>
                   {x.full_name} · {x.kind}
@@ -249,6 +249,42 @@ export default function AdminAttendancePage() {
           ))}
         </section>
       )}
+      <style jsx global>{`
+        .attendance-admin-page{max-width:1200px;margin-inline:auto;padding-bottom:72px}
+        .attendance-admin-page .intern-head{margin:26px 0 24px}
+        .attendance-admin-page .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:650;letter-spacing:-.025em;margin-bottom:10px}
+        .attendance-admin-page .intern-head .muted{font-size:16px;line-height:1.6}
+        .attendance-admin-page .tab-row{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+        .attendance-admin-page .tab-row .btn{border-radius:999px;min-height:44px;padding:10px 20px;font-size:14px;font-weight:600}
+        .attendance-admin-page .card{border:1px solid #dce8e1;border-radius:20px;padding:24px;margin-bottom:16px;box-shadow:0 6px 22px rgba(16,57,36,.04)}
+        .attendance-admin-page .attendance-face-row{display:grid;grid-template-columns:110px minmax(190px,1fr) auto;align-items:center;gap:16px 22px;padding:18px 0;border-bottom:1px solid #e1ebe5}
+        .attendance-admin-page .attendance-face-row:last-child{border-bottom:0}
+        .attendance-admin-page .face-admin-image{display:flex;flex-direction:column;align-items:center;gap:9px}
+        .attendance-admin-page .face-admin-image img{width:90px;height:90px;object-fit:cover;border-radius:16px;border:1px solid #d8e7de}
+        .attendance-admin-page .face-admin-image .btn{font-size:13px;min-height:34px}
+        .attendance-admin-page .attendance-face-row>div:nth-child(2) b{font-size:18px;font-weight:650}
+        .attendance-admin-page .attendance-face-row>div:nth-child(2) .muted{font-size:14px;line-height:1.6}
+        .attendance-admin-page .attendance-face-row .attendance-delete-btn{justify-self:end}
+        .attendance-admin-page .attendance-face-action-row,.attendance-admin-page .attendance-face-row>.face-admin-actions{grid-column:2 / -1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%}
+        .attendance-admin-page .attendance-face-action-row .input,.attendance-admin-page .face-admin-actions>.input{flex:1 1 240px;min-width:0}
+        .attendance-admin-page .btn{border-radius:999px;min-height:42px;padding:10px 17px;font-size:14px;font-weight:600;white-space:normal}
+        .attendance-admin-page .attendance-face-action-row .btn{min-width:190px}
+        .attendance-admin-page .input{min-height:46px;border:1.5px solid #60a5fa;border-radius:10px;padding:10px 13px;font-size:15px}
+        .attendance-admin-page .input:focus{outline:3px solid #dbeafe;outline-offset:1px;border-color:#2563eb}
+        .attendance-admin-page .attendance-filter-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+        .attendance-admin-page .attendance-filter-card .form-field{min-width:0;display:flex;flex-direction:column;gap:8px}
+        .attendance-admin-page .attendance-filter-card label{font-size:14px;font-weight:600}
+        .attendance-admin-page .attendance-record-card{overflow-x:auto}
+        .attendance-admin-page .attendance-table{min-width:690px;column-gap:12px;row-gap:0;font-size:14px}
+        .attendance-admin-page .attendance-table>b{font-size:14px;padding:13px 10px;background:#f1f7f3}
+        .attendance-admin-page .attendance-table>span{padding:12px 10px;line-height:1.5;border-bottom:1px solid #e4eee8}
+        .attendance-admin-page .attendance-exception-row{padding:20px 4px;border-bottom:1px solid #e1ebe5;display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+        .attendance-admin-page .attendance-exception-row:last-child{border-bottom:0}
+        .attendance-admin-page .attendance-exception-row b{font-size:17px;font-weight:650}
+        .attendance-admin-page .attendance-exception-row p{font-size:15px;line-height:1.6}
+        .attendance-admin-page .attendance-exception-row .muted{font-size:14px}
+        @media(max-width:700px){.attendance-admin-page .attendance-face-row{grid-template-columns:90px minmax(0,1fr)}.attendance-admin-page .attendance-face-row .attendance-delete-btn{grid-column:2;justify-self:start}.attendance-admin-page .attendance-face-action-row,.attendance-admin-page .attendance-face-row>.face-admin-actions{grid-column:1/-1}.attendance-admin-page .attendance-exception-row{flex-direction:column}.attendance-admin-page .attendance-filter-card{grid-template-columns:1fr}}
+      `}</style>
     </main>
   );
 }
