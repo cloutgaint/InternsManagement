@@ -113,7 +113,7 @@ export default function AdminOffersPage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-offers-page">
       <div className="intern-head">
         <div>
           <h1>Offer Letter Management</h1>
@@ -313,6 +313,41 @@ export default function AdminOffersPage() {
           </section>
         </div>
       )}
+      <style jsx global>{`.admin-offers-page{max-width:1240px;margin-inline:auto;padding:24px 28px 72px;color:#111}
+.admin-offers-page .intern-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin:18px 0 26px}
+.admin-offers-page .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:700;letter-spacing:-.035em;color:#111;margin:0 0 8px}
+.admin-offers-page .intern-head p{font-size:15px;line-height:1.6;color:#525252;margin:0}
+.admin-offers-page>.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px 26px;margin-bottom:18px;box-shadow:0 5px 22px rgba(15,23,42,.04)}
+.admin-offers-page h2{font-size:20px;font-weight:650;letter-spacing:-.02em;color:#111;margin:0 0 18px}
+.admin-offers-page .workflow-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;padding:18px 0;border-top:1px solid #edf0f3}
+.admin-offers-page .workflow-row:first-of-type{border-top:0}
+.admin-offers-page .workflow-row>div:first-child{min-width:0}
+.admin-offers-page .workflow-row b{display:block;font-size:15px;font-weight:650;color:#111;margin-bottom:5px}
+.admin-offers-page .workflow-row .muted{font-size:13px;line-height:1.6;color:#525252;overflow-wrap:anywhere}
+.admin-offers-page .action-row{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.admin-offers-page .btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 15px;border-radius:10px;font-size:13px;font-weight:650;line-height:1.25;white-space:nowrap;box-sizing:border-box}
+.admin-offers-page .btn:not(.secondary):not(.danger){background:#075b3b;border:1px solid #075b3b;color:#fff}
+.admin-offers-page .btn:not(.secondary):not(.danger):hover{background:#06472f;border-color:#06472f}
+.admin-offers-page .btn.secondary{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
+.admin-offers-page .btn.secondary:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+.admin-offers-page .btn.danger{background:#b4232d;border:1px solid #b4232d;color:#fff}
+.admin-offers-page .btn.danger:hover{background:#941b24}
+.admin-offers-page .status-pill{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:6px 10px;border-radius:999px;background:#e8f5ec;color:#17633d;font-size:11px;font-weight:700;white-space:nowrap}
+.admin-offers-page .input{width:100%;min-width:0;min-height:42px;margin:0;padding:9px 11px;border:1.5px solid #93b4ed;border-radius:9px;color:#111;background:#fff;font-size:13px;box-sizing:border-box}
+.admin-offers-page .action-row>.input{width:auto;min-width:145px;max-width:180px}
+.admin-offers-page .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+.admin-offers-page button:focus-visible,.admin-offers-page input:focus-visible,.admin-offers-page textarea:focus-visible{outline:3px solid #bfdbfe;outline-offset:2px}
+.admin-offers-page .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.admin-offers-page .form-field{display:flex;flex-direction:column;gap:7px;margin:0 0 16px;min-width:0}
+.admin-offers-page .form-field label{font-size:13px;font-weight:650;color:#262626}
+.admin-offers-page .offer-template{min-height:220px;resize:vertical;line-height:1.6}
+.admin-offers-page .field-help{font-size:12px;line-height:1.6;color:#525252}
+.admin-offers-page .offer-preview{max-width:760px}
+.admin-offers-page .offer-ref{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px}
+.admin-offers-page .letter-body{padding:26px 8px;font-size:14px;line-height:1.9;color:#222;white-space:pre-wrap}
+.admin-offers-page .offer-sign{margin-top:20px;font-size:14px;color:#111}
+@media(max-width:900px){.admin-offers-page .workflow-row{grid-template-columns:minmax(0,1fr)}.admin-offers-page .action-row{justify-content:flex-start}.admin-offers-page .action-row>.input{flex:1;min-width:150px}}
+@media(max-width:600px){.admin-offers-page{padding:18px 14px 48px}.admin-offers-page>.card{padding:20px 16px}.admin-offers-page .intern-head{flex-direction:column}.admin-offers-page .form-grid{grid-template-columns:1fr}.admin-offers-page .action-row>.btn{flex:1}.admin-offers-page .action-row>.input{width:100%;max-width:none}.admin-offers-page .offer-ref{flex-direction:column}}`}</style>
     </main>
   );
 }
