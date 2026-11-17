@@ -84,7 +84,7 @@ export default function LoginPage() {
     }
   }
   return (
-    <main className="auth-shell auth-login-shell premium-login-shell"><div className="premium-login-layout"><aside className="premium-login-story"><div className="premium-login-story-inner"><span className="premium-login-kicker">GAINT INTERN HUB</span><h2>One place for your <em>internship journey.</em></h2><p>Access your workspace, stay connected with your college and mentors, and follow your progress through every stage.</p><div className="premium-login-story-steps"><div><span>01</span><strong>Register &amp; verify</strong></div><div><span>02</span><strong>Learn &amp; collaborate</strong></div><div><span>03</span><strong>Track your progress</strong></div></div><div className="premium-login-story-foot">Your next chapter starts here <span aria-hidden="true">↗</span></div></div></aside>
+    <main className="auth-shell auth-login-shell premium-login-shell"><div className="premium-login-layout"><aside className="premium-login-story"><div className="premium-login-story-inner"><div className="premium-login-brand"><img src="/Interns-logo.png" alt="GAINT Interns Hub" /></div><h2>One place for your <em>internship journey.</em></h2><p>Access your workspace, stay connected with your college and mentors, and follow your progress through every stage.</p><div className="premium-login-story-steps"><div><span>01</span><strong>Register &amp; verify</strong></div><div><span>02</span><strong>Learn &amp; collaborate</strong></div><div><span>03</span><strong>Track your progress</strong></div></div><div className="premium-login-story-foot">Your next chapter starts here <span aria-hidden="true">↗</span></div></div></aside>
       <section className="auth-panel auth-login-panel premium-login-panel">
         <div className="auth-brand">
           <span className="eyebrow">{adminMode?"GAINT ADMIN PORTAL":collegeMode?"COLLEGE COORDINATOR PORTAL":mentorMode?"GAINT MENTOR PORTAL":"GAINT STUDENT PORTAL"}</span>
@@ -228,7 +228,9 @@ export default function LoginPage() {
       .premium-login-panel .auth-login-switch{margin:8px 0 0;overflow-wrap:anywhere}
       @media(max-width:850px){.premium-login-layout{grid-template-columns:minmax(0,1fr);max-width:560px}.premium-login-story{padding:22px 28px}.premium-login-story h2{font-size:27px;margin:12px 0 0}.premium-login-story p,.premium-login-story-steps,.premium-login-story-foot{display:none}.premium-login-layout .premium-login-panel{padding:28px}}
       @media(max-width:480px){.premium-login-shell{padding:12px 10px 20px}.premium-login-story{padding:18px}.premium-login-story h2{font-size:23px}.premium-login-layout .premium-login-panel{padding:23px 18px}}
-            @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
+            .premium-login-brand{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;padding:11px 16px;max-width:235px;box-shadow:0 8px 22px #002b1b24}.premium-login-brand img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain}
+      @media(max-width:480px){.premium-login-brand{padding:8px 12px;max-width:185px}.premium-login-brand img{width:155px}}
+      @media(prefers-reduced-motion:reduce){.premium-login-panel .input{transition:none}}
       `}</style>
     </main>
   );
