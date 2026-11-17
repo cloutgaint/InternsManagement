@@ -404,6 +404,12 @@ export default function AdminVerificationPage() {
         </p>
       )}
       <style jsx global>{`
+      .verification-page .btn{border-radius:999px!important;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;min-height:41px;font-size:12px;font-weight:750}
+      .verification-page .verification-layout{grid-template-columns:minmax(310px,.85fr) minmax(0,1.65fr)}
+      .verification-page .verification-page-head{margin-bottom:24px}
+      .verification-page .verification-queue{top:112px}
+      @media(max-width:720px){.verification-page .verification-layout{grid-template-columns:1fr}}
+
 .verification-page{max-width:1380px;padding:28px 28px 64px;color:#172e23}
 .verification-page-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}
 .verification-page-head h1{font-size:clamp(26px,2.5vw,34px);letter-spacing:-.9px;margin:0 0 8px;font-weight:800}
