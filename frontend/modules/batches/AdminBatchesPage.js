@@ -123,7 +123,7 @@ export default function AdminBatchesPage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-batches-page">
       <div className="intern-head">
         <div>
           <h1>Batch & Internship Duration</h1>
@@ -368,6 +368,23 @@ export default function AdminBatchesPage() {
           </section>
         </div>
       )}
+      <style jsx global>{`.admin-batches-page{max-width:1180px;margin-inline:auto;padding-bottom:72px;color:#111}
+.admin-batches-page .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-items:end}
+.admin-batches-page .form-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.admin-batches-page .form-field label{font-size:12px;font-weight:650;color:#262626}
+.admin-batches-page .input{width:100%;min-width:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border:1.5px solid #93b4ed;border-radius:9px;background:#fff;color:#111;font-size:14px}
+.admin-batches-page .input:hover{border-color:#2563eb}
+.admin-batches-page .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.admin-batches-page .form-actions{grid-column:2;display:flex;align-items:flex-end;justify-content:stretch;align-self:end;margin:0;min-width:0}
+.admin-batches-page .form-actions>.btn{width:100%;min-height:44px;box-sizing:border-box;border-radius:9px;padding:10px 16px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:650;line-height:1.2}
+.admin-batches-page .btn:not(.secondary){background:#075b3b;color:#fff;border:1px solid #075b3b}
+.admin-batches-page .btn:not(.secondary):hover{background:#064b32;border-color:#064b32}
+.admin-batches-page .btn.secondary{min-height:40px;border-radius:9px;padding:8px 13px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:12px;font-weight:650}
+.admin-batches-page .btn.secondary:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+.admin-batches-page button:focus-visible,.admin-batches-page input:focus-visible,.admin-batches-page select:focus-visible,.admin-batches-page textarea:focus-visible{outline:3px solid #bfdbfe;outline-offset:2px}
+.admin-batches-page .workflow-row{gap:16px}
+.admin-batches-page .workflow-row .action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){.admin-batches-page .form-grid{grid-template-columns:1fr}.admin-batches-page .form-actions{grid-column:1}.admin-batches-page .form-actions>.btn{width:100%}.admin-batches-page .workflow-row{align-items:flex-start;flex-direction:column}.admin-batches-page .workflow-row .action-row{width:100%;justify-content:flex-start}}`}</style>
     </main>
   );
 }
