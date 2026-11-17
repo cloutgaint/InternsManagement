@@ -300,6 +300,16 @@ export default function App({ Component, pageProps }) {
         @media(max-width:1280px){.top .glass-brand-logo{width:125px}.top .skillbridge-wordmark strong{font-size:21px}.top .skillbridge-wordmark small{font-size:10px}}
         @media(max-width:1080px){.top.glass-top{min-height:72px}.top .glass-nav-shell{min-height:52px}.top .glass-brand-logo{width:130px;height:43px}.top .skillbridge-wordmark strong{font-size:22px}.top .skillbridge-wordmark small{display:block;font-size:10px}}
         @media(max-width:520px){.top.glass-top{min-height:68px}.top .glass-brand{gap:8px}.top .glass-brand-logo{width:86px;height:35px}.top .skillbridge-wordmark{padding-left:9px;gap:3px}.top .skillbridge-wordmark strong{font-size:18px}.top .skillbridge-wordmark small{font-size:8px;max-width:150px;white-space:normal}.top .glass-mobile-toggle{width:39px;height:39px}}
+        /* Taller, more spacious header across desktop and mobile. */
+        .top.glass-top{min-height:100px;padding:16px 28px}
+        .top .glass-nav-shell{min-height:68px;max-width:1380px}
+        .top .glass-brand-logo{width:155px;height:56px}
+        .top .skillbridge-wordmark strong{font-size:27px}
+        .top .skillbridge-wordmark small{font-size:11.5px}
+        .top .glass-nav-link{min-height:44px;padding:11px 13px}
+        @media(max-width:1280px){.top.glass-top{min-height:92px;padding:13px 22px}.top .glass-nav-shell{min-height:64px}.top .glass-brand-logo{width:138px;height:51px}.top .skillbridge-wordmark strong{font-size:23px}}
+        @media(max-width:1080px){.top.glass-top{min-height:84px;padding:12px 20px}.top .glass-nav-shell{min-height:58px}.top .glass-brand-logo{width:130px;height:48px}.top .glass-nav-link{min-height:43px}}
+        @media(max-width:520px){.top.glass-top{min-height:76px;padding:10px 14px}.top .glass-nav-shell{min-height:54px}.top .glass-brand-logo{width:92px;height:40px}.top .skillbridge-wordmark strong{font-size:19px}.top .skillbridge-wordmark small{font-size:8.5px}}
         @media(prefers-reduced-motion:reduce){.top .glass-nav-link{transition:none}}
         .login-back-bar{position:relative;z-index:1;background:#eef7f1;padding:14px 24px 10px;border:0;box-shadow:none}
         .login-back-bar .page-back-inner{max-width:1000px}
