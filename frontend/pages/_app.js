@@ -95,7 +95,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>GAINT Intern Management</title>
+        <title>GAINT SkillBridge | Connecting Education with Industry</title>
         <meta
           name="description"
           content="End-to-end internship lifecycle management"
@@ -106,11 +106,11 @@ export default function App({ Component, pageProps }) {
           <Link
             href="/"
             className="glass-brand"
-            aria-label="GAINT Intern Management home"
+            aria-label="GAINT SkillBridge home"
           >
             <img
               src="/Interns-logo.png"
-              alt="GAINT Interns Hub"
+              alt="GAINT SkillBridge"
               className="glass-brand-logo"
             />
           </Link>
