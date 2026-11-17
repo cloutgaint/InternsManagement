@@ -232,6 +232,37 @@ export default function AdminDomainMasterPage() {
           </div>
         </section>
       ))}
+      {dialog && (
+        <div className="domain-dialog-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) closeDialog(); }}>
+          <section className="domain-dialog" role="dialog" aria-modal="true" aria-labelledby="domain-dialog-title">
+            <div className="domain-dialog-header">
+              <div>
+                <span className="domain-dialog-eyebrow">{dialog.type === "subdomain" ? "Domain configuration" : "Capacity settings"}</span>
+                <h2 id="domain-dialog-title">{dialog.type === "subdomain" ? "Add sub-domain" : "Update batch capacity"}</h2>
+                <p>{dialog.type === "subdomain" ? "Create a sub-domain under " + dialog.domain.name + "." : dialog.domain.name + " · " + dialog.batch.name}</p>
+              </div>
+              <button type="button" className="domain-dialog-close" aria-label="Close dialog" onClick={closeDialog} disabled={dialogBusy}>×</button>
+            </div>
+            <form onSubmit={submitDialog}>
+              {dialog.type === "subdomain" ? (
+                <div className="domain-dialog-fields">
+                  <label>Sub-domain name<input className="input" autoFocus required maxLength={100} value={dialog.name} onChange={(e) => setDialog((x) => ({ ...x, name: e.target.value }))} placeholder="e.g. React Development"/></label>
+                  <label>Sub-domain code<input className="input" required maxLength={30} value={dialog.code} onChange={(e) => setDialog((x) => ({ ...x, code: e.target.value.toUpperCase() }))} placeholder="e.g. REACT"/></label>
+                </div>
+              ) : (
+                <div className="domain-dialog-fields">
+                  <label>Maximum intern capacity<input className="input" autoFocus type="number" min="1" step="1" required value={dialog.capacity} onChange={(e) => setDialog((x) => ({ ...x, capacity: e.target.value }))}/><small>Enter the maximum number of interns for this domain in the selected batch.</small></label>
+                </div>
+              )}
+              {dialogError && <p className="domain-dialog-error" role="alert">{dialogError}</p>}
+              <div className="domain-dialog-actions">
+                <button type="button" className="btn secondary" onClick={closeDialog} disabled={dialogBusy}>Cancel</button>
+                <button type="submit" className="btn" disabled={dialogBusy}>{dialogBusy ? "Saving…" : dialog.type === "subdomain" ? "Add sub-domain" : "Save capacity"}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
       <style jsx global>{`.admin-domain-master{max-width:1240px;margin-inline:auto;padding:24px 28px 72px;color:#111}
 .admin-domain-master .intern-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:16px 0 25px}
 .admin-domain-master .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:700;letter-spacing:-.035em;color:#111;margin:0 0 8px}
@@ -265,7 +296,22 @@ export default function AdminDomainMasterPage() {
 .admin-domain-master .capacity-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 12px;border:1px solid #dbe5ef;border-radius:10px;background:#fff;color:#374151;font-size:12px;text-align:left}
 .admin-domain-master .capacity-btn:hover{border-color:#60a5fa;background:#f8fbff}
 .admin-domain-master .capacity-btn strong{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:28px;padding:0 7px;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-size:13px}
-@media(max-width:700px){.admin-domain-master{padding:18px 14px 48px}.admin-domain-master>.card{padding:20px 16px}.admin-domain-master .form-grid{grid-template-columns:1fr}.admin-domain-master .verification-title{flex-direction:column}.admin-domain-master .form-actions{justify-content:stretch}.admin-domain-master .form-actions .btn{width:100%}}`}</style>
+@media(max-width:700px){.admin-domain-master{padding:18px 14px 48px}.admin-domain-master>.card{padding:20px 16px}.admin-domain-master .form-grid{grid-template-columns:1fr}.admin-domain-master .verification-title{flex-direction:column}.admin-domain-master .form-actions{justify-content:stretch}.admin-domain-master .form-actions .btn{width:100%}}
+.admin-domain-master .domain-dialog-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.48);backdrop-filter:blur(3px)}
+.admin-domain-master .domain-dialog{width:min(100%,520px);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:25px;box-shadow:0 24px 70px rgba(15,23,42,.24);color:#111}
+.admin-domain-master .domain-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}
+.admin-domain-master .domain-dialog-eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#64748b}
+.admin-domain-master .domain-dialog-header h2{font-size:21px;font-weight:700;margin:5px 0 6px;color:#111}
+.admin-domain-master .domain-dialog-header p{font-size:13px;line-height:1.5;color:#525252;margin:0}
+.admin-domain-master .domain-dialog-close{width:34px;height:34px;flex:none;border:1px solid #e2e8f0;border-radius:9px;background:#fff;color:#525252;font-size:22px;line-height:1}
+.admin-domain-master .domain-dialog-fields{display:grid;gap:16px}
+.admin-domain-master .domain-dialog-fields label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:650;color:#262626}
+.admin-domain-master .domain-dialog-fields .input{height:44px;min-height:44px;margin:0}
+.admin-domain-master .domain-dialog-fields small{font-size:11px;font-weight:400;line-height:1.5;color:#64748b}
+.admin-domain-master .domain-dialog-error{margin:14px 0 0;padding:10px 12px;border:1px solid #fecaca;border-radius:9px;background:#fef2f2;color:#991b1b;font-size:12px}
+.admin-domain-master .domain-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:17px;border-top:1px solid #edf0f4}
+.admin-domain-master .domain-dialog-actions .btn{min-width:112px}
+@media(max-width:520px){.admin-domain-master .domain-dialog{padding:20px 17px}.admin-domain-master .domain-dialog-actions{flex-direction:column-reverse}.admin-domain-master .domain-dialog-actions .btn{width:100%}}`}</style>
     </main>
   );
 }
