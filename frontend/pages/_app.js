@@ -98,7 +98,7 @@ export default function App({ Component, pageProps }) {
         <title>GAINT SkillBridge | Connecting Education with Industry</title>
         <meta
           name="description"
-          content="End-to-end internship lifecycle management"
+          content="GAINT SkillBridge — Connecting Education with Industry. Internship registration, assessments, projects, mentoring and progress tracking."
         />
       </Head>
       <header className="top glass-top">
@@ -112,7 +112,7 @@ export default function App({ Component, pageProps }) {
               src="/Interns-logo.png"
               alt="GAINT SkillBridge"
               className="glass-brand-logo"
-            />
+            /><span className="skillbridge-wordmark"><strong>SkillBridge</strong><small>Connecting Education with Industry</small></span>
           </Link>
           <button className="glass-mobile-toggle" type="button" aria-label={mobileNavOpen?"Close navigation":"Open navigation"} aria-expanded={mobileNavOpen} aria-controls="gaint-primary-navigation" onClick={()=>setMobileNavOpen(v=>!v)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">{mobileNavOpen?<><path d="M5 5l14 14M19 5L5 19"/></>:<><path d="M4 7h16M4 12h16M4 17h16"/></>}</svg></button>
           <nav id="gaint-primary-navigation" className={"nav glass-nav"+(mobileNavOpen?" mobile-open":"")} aria-label="Main navigation">
@@ -255,6 +255,12 @@ export default function App({ Component, pageProps }) {
         </div>
       </header>
       <style jsx global>{`
+        .top .glass-brand{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none}
+        .top .skillbridge-wordmark{display:flex;flex-direction:column;gap:2px;white-space:nowrap;border-left:1px solid #d7e8dd;padding-left:12px}
+        .top .skillbridge-wordmark strong{font-size:19px;font-weight:850;letter-spacing:-.65px;color:#075e3f;line-height:1.1}
+        .top .skillbridge-wordmark small{font-size:9px;font-weight:600;color:#668275;letter-spacing:.05px}
+        @media(max-width:1250px){.top .skillbridge-wordmark small{display:none}.top .skillbridge-wordmark strong{font-size:17px}}
+        @media(max-width:520px){.top .glass-brand-logo{width:95px;height:36px}.top .skillbridge-wordmark{padding-left:8px}.top .skillbridge-wordmark strong{font-size:15px}}
         /* Compact, balanced desktop header with a real mobile navigation. */
         .top.glass-top{min-height:72px;padding:9px 24px;background:#f9fcfa;border-bottom:1px solid #dceae2;box-shadow:0 3px 16px #16452d0c;backdrop-filter:blur(16px)}
         .top .glass-nav-shell{max-width:1200px;min-height:52px;gap:24px}
