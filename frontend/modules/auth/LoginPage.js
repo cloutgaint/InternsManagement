@@ -98,7 +98,7 @@ export default function LoginPage() {
           <p>
             {mfa
               ? "Admin and Mentor accounts require multi-factor authentication."
-              : adminMode ? "Access the administrative workspace using your authorized account." : collegeMode ? "View your college interns and semester batches." : mentorMode ? "Assign tasks and review intern submissions." : "Sign in to continue to your internship workspace."}
+              : adminMode ? "Access the administrative workspace using your authorized account." : collegeMode ? "View your college interns and semester batches." : mentorMode ? "Assign weekly tasks, review intern progress and complete evaluations." : "Sign in to continue to your internship workspace."}
           </p>
         </div>
         {router.query.registered==="1"&&!adminMode&&<p className="success" role="status">Registration submitted successfully. Your college permission proof is awaiting Admin verification and approval. You can sign in after your account is activated.</p>}
