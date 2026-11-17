@@ -492,6 +492,20 @@ export default function AdminVerificationPage() {
 .verification-page .verification-foot{font-size:13px;line-height:1.65}
 .verification-page .btn{font-size:13px}
 @media(max-width:440px){.verification-page .proof-row{padding:13px}.verification-page .proof-row b{font-size:14px}.verification-page .proof-row small{font-size:12px}.verification-page .status-pill{font-size:10px}}
+/* Balanced typography: retain legible sizes with softer weights. */
+.verification-page-head h1{font-weight:700}
+.verification-queue-heading h2{font-weight:650}
+.verification-page .proof-row b{font-weight:600}
+.verification-page .status-pill{font-weight:650}
+.verification-queue-count,.verification-pending-badge{font-weight:600}
+.verification-page .empty-state h2{font-weight:650}
+.verification-page .verification-title h2{font-weight:650}
+.verification-page .verification-checklist-heading h3{font-weight:650}
+.verification-page .verification-checklist-heading span{font-weight:600}
+.verification-page .proof-meta b{font-weight:600}
+.verification-page .proof-meta span{font-weight:500}
+.verification-page .verification-actions .btn,.verification-page .btn{font-weight:600}
+.verification-page .verification-foot{font-weight:400}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
