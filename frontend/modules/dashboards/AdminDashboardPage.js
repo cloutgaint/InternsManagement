@@ -92,6 +92,32 @@ const modules = [
   ],
   ["🔔", "Notifications", "Requests and system alerts", "/notifications"],
 ];
+const DashboardIcon=({name})=>{const drawing=()=>{switch(name){
+    case "🏫": return <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M9 12h.01M15 12h.01"/></>;
+    case "🧑‍🎓": return <><circle cx="12" cy="8" r="3"/><path d="M5 21v-2a7 7 0 0 1 14 0v2M2 5l10-3 10 3-10 3zM20 6v5"/></>;
+    case "📅": return <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h3"/></>;
+    case "✉️": return <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>;
+    case "🧩": return <><path d="M8 3H4a1 1 0 0 0-1 1v5h2a2 2 0 1 1 0 4H3v7a1 1 0 0 0 1 1h6v-2a2 2 0 1 1 4 0v2h6a1 1 0 0 0 1-1v-6h-2a2 2 0 1 1 0-4h2V4a1 1 0 0 0-1-1h-6v2a2 2 0 1 1-4 0V3z"/></>;
+    case "🌴": return <><path d="M12 21V9M12 9C8 3 3 5 2 8c4-1 7 0 10 1M12 9c1-6 6-8 10-5-4 0-7 2-10 5M12 9c5-2 9 0 10 4-4-2-7-2-10-4M8 21h8"/></>;
+    case "📷": return <><path d="M4 7h4l2-3h4l2 3h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4"/></>;
+    case "📁": return <><path d="M3 7a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></>;
+    case "👥": return <><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5v1"/></>;
+    case "🎯": return <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></>;
+    case "📝": return <><path d="M4 4h12v16H4zM8 9h5M8 13h5M8 17h3M17 6l3 3-5 5-3 1 1-3z"/></>;
+    case "❓": return <><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2l-1.5 1.5V14M12 17h.01"/></>;
+    case "🗂️": return <><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 4v16M12 9h5M12 13h5"/></>;
+    case "🏢": return <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2M14 7h2M9 11h2M14 11h2M10 21v-5h4v5"/></>;
+    case "📄": return <><path d="M6 2h8l5 5v15H6zM14 2v6h5M9 12h7M9 16h7"/></>;
+    case "📋": return <><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 5V3h6v2M9 11h6M9 15h6M9 19h4"/></>;
+    case "📊": return <><path d="M4 21h16M6 18v-6h3v6M11 18V5h3v13M16 18V9h3v9"/></>;
+    case "🛡️": return <><path d="M12 2 20 5v6c0 5-3 8-8 11-5-3-8-6-8-11V5zM9 12l2 2 4-4"/></>;
+    case "📈": return <><path d="M3 20h18M4 16l5-5 4 3 7-9M16 5h4v4"/></>;
+    case "🎓": return <><path d="m2 9 10-5 10 5-10 5zM6 12v5c4 3 8 3 12 0v-5M22 9v7"/></>;
+    case "📚": return <><path d="M4 4h6v16H4zM10 6h5v14h-5zM16 4l4-1 3 16-4 1z"/></>;
+    case "🔔": return <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9M10 21h4"/></>;
+    case "🪪": return <><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M4 16c1-3 7-3 8 0M15 9h4M15 13h4"/></>;
+    default:return <circle cx="12" cy="12" r="8"/>;
+  }};return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{drawing()}</svg>};
 const ArrowIcon=()=> <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>;
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -228,7 +254,7 @@ export default function AdminDashboardPage() {
             {x.title==="Student Verification" && pendingBadge(verification)}
             <div className="admin-overview-top">
               <span className="admin-overview-icon" aria-hidden="true">
-                {x.icon}
+                <DashboardIcon name={x.icon} />
               </span>
               <span className="admin-card-chevron" aria-hidden="true">
                 <ArrowIcon />
@@ -255,7 +281,7 @@ export default function AdminDashboardPage() {
         </div>
         <div className="admin-queue-grid">
           <Link href="/admin/verification" className="admin-queue-link">
-            <span aria-hidden="true">🪪</span>
+            <span aria-hidden="true"><DashboardIcon name="🪪" /></span>
             <span>
               <b>Student Verification</b>
               <small>
@@ -266,7 +292,7 @@ export default function AdminDashboardPage() {
             <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/attendance" className="admin-queue-link">
-            <span aria-hidden="true">📅</span>
+            <span aria-hidden="true"><DashboardIcon name="📅" /></span>
             <span>
               <b>Attendance</b>
               <small>
@@ -279,7 +305,7 @@ export default function AdminDashboardPage() {
             <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/leave" className="admin-queue-link">
-            <span aria-hidden="true">🌴</span>
+            <span aria-hidden="true"><DashboardIcon name="🌴" /></span>
             <span>
               <b>Leave Requests</b>
               <small>
@@ -290,7 +316,7 @@ export default function AdminDashboardPage() {
             <span aria-hidden="true"><ArrowIcon /></span>
           </Link>
           <Link href="/admin/completion" className="admin-queue-link">
-            <span aria-hidden="true">🎓</span>
+            <span aria-hidden="true"><DashboardIcon name="🎓" /></span>
             <span>
               <b>Completion</b>
               <small>
@@ -317,7 +343,7 @@ export default function AdminDashboardPage() {
           {modules.map(([icon, title, description, href]) => (
             <Link key={href} href={href} className="admin-workspace-card" style={{position:"relative",paddingRight:modulePending[href]>0?45:undefined}}>
               <span className="admin-workspace-icon" aria-hidden="true">
-                {icon}
+                <DashboardIcon name={icon} />
               </span>
               <span className="admin-workspace-copy">
                 <b>{title}</b>
@@ -332,6 +358,15 @@ export default function AdminDashboardPage() {
         </div>
       </section>
       <style jsx global>{`
+      .admin-home .admin-overview-icon,.admin-home .admin-workspace-icon,.admin-home .admin-queue-link>span:first-child{color:#0a6748;background:#e3f4e9}
+      .admin-home .admin-overview-card.tone-amber .admin-overview-icon{color:#9c671c;background:#fff0d2}
+      .admin-home .admin-overview-card.tone-blue .admin-overview-icon{color:#3464aa;background:#e1edff}
+      .admin-home .admin-overview-card.tone-purple .admin-overview-icon{color:#7b52a6;background:#eee2ff}
+      .admin-home .admin-workspace-icon svg,.admin-home .admin-overview-icon svg,.admin-home .admin-queue-link>span:first-child svg{display:block;width:22px;height:22px}
+      .admin-home .admin-workspace-card:nth-child(4n+2) .admin-workspace-icon{color:#3464aa;background:#e8f0ff}
+      .admin-home .admin-workspace-card:nth-child(4n+3) .admin-workspace-icon{color:#986419;background:#fff2dc}
+      .admin-home .admin-workspace-card:nth-child(4n+4) .admin-workspace-icon{color:#7751a0;background:#f1eaff}
+
 .admin-home{max-width:1320px;padding:28px 28px 60px;color:#172c21}
 .admin-home-header{margin-bottom:25px;align-items:center}
 .admin-home-header h1{font-size:clamp(28px,2.7vw,36px);letter-spacing:-1.1px;margin:7px 0 8px}
