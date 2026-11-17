@@ -5,6 +5,7 @@ const displayLabel = (value) => String(value || "").replaceAll("_", " ").toLower
 export default function AdminAttendancePage() {
   const [faces, setFaces] = useState([]),
     [exceptions, setExceptions] = useState([]),
+    [exceptionPage, setExceptionPage] = useState(1),
     [records, setRecords] = useState([]),
     [tab, setTab] = useState("faces"),
     [reason, setReason] = useState({}),
@@ -77,6 +78,11 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
+  const pageSize = 8;
+  const totalPages = Math.max(1, Math.ceil(exceptions.length / pageSize));
+  const page = Math.min(exceptionPage, totalPages);
+  const pagedExceptions = exceptions.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setExceptionPage(1); }, [tab]);
   return (
     <main className="wrap attendance-admin-page">
       <div className="intern-head">
@@ -214,7 +220,7 @@ export default function AdminAttendancePage() {
           {feedbackArea === "exception" && <>{err && <p className="error" role="alert">{err}</p>}{msg && <p className="success" role="status">{msg}</p>}</>}
           {!exceptions.length && <div className="attendance-exceptions-empty">No attendance exceptions to display.</div>}
           <div className="attendance-exceptions-list">
-            {exceptions.map((x) => (
+            {pagedExceptions.map((x) => (
               <article className="attendance-exception-card" key={x.id}>
                 <div className="attendance-exception-top">
                   <div className="attendance-exception-identity">
@@ -240,6 +246,14 @@ export default function AdminAttendancePage() {
               </article>
             ))}
           </div>
+          {exceptions.length > pageSize && <nav className="exception-pagination" aria-label="Exception pages">
+            <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, exceptions.length)} of {exceptions.length}</span>
+            <div className="exception-pagination-actions">
+              <button type="button" className="btn secondary" disabled={page === 1} onClick={() => setExceptionPage(page - 1)}>Previous</button>
+              <span aria-live="polite">Page {page} of {totalPages}</span>
+              <button type="button" className="btn secondary" disabled={page === totalPages} onClick={() => setExceptionPage(page + 1)}>Next</button>
+            </div>
+          </nav>}
         </section>
       )}
       <style jsx global>{`
@@ -303,6 +317,9 @@ export default function AdminAttendancePage() {
         .attendance-admin-page .attendance-exception-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
         .attendance-admin-page .attendance-exceptions-empty{padding:36px 12px;text-align:center;color:#667d70;font-size:15px}
         @media(max-width:600px){.attendance-admin-page .attendance-exceptions-panel{padding:16px}.attendance-admin-page .attendance-exception-card{padding:17px}.attendance-admin-page .attendance-exception-details{grid-template-columns:1fr}.attendance-admin-page .attendance-exceptions-heading{flex-direction:column}}
+        .attendance-admin-page .exception-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;padding-top:20px;margin-top:22px;border-top:1px solid #e4ece8;font-size:14px;color:#111}
+        .attendance-admin-page .exception-pagination-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+        .attendance-admin-page .exception-pagination-actions .btn:disabled{opacity:.45;cursor:not-allowed}
       `}</style>
     </main>
   );
