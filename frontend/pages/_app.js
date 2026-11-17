@@ -320,6 +320,21 @@ export default function App({ Component, pageProps }) {
         .login-back-bar .page-back-button:hover{background:#fff;border-color:#8bc6a6;transform:translateX(-2px)}
         .login-back-bar .page-back-button:focus-visible{outline:3px solid #25865c;outline-offset:2px}
         @media(max-width:640px){.login-back-bar{padding:10px 14px 8px}}
+        /* Google-inspired soft surfaces, subtle borders and rounded action geometry. */
+        :root{--skillbridge-line:#dce6e1;--skillbridge-line-hover:#b8d7c6;--skillbridge-ring:#b8d9ff}
+        body{background:#f8faf9}
+        .card{border-color:var(--skillbridge-line);border-radius:20px;box-shadow:0 4px 20px rgba(27,58,42,.045)}
+        .btn,.btn.secondary,.btn.danger,.page-back-button{border-radius:999px!important}
+        .btn{transition:background-color .16s,border-color .16s,box-shadow .16s,transform .16s}
+        .btn:focus-visible,.page-back-button:focus-visible,a.simple-home-primary:focus-visible,a.simple-home-secondary:focus-visible{outline:3px solid var(--skillbridge-ring);outline-offset:3px}
+        .input,select,textarea{border-color:var(--skillbridge-line);border-radius:13px}
+        .input:focus,select:focus,textarea:focus{border-color:#8fbca5;outline:2px solid #d8eafa;outline-offset:1px}
+        .badge,.status-pill{border-radius:999px}
+        .simple-home-primary,.simple-home-secondary{border-radius:999px!important;display:inline-flex;align-items:center;justify-content:center;gap:13px}
+        .skillbridge-cta-arrow{display:inline-flex;align-items:center;justify-content:center;flex:none}
+        .skillbridge-cta-arrow svg{display:block;width:19px;height:19px;transition:transform .18s}
+        .simple-home-primary:hover .skillbridge-cta-arrow svg,.simple-home-secondary:hover .skillbridge-cta-arrow svg{transform:translateX(3px)}
+        @media(prefers-reduced-motion:reduce){.skillbridge-cta-arrow svg,.btn{transition:none}}
         .nav-notification-icon {
           width: 36px;
           height: 36px;
