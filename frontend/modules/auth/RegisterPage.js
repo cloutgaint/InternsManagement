@@ -12,6 +12,7 @@ export default function RegisterPage() {
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
     [resumeError,setResumeError] = useState(""),
+    [fieldError,setFieldError] = useState(null),
     resumeRef=useRef(null),
     [showPassword, setShowPassword] = useState(false),
     [busy, setBusy] = useState(false),
@@ -24,12 +25,13 @@ export default function RegisterPage() {
       .catch((e) => setErr(e.message))
       .finally(() => setCollegeLoad(false));
   }, []);
-  const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  const set = (k, v) => {setF((x) => ({ ...x, [k]: v }));if(fieldError===k){setFieldError(null);setErr("");}};
   async function submit(e) {
     e.preventDefault();
     // React clears currentTarget once the handler awaits.
     const form = e.currentTarget;
     setErr("");
+    setFieldError(null);
     setResumeError("");
     setMsg("");
     try {
@@ -56,11 +58,12 @@ export default function RegisterPage() {
         setResumeError(x.message);
         resumeRef.current?.scrollIntoView({behavior:"smooth",block:"center"});
         resumeRef.current?.focus({preventScroll:true});
-      } else setErr(x.message);
+      } else {setErr(x.message);setFieldError(x.field||null);if(x.field){requestAnimationFrame(()=>{const el=form.querySelector(`[name="${x.field}"]`);el?.scrollIntoView({behavior:"smooth",block:"center"});el?.focus({preventScroll:true});});}}
     } finally {
       setBusy(false);
     }
   }
+  const EyeIcon=({visible})=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>{visible&&<path d="M3 3l18 18" strokeWidth="2.2"/>}</svg>;
   return (
     <main className="wrap">
       <div className="card registration-card">
@@ -104,7 +107,7 @@ export default function RegisterPage() {
                 maxLength="10"
                 value={f.mobile}
                 onChange={(e) =>
-                  set("mobile", e.target.value.replace(/\\D/g, "").slice(0, 10))
+                  set("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))
                 }
                 required
                 placeholder="10-digit mobile number"
@@ -431,7 +434,7 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   set(
                     "coordinatorPhone",
-                    e.target.value.replace(/\\D/g, "").slice(0, 10),
+                    e.target.value.replace(/\D/g, "").slice(0, 10),
                   )
                 }
                 required
@@ -447,7 +450,7 @@ export default function RegisterPage() {
                 multiple
                 accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                 onChange={(e) =>
-                  setFiles(Array.from(e.target.files || []).slice(0, 2))
+                  setFiles(Array.from(e.target.files || []))
                 }
                 required
               />
@@ -472,9 +475,10 @@ export default function RegisterPage() {
                   className="eye-btn"
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
                   onClick={() => setShowPassword((v) => !v)}
                 >
-                  ◉
+                  <EyeIcon visible={showPassword} />
                 </button>
               </div>
               <span className="field-help">
@@ -516,6 +520,9 @@ export default function RegisterPage() {
         </form>
       </div>
       <style jsx global>{`
+      .registration-form .eye-btn{display:grid;place-items:center;width:35px;height:35px;border:0;border-radius:9px;background:#e8f4ed;color:#075f40;cursor:pointer}.registration-form .eye-btn:hover{background:#d7ebdf}.registration-form .eye-btn:focus-visible{outline:2px solid #08744b;outline-offset:2px}
+      .registration-form .form-actions+.error{margin-top:12px}
+
 .registration-card{max-width:1120px;margin:16px auto 40px;padding:32px 36px;background:#fff;border:1px solid #e0e9e4;border-radius:20px;box-shadow:0 18px 55px rgba(18,52,35,.07)}
 .registration-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 0 24px;margin:0 0 8px;border-bottom:1px solid #e7eeea}
 .registration-head h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.8px;line-height:1.2;color:#14291f;margin:0 0 8px}
