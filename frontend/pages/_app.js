@@ -71,6 +71,9 @@ export default function App({ Component, pageProps }) {
         { href: "/login?role=mentor", label: "Mentor Login" },
         { href: "/register", label: "Student Registration" },
       ];
+  const activeNavHref=router.pathname==="/login"
+    ? (["admin","college","mentor"].includes(router.query.role)?"/login?role="+router.query.role:"/login")
+    : router.pathname;
   function goBack() {
     if (!loggedIn) {
       router.push("/");
@@ -114,10 +117,10 @@ export default function App({ Component, pageProps }) {
               <Link
                 key={href}
                 href={href}
-                aria-current={router.pathname === href ? "page" : undefined}
+                aria-current={activeNavHref === href ? "page" : undefined}
                 className={
                   "glass-nav-link" +
-                  (router.pathname === href ? " is-active" : "") +
+                  (activeNavHref === href ? " is-active" : "") +
                   (!loggedIn && href === "/register" ? " glass-nav-cta" : "")
                 }
               >
