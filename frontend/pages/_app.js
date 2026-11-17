@@ -335,6 +335,50 @@ export default function App({ Component, pageProps }) {
         .skillbridge-cta-arrow svg{display:block;width:19px;height:19px;transition:transform .18s}
         .simple-home-primary:hover .skillbridge-cta-arrow svg,.simple-home-secondary:hover .skillbridge-cta-arrow svg{transform:translateX(3px)}
         @media(prefers-reduced-motion:reduce){.skillbridge-cta-arrow svg,.btn{transition:none}}
+        /* Shared SkillBridge form controls: crisp blue borders, consistent geometry. */
+        :where(main,form,.card) :is(input.input,select.input,textarea.input),
+        :where(main,form,.card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select,textarea):not(.btn):not(.nav-search){
+          box-sizing:border-box;
+          border:1.5px solid #3b82f6;
+          border-radius:7px;
+          min-height:44px;
+          transition:border-color .16s ease,box-shadow .16s ease,font-weight .16s ease;
+        }
+        :where(main,form,.card) :is(input.input,select.input,textarea.input):hover:not(:disabled),
+        :where(main,form,.card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select,textarea):not(.btn):hover:not(:disabled){
+          border-color:#2563eb;
+          box-shadow:inset 0 0 0 .5px #2563eb;
+        }
+        :where(main,form,.card) :is(input.input,select.input,textarea.input):focus:not(:disabled),
+        :where(main,form,.card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select,textarea):not(.btn):focus:not(:disabled){
+          border-color:#1d4ed8;
+          outline:2px solid #bfdbfe;
+          outline-offset:1px;
+          box-shadow:inset 0 0 0 .5px #1d4ed8;
+          font-weight:600;
+        }
+        :where(main,form,.card) :is(input,select,textarea):disabled{cursor:not-allowed;opacity:.65}
+        .page-back-bar .page-back-button,
+        .login-back-bar .page-back-button{
+          background:#2563eb!important;
+          border:1px solid #2563eb!important;
+          color:#fff!important;
+          font-weight:600;
+          box-shadow:0 4px 12px rgba(37,99,235,.16);
+        }
+        .page-back-bar .page-back-button .back-arrow,
+        .login-back-bar .page-back-button .back-arrow{
+          background:rgba(255,255,255,.18)!important;
+          color:#fff!important;
+        }
+        .page-back-bar .page-back-button:hover,
+        .login-back-bar .page-back-button:hover{
+          background:#1d4ed8!important;
+          border-color:#1d4ed8!important;
+          color:#fff!important;
+        }
+        .page-back-bar .page-back-button:focus-visible,
+        .login-back-bar .page-back-button:focus-visible{outline:3px solid #bfdbfe;outline-offset:3px}
         .nav-notification-icon {
           width: 36px;
           height: 36px;
