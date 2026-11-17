@@ -63,8 +63,8 @@ export default function AdminCompletionPage() {
   }
   async function download(x){try{const b=await apiBlob("/admin/certificates/"+x.certificate_db_id+"/file"),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(x.certificate_id||"certificate")+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)}catch(e){setErr(e.message)}}
   return (
-    <main className="wrap">
-      <h1>Completion & Certificates</h1>
+    <main className="wrap completion-page">
+      <div className="completion-page-heading"><div><span className="completion-page-eyebrow">Internship management</span><h1>Completion & Certificates</h1><p>Review internship outcomes, manage student exits and issue certificates.</p></div><span className="completion-page-count">{rows.length} students</span></div>
       {dialog&&<div className="completion-dialog-overlay" role="presentation" onMouseDown={(e)=>{if(e.target===e.currentTarget)closeDialog();}}>
         <section className="completion-dialog" role="dialog" aria-modal="true" aria-labelledby="completion-dialog-title" aria-describedby="completion-dialog-description" onKeyDown={(e)=>{if(e.key==="Escape"){e.preventDefault();closeDialog();}}}>
           <div className="completion-dialog-header"><span className="completion-dialog-brand">GAINT SkillBridge</span><button type="button" className="completion-dialog-close" onClick={closeDialog} disabled={dialogBusy} aria-label="Close dialog">×</button></div>
@@ -121,6 +121,26 @@ export default function AdminCompletionPage() {
         </section>
       ))}
       <style jsx global>{`
+        .completion-page{max-width:1200px;margin-inline:auto;padding-bottom:70px}
+        .completion-page-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:26px 0 28px}
+        .completion-page-eyebrow{display:block;font-size:14px;font-weight:600;color:#08734d;margin-bottom:9px}
+        .completion-page-heading h1{font-size:clamp(29px,3vw,38px);line-height:1.2;letter-spacing:-.025em;font-weight:650;margin:0 0 10px;color:#142e24}
+        .completion-page-heading p{font-size:16px;line-height:1.6;color:#5c7268;margin:0}
+        .completion-page-count{flex-shrink:0;background:#e9f5ee;border:1px solid #cce8d7;color:#075d3d;padding:10px 17px;border-radius:999px;font-size:14px;font-weight:650}
+        .completion-page .admin-completion-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 26px;margin:0 0 14px;border:1px solid #d9e8e0;border-radius:20px;background:#fff;box-shadow:0 6px 22px rgba(20,65,42,.045);transition:border-color .2s,box-shadow .2s}
+        .completion-page .admin-completion-row:hover{border-color:#a8d2bc;box-shadow:0 10px 28px rgba(20,65,42,.075)}
+        .completion-page .admin-completion-info{flex:1;min-width:0}
+        .completion-page .admin-completion-info>b{display:block;font-size:19px;font-weight:650;color:#183428;margin-bottom:8px}
+        .completion-page .admin-completion-info .muted{font-size:15px;line-height:1.65;color:#5a7066}
+        .completion-page .admin-completion-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+        .completion-page .admin-completion-actions .btn{min-height:44px;padding:11px 17px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap}
+        .completion-page .admin-completion-actions .btn.danger{background:#dc2626;border-color:#dc2626;color:#fff}
+        .completion-page .admin-completion-actions .btn.secondary{background:#eef5f1;border:1px solid #d7e6dd;color:#163d2c}
+        .completion-page .admin-completion-actions .btn:hover{filter:brightness(.95)}
+        .completion-page .admin-completion-actions .btn.danger:hover{background:#b91c1c;color:#fff}
+        @media(max-width:820px){.completion-page-heading{align-items:flex-start}.completion-page .admin-completion-row{align-items:flex-start;flex-direction:column}.completion-page .admin-completion-actions{justify-content:flex-start;width:100%}}
+        @media(max-width:520px){.completion-page-heading{flex-direction:column}.completion-page .admin-completion-row{padding:20px}.completion-page .admin-completion-actions .btn{flex:1}}
+
         .completion-dialog-overlay{position:fixed;inset:0;z-index:9999;background:rgba(13,31,25,.52);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
         .completion-dialog{width:min(100%,560px);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border:1px solid #dbe7e0;border-radius:22px;padding:32px;box-shadow:0 28px 80px rgba(8,39,26,.22);color:#182d23}
         .completion-dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
