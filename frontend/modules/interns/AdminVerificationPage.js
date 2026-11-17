@@ -352,21 +352,21 @@ export default function AdminVerificationPage() {
                   disabled={busy || selected.status === "VERIFIED"}
                   onClick={() => decision("VERIFIED")}
                 >
-                  Verify Proof
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Verify Proof
                 </button>
                 <button
                   className="btn warning verification-action-reupload"
                   disabled={busy}
                   onClick={() => decision("REUPLOAD_REQUESTED")}
                 >
-                  Request Re-upload
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 16v4h16v-4"/></svg> Request Re-upload
                 </button>
                 <button
                   className="btn danger verification-action-reject"
                   disabled={busy}
                   onClick={() => decision("REJECTED")}
                 >
-                  Reject Proof
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg> Reject Proof
                 </button>
                 {["VERIFIED", "OVERRIDE"].includes(selected.status) && !selected.is_active && (
                   <button
@@ -380,14 +380,14 @@ export default function AdminVerificationPage() {
                 {!selected.is_active && (
                   <>
                     <button className="btn secondary verification-action-correction" disabled={busy} onClick={() => accountDecision(selected, "request-correction", "Correction requested from the student.")}>
-                      Request Correction
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L9 19l-5 1 1-5z"/></svg> Request Correction
                     </button>
-                    <button className="btn danger verification-action-reject" disabled={busy} onClick={() => accountDecision(selected, "reject", "Application rejected.")}>
-                      Reject Application
+                    <button className="btn danger verification-action-reject verification-action-reject-application" disabled={busy} onClick={() => accountDecision(selected, "reject", "Application rejected.")}>
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg> Reject Application
                     </button>
                     {role === "SUPER_ADMIN" && !["VERIFIED", "OVERRIDE"].includes(selected.status) && (
                       <button className="btn warning verification-action-override" disabled={busy} onClick={() => override(selected)}>
-                        Super Admin Override &amp; Approve
+<svg className="verification-action-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg> Super Admin Override &amp; Approve
                       </button>
                     )}
                   </>
@@ -541,6 +541,20 @@ export default function AdminVerificationPage() {
 .verification-page .verification-actions>.verification-action-reject:hover:not(:disabled){background:#b91c1c!important;border-color:#b91c1c!important}
 .verification-page .verification-actions>.verification-action-reject:nth-child(3):hover:not(:disabled){background:#6b21a8!important;border-color:#6b21a8!important}
 .verification-page .verification-actions>.verification-action-override:hover:not(:disabled){background:#1d4ed8!important;border-color:#1d4ed8!important}
+/* GAINT logo-inspired accessible pastel action palette and purposeful icons. */
+.verification-page .verification-actions>.btn{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;font-weight:600!important;min-height:48px}
+.verification-page .verification-action-icon{flex:0 0 17px;width:17px;height:17px}
+.verification-page .verification-actions>.btn:not(.verification-action-override):not(.verification-action-reject):not(.verification-action-reupload):not(.verification-action-correction){background:#075f3e!important;border-color:#075f3e!important;color:#fff!important}
+.verification-page .verification-actions>.verification-action-reupload{background:#dff6e9!important;border-color:#b5e5ca!important;color:#08633d!important}
+.verification-page .verification-actions>.verification-action-reject:not(.verification-action-reject-application){background:#fff1c9!important;border-color:#f5d98b!important;color:#8b5900!important}
+.verification-page .verification-actions>.verification-action-correction{background:#e1f0ff!important;border-color:#bddcff!important;color:#07538c!important}
+.verification-page .verification-actions>.verification-action-reject-application{background:#fee7e7!important;border-color:#f7bcbc!important;color:#a61b1b!important}
+.verification-page .verification-actions>.verification-action-override{background:#075f3e!important;border-color:#075f3e!important;color:#fff!important}
+.verification-page .verification-actions>.btn:hover:not(:disabled){background:#075f3e!important;border-color:#075f3e!important;color:#fff!important;filter:none}
+.verification-page .verification-actions>.verification-action-reject:not(.verification-action-reject-application):hover:not(:disabled){background:#a46b08!important;border-color:#a46b08!important}
+.verification-page .verification-actions>.verification-action-reject-application:hover:not(:disabled){background:#c62828!important;border-color:#c62828!important}
+.verification-page .verification-actions>.verification-action-correction:hover:not(:disabled){background:#1769aa!important;border-color:#1769aa!important}
+.verification-page .verification-actions>.verification-action-reupload:hover:not(:disabled){background:#16814d!important;border-color:#16814d!important}
 @media(prefers-reduced-motion:reduce){.verification-page .proof-row{transition:none}}
 `}</style>
     </main>
