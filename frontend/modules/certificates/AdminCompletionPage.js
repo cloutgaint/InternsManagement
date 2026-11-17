@@ -122,22 +122,22 @@ export default function AdminCompletionPage() {
       ))}
       <style jsx global>{`
         .completion-dialog-overlay{position:fixed;inset:0;z-index:9999;background:rgba(13,31,25,.52);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
-        .completion-dialog{width:min(100%,490px);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border:1px solid #dbe7e0;border-radius:20px;padding:26px;box-shadow:0 28px 80px rgba(8,39,26,.22);color:#182d23}
-        .completion-dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-        .completion-dialog-brand{font-size:12px;letter-spacing:0;text-transform:none;color:#075f3e;font-weight:650}
-        .completion-dialog-close{width:32px;height:32px;border:0;border-radius:50%;background:#eef5f0;color:#254535;font-size:24px;cursor:pointer;line-height:1}
-        .completion-dialog h2{font-size:23px;font-weight:650;margin:0 0 9px}
-        .completion-dialog p.muted{font-size:14px;line-height:1.6;margin:0 0 22px}
-        .completion-dialog-field{display:flex;flex-direction:column;gap:9px;font-size:13px;font-weight:600;margin-bottom:17px}
-        .completion-dialog-field .input{width:100%;border:1.5px solid #3b82f6;border-radius:8px;min-height:44px;padding:11px 13px;font:inherit;font-weight:400;resize:vertical}
+        .completion-dialog{width:min(100%,560px);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border:1px solid #dbe7e0;border-radius:22px;padding:32px;box-shadow:0 28px 80px rgba(8,39,26,.22);color:#182d23}
+        .completion-dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+        .completion-dialog-brand{font-size:17px;letter-spacing:0;text-transform:none;color:#075f3e;font-weight:650}
+        .completion-dialog-close{width:38px;height:38px;border:0;border-radius:50%;background:#eef5f0;color:#254535;font-size:24px;cursor:pointer;line-height:1}
+        .completion-dialog h2{font-size:28px;font-weight:650;line-height:1.2;margin:0 0 12px}
+        .completion-dialog p.muted{font-size:16px;line-height:1.65;margin:0 0 24px}
+        .completion-dialog-field{display:flex;flex-direction:column;gap:10px;font-size:15px;font-weight:600;margin-bottom:17px}
+        .completion-dialog-field .input{width:100%;border:1.5px solid #3b82f6;border-radius:8px;min-height:48px;padding:12px 15px;font-size:16px;font:inherit;font-weight:400;resize:vertical}
         .completion-dialog-field .input:focus{outline:3px solid #dbeafe;outline-offset:1px;border-color:#1d4ed8}
         .completion-dialog-required{color:#dc2626}
         .completion-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;flex-wrap:wrap}
-        .completion-dialog-actions .btn{border-radius:999px;min-width:100px;min-height:42px}
+        .completion-dialog-actions .btn{border-radius:999px;min-width:116px;min-height:46px;font-size:15px;font-weight:600}
         .completion-dialog-actions .btn:not(.secondary):not(.danger){background:#2563eb;color:#fff;border-color:#2563eb}
         .completion-dialog-actions .btn.danger{background:#dc2626;color:#fff;border-color:#dc2626}
         .completion-dialog-actions .btn.secondary{background:#edf3f0;color:#18382b;border-color:#d8e5dd}
-        @media(max-width:520px){.completion-dialog{padding:20px}.completion-dialog-actions .btn{flex:1}}
+        @media(max-width:520px){.completion-dialog{padding:24px 20px}.completion-dialog h2{font-size:24px}.completion-dialog-brand{font-size:16px}.completion-dialog-actions .btn{flex:1}}
       `}</style>
     </main>
   );
