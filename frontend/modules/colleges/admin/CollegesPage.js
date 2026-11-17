@@ -269,7 +269,7 @@ export default function Page() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-colleges-page">
       <div className="intern-head">
         <div>
           <h1>College Master</h1>
@@ -462,6 +462,38 @@ export default function Page() {
           ))
         )}
       </section>
+      <style jsx global>{`.admin-colleges-page{max-width:1180px;margin-inline:auto;padding-bottom:72px;color:#111}
+.admin-colleges-page .intern-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin:28px 0 24px}
+.admin-colleges-page .intern-head h1{font-size:clamp(27px,3vw,34px);font-weight:700;letter-spacing:-.035em;color:#111;margin:0 0 8px}
+.admin-colleges-page .intern-head .muted{font-size:14px;line-height:1.65;color:#525252;max-width:760px}
+.admin-colleges-page>.card{background:#fff;border:1px solid #e2e8f0;border-radius:17px;padding:25px 27px;margin:0 0 17px;box-shadow:0 4px 18px rgba(15,23,42,.035)}
+.admin-colleges-page>.card h2{font-size:19px;font-weight:700;letter-spacing:-.02em;color:#111;margin:0 0 15px}
+.admin-colleges-page .form-section-title{font-size:13px;font-weight:700;color:#111;margin:8px 0 12px;padding-bottom:9px;border-bottom:1px solid #edf0f4}
+.admin-colleges-page .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px}
+.admin-colleges-page .form-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.admin-colleges-page .form-field label{font-size:12px;font-weight:650;color:#262626}
+.admin-colleges-page .input{width:100%;min-width:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border:1.5px solid #93b4ed;border-radius:9px;background:#fff;color:#111;font-size:14px;transition:border-color .15s,box-shadow .15s}
+.admin-colleges-page textarea.input{min-height:78px;resize:vertical}
+.admin-colleges-page .input:hover{border-color:#2563eb}
+.admin-colleges-page .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.admin-colleges-page .form-actions{display:flex;justify-content:flex-start;align-items:center;grid-column:1/-1;margin-top:3px}
+.admin-colleges-page .btn{display:inline-flex;align-items:center;justify-content:center;min-height:43px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:650;line-height:1.2;text-align:center}
+.admin-colleges-page .btn:not(.secondary){background:#075b3b;color:#fff;border:1px solid #075b3b}
+.admin-colleges-page .btn:not(.secondary):hover{background:#064b32;box-shadow:0 3px 9px rgba(7,91,59,.16)}
+.admin-colleges-page .btn.secondary{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.admin-colleges-page .btn.secondary:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+.admin-colleges-page button:focus-visible,.admin-colleges-page input:focus-visible,.admin-colleges-page select:focus-visible,.admin-colleges-page textarea:focus-visible{outline:3px solid #bfdbfe;outline-offset:2px}
+.admin-colleges-page .workflow-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 0;border-top:1px solid #edf0f4}
+.admin-colleges-page .workflow-row:last-child{padding-bottom:0}
+.admin-colleges-page .workflow-row>div:first-child{flex:1;min-width:0}
+.admin-colleges-page .workflow-row b{font-size:14px;font-weight:700;color:#111}
+.admin-colleges-page .workflow-row .muted{font-size:12px;line-height:1.55;color:#525252;margin:5px 0 0;overflow-wrap:anywhere}
+.admin-colleges-page .workflow-row .action-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.admin-colleges-page .status-pill{font-size:11px;font-weight:700;letter-spacing:0;padding:6px 10px;border-radius:999px;white-space:nowrap}
+.admin-colleges-page .college-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%}
+.admin-colleges-page .college-edit label{grid-column:1/-1;font-size:12px;color:#262626}
+@media(max-width:760px){.admin-colleges-page>.card{padding:20px 17px}.admin-colleges-page .workflow-row{align-items:flex-start;flex-direction:column}.admin-colleges-page .workflow-row .action-row{justify-content:flex-start}.admin-colleges-page .college-edit{grid-template-columns:1fr}}
+@media(max-width:520px){.admin-colleges-page .form-grid{grid-template-columns:1fr}.admin-colleges-page .intern-head{flex-direction:column}.admin-colleges-page>.card .form-actions .btn{width:100%}}`}</style>
     </main>
   );
 }
