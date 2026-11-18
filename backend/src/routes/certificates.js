@@ -58,11 +58,24 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
   pdf.font("Times-Italic");
   while(nameSize>18*scale){pdf.fontSize(nameSize);if(pdf.widthOfString(name)<=available)break;nameSize-=1*scale;}
   pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,202*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
+  // The horizontal divider is printed at about y=320 on the original
+  // 862.5 x 605.25 pt template. All description lines belong below it.
+  // Fixed, independent rows prevent a long title from shifting dates into
+  // the preprinted Chairman / CEO signature area.
+  const fitRow=(value,y,preferred=10,min=7.5,bold=false)=>{
+   const content=String(value||"").trim(),x=92*sx,width=W-184*sx;
+   const font=bold?"Helvetica-Bold":"Helvetica";
+   let size=preferred*scale;
+   pdf.font(font);
+   while(size>min*scale){pdf.fontSize(size);if(pdf.widthOfString(content)<=width)break;size-=0.25*scale;}
+   pdf.fillColor("#233a68").fontSize(size).text(content,x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
+  };
   const project=String(c.project_title||"Internship Project").trim().toUpperCase();
-  center("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",257,10,"#233a68","Helvetica",115,115);
-  center(project,274,11,"#233a68","Helvetica-Bold",115,115);
-  center("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",292,9,"#233a68","Helvetica",110,110);
-  center("DURING THE PERIOD FROM "+date(c.start_date)+" TO "+date(c.end_date),307,10,"#233a68","Helvetica-Bold",110,110);
+  fitRow("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",341,10,8);
+  fitRow(project,357,11,7.5,true);
+  fitRow("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",375,9.5,8);
+  fitRow("DURING THE PERIOD FROM",391,9.5,8);
+  fitRow(date(c.start_date)+" TO "+date(c.end_date),407,10,8,true);
   res.setHeader("Content-Type","application/pdf");
   res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${c.certificate_number}.pdf"`);
   pdf.pipe(res);pdf.end();
