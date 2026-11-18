@@ -162,7 +162,7 @@ export default function AdminOffersPage() {
       setBusy(false);
     }
   }
-  async function submitReasonAction(){if(!reasonDialog)return;const reason=reasonValue.trim();if(!reason){setReasonError("Please enter a reason.");return;}if(reason.length>500){setReasonError("Reason must be 500 characters or fewer.");return;}const {offer,type}=reasonDialog;setBusy(true);setReasonError("");setFeedbackArea("action");try{await api("/admin/offer-letters/"+offer.id+"/"+type,{method:"POST",body:JSON.stringify({reason})});setReasonDialog(null);setReasonValue("");setMsg(type==="reissue"?"Reissue draft created. Preview the letter and edit its content before approval.":"Offer letter revoked.");setPreview(null);await load()}catch(e){setReasonError(e.message)}finally{setBusy(false)}}
+  async function submitReasonAction(){if(!reasonDialog)return;const reason=reasonValue.trim();if(!reason){setReasonError("Please enter a reason.");return;}if(reason.length>500){setReasonError("Reason must be 500 characters or fewer.");return;}const {offer,type}=reasonDialog;setBusy(true);setReasonError("");setFeedbackArea("action");try{await api("/admin/offer-letters/"+offer.id+"/"+type,{method:"POST",body:JSON.stringify({reason})});setReasonDialog(null);setReasonValue("");setMsg(type==="reissue"?"Reissue draft created. Review the content, preview the PDF, approve and issue again.":"Offer letter revoked. Use Create reissue draft to send a corrected offer.");if(type==="reissue"){const detail=await api("/admin/offer-letters/"+offer.id+"/preview");setPreview(detail);setSelected(detail);setEditBody(detail.rendered_body||"");setEditSignatory(detail.signatory||"");setEditingOffer(false);setEditError("");setEditMessage("Reissue draft ready. You can edit the content or preview the PDF before approval.");}else setPreview(null);await load()}catch(e){setReasonError(e.message)}finally{setBusy(false)}}
   return (
     <main className="wrap admin-offers-page">
       <div className="intern-head">
@@ -373,6 +373,7 @@ export default function AdminOffersPage() {
                   Approve Letter
                 </button>
               )}
+              {!editingOffer && preview.status === "APPROVED" && <div className="form-field"><label htmlFor="offer-preview-issue-date">Issue date and time</label><input id="offer-preview-issue-date" className="input" type="datetime-local" value={issueAt} onChange={e=>setIssueAt(e.target.value)}/></div>}
               {!editingOffer && preview.status === "APPROVED" && (
                 <button
                   className="btn"
