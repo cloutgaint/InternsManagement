@@ -7,6 +7,7 @@ export default function AdminOffersPage() {
     [letters, setLetters] = useState([]),
     [templates, setTemplates] = useState([]),
     [selected, setSelected] = useState(null),
+    [pdfPreview,setPdfPreview]=useState(null),
     [preview, setPreview] = useState(null),
     [tpl, setTpl] = useState({
       name: "GAINT Internship Offer Letter",
@@ -94,7 +95,9 @@ export default function AdminOffersPage() {
       setBusy(false);
     }
   }
-  async function showPdf(l) {try {const blob=await apiBlob("/admin/offer-letters/"+l.id+"/pdf");const url=URL.createObjectURL(blob);const tab=window.open(url,"_blank","noopener,noreferrer");if(!tab){const a=document.createElement("a");a.href=url;a.download="GAINT-Internship-Offer.pdf";a.click()}setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setErr(e.message)}}
+  async function showPdf(l) {try {const blob=await apiBlob("/admin/offer-letters/"+l.id+"/pdf");const url=URL.createObjectURL(blob);setPdfPreview(old=>{if(old?.url)URL.revokeObjectURL(old.url);return {url,name:l.student_name_snapshot||"Intern",reference:l.reference_number||"Offer"}})}catch(e){setErr(e.message)}}
+  function closePdf(){setPdfPreview(old=>{if(old?.url)URL.revokeObjectURL(old.url);return null})}
+  function downloadPdf(){if(!pdfPreview)return;const a=document.createElement("a");a.href=pdfPreview.url;a.download="GAINT-Offer-"+pdfPreview.reference.replace(/[^a-zA-Z0-9_-]/g,"")+".pdf";document.body.appendChild(a);a.click();a.remove()}
   async function show(l) {
     try {
       setPreview(await api("/admin/offer-letters/" + l.id + "/preview"));
@@ -348,7 +351,9 @@ export default function AdminOffersPage() {
           </section>
         </div>
       )}
-      <style jsx global>{`.admin-offers-page .letterhead-settings{display:flex;flex-direction:column;gap:12px}
+      {pdfPreview&&<div className="offer-pdf-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closePdf()}}><section className="offer-pdf-dialog" role="dialog" aria-modal="true" aria-label="Offer letter PDF preview"><header><div><h2>Offer letter preview</h2><p>{pdfPreview.name} · {pdfPreview.reference}</p></div><div className="action-row"><button type="button" className="btn secondary" onClick={downloadPdf}>Download PDF</button><button type="button" className="btn secondary" onClick={closePdf} aria-label="Close preview">Close</button></div></header><iframe src={pdfPreview.url+"#toolbar=0&navpanes=0&view=FitH"} title="Official GAINT offer letter PDF"/></section></div>}
+      <style jsx global>{`.offer-pdf-overlay{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.75);display:flex;align-items:center;justify-content:center;padding:20px}.offer-pdf-dialog{display:flex;flex-direction:column;width:min(980px,100%);height:min(95vh,100%);background:white;border-radius:16px;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.3)}.offer-pdf-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid #e2e8f0}.offer-pdf-dialog h2{font-size:18px;color:#111;margin:0}.offer-pdf-dialog p{font-size:12px;color:#525252;margin:4px 0 0}.offer-pdf-dialog iframe{flex:1;width:100%;border:0;background:#525252}.offer-pdf-dialog .btn{min-height:38px;border-radius:9px;padding:8px 14px;background:#eff6ff;color:#111;border:1px solid #bfdbfe}@media(max-width:600px){.offer-pdf-overlay{padding:5px}.offer-pdf-dialog header{flex-wrap:wrap}}
+.admin-offers-page .letterhead-settings{display:flex;flex-direction:column;gap:12px}
 .admin-offers-page .letterhead-settings h2{margin-bottom:0}
 .admin-offers-page .letterhead-settings p{margin:0;line-height:1.5}
 .admin-offers-page .letterhead-settings .form-field{margin:4px 0}
