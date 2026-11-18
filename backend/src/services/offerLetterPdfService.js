@@ -202,7 +202,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     catch { /* Invalid historic signature must not prevent offer download. */ }
   }
   if (stamp) {
-    try { pdf.image(stamp.image_data, left+151, closingY+12, { fit: [96, 96], align: "center", valign: "center" }); }
+    try { pdf.image(stamp.image_data, left+132, closingY+3, { fit: [108, 108], align: "center", valign: "center" }); }
     catch { /* Invalid historic stamp must not prevent offer download. */ }
   }
   write(pdf, signatory, left, closingY+103, textWidth, 10, true, { height: 24, ellipsis: true });
