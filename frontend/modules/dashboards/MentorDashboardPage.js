@@ -84,7 +84,7 @@ export default function MentorDashboardPage() {
   return (
     <main className="wrap mentor-dashboard-modern">
       <header className="mentor-dash-heading"><div><h1>Mentor workspace</h1><p className="muted">Manage weekly plans, review assigned projects and track evaluations.</p></div><a className="btn" href="/mentor/tasks">Create / Edit Tasks</a></header>
-      <MentorQueue count={d.submissions?.length||0} links={[{label:"Review task submissions",href:"/mentor?section=reviews"},{label:"Final submissions",href:"/mentor/final-submissions"},{label:"Face approvals",href:"/mentor/face-approvals"},{label:"Intern operations",href:"/mentor/operations"}]}/>
+      <MentorQueue count={d.submissions?.length||0} links={[{label:"Review task submissions",href:"/mentor#task-reviews"},{label:"Final submissions",href:"/mentor/final-submissions"},{label:"Face approvals",href:"/mentor/face-approvals"},{label:"Intern operations",href:"/mentor/operations"}]}/>
       <nav className="card mentor-dash-quick" aria-label="Mentor quick actions"><div><h2>Quick actions</h2><p className="muted">Access your most-used mentor workspaces.</p></div><div className="mentor-dash-actions"><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a><a className="btn secondary" href="/mentor/klu-fortnight">KLU Fortnight Reports</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">Final Evaluations</a><a className="btn secondary" href="/mentor/operations">Intern Operations</a><a className="btn secondary" href="/mentor/profile">My Profile / Signature</a></div></nav>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
@@ -105,7 +105,7 @@ export default function MentorDashboardPage() {
         {(d.groups||[]).map(g=><InternHealthCard key={g.id} name={g.name} members={(teamMembers[g.id]||[]).map(m=>m.full_name+(m.is_my_intern?" (My intern)":" (Teammate)")).join(" · ")}/>) }
         {!d.groups?.length&&<EmptyState title="No assigned projects" description="Your assigned project teams will appear here when available."/>}
       </section>
-      <div className="mentor-dash-evaluations">
+      <div id="task-reviews" className="mentor-dash-evaluations">
         <section className="card mentor-dash-section">
           <h2>Pending task evaluations</h2>
           {!d.submissions.length ? (
