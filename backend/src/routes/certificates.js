@@ -71,11 +71,11 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
    pdf.fillColor("#233a68").fontSize(size).text(content,x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
   };
   const project=String(c.project_title||"Internship Project").trim().toUpperCase();
-  fitRow("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",355,10,8);
-  fitRow(project,371,11,7.5,true);
-  fitRow("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",389,9.5,8);
-  fitRow("DURING THE PERIOD FROM",405,9.5,8);
-  fitRow(date(c.start_date)+" TO "+date(c.end_date),421,10,8,true);
+  fitRow("THIS IS TO CERTIFY THAT THE PROJECT ENTITLED",355,10,8);
+  fitRow('"' + project + '" IS A BONAFIDE WORK',371,10,7.5,true);
+  fitRow("CARRIED OUT BY " + String(c.student_name||"").trim().toUpperCase(),389,9.5,7.5,true);
+  fitRow("AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",405,9.5,8);
+  fitRow("DURING THE PERIOD FROM " + date(c.start_date) + " TO " + date(c.end_date),421,9.5,7.5,true);
   res.setHeader("Content-Type","application/pdf");
   res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${c.certificate_number}.pdf"`);
   pdf.pipe(res);pdf.end();
