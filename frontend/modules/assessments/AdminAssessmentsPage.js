@@ -177,7 +177,7 @@ export default function AdminAssessmentsPage() {
     }
   }
   return (
-    <main className="wrap">
+    <main className="wrap admin-assessments-page">
       <div className="intern-head">
         <div>
           <h1>Assessments</h1>
@@ -493,6 +493,20 @@ export default function AdminAssessmentsPage() {
           </section>
         </div>
       )}
+      <style jsx global>{`
+      .admin-assessments-page .btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;border:1px solid #065f46;border-radius:10px;background:#065f46;color:#fff;font-size:13px;font-weight:700;transition:background .15s,border-color .15s,color .15s}
+      .admin-assessments-page .btn:hover:not(:disabled){background:#064e3b;border-color:#064e3b;color:#fff}
+      .admin-assessments-page .btn.secondary{background:#e8f5ee;border-color:#b9dcca;color:#075b3b}
+      .admin-assessments-page .btn.secondary:hover:not(:disabled){background:#065f46;border-color:#065f46;color:#fff}
+      .admin-assessments-page .btn.danger{background:#b42332;border-color:#b42332;color:#fff}
+      .admin-assessments-page .btn.danger:hover:not(:disabled){background:#91202a;border-color:#91202a;color:#fff}
+      .admin-assessments-page .btn:focus-visible,.admin-assessments-page nav button:focus-visible{outline:3px solid #86efac;outline-offset:3px}
+      .admin-assessments-page .btn:disabled{opacity:.55;cursor:not-allowed}
+      .admin-assessments-page .action-row{align-items:center;gap:10px}
+      .admin-assessments-page nav[aria-label="Assessment workspace"] button:hover{border-color:#065f46!important;box-shadow:0 6px 18px #065f4618}
+      .admin-assessments-page nav[aria-label="Assessment workspace"] button[aria-current="page"]{background:#ecfdf5!important}
+      @media(max-width:600px){.admin-assessments-page .action-row .btn{flex:1}}
+      `}</style>
     </main>
   );
 }
