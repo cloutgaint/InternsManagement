@@ -10,8 +10,8 @@ const s = {
   title: "mt-0 text-[19px]",
   success: "rounded-lg border border-current bg-[#e8f7ed] p-2.5 text-[#176331]",
   error: "rounded-lg border border-current bg-[#ffe9e9] p-2.5 text-[#8b1f1f]",
-  row: "flex justify-between gap-4 border-b border-[#e4ebe7] py-[11px] last:border-b-0",
-  pill: "whitespace-nowrap rounded-full bg-[#edf2ef] px-2 py-[5px] text-[10px] font-extrabold",
+  row: "flex items-center justify-between gap-4 border-b border-[#e4ebe7] py-[11px] last:border-b-0",
+  pill: "inline-flex min-h-7 items-center justify-center rounded-full bg-[#e8f3eb] px-3 py-1 text-center text-xs font-semibold leading-none text-black",
   muted: "text-[#65756c]",
   fileBtn: button + " bg-[#e8f0eb] px-4 py-[11px] text-[#123]",
   alert: "mx-0 my-3.5 flex flex-col gap-1.5 rounded-[10px] border border-[#ecd39e] bg-[#fff4df] px-[15px] py-[13px] text-[#745514]",
@@ -57,7 +57,7 @@ export default function ProofStatusCard({ hidden = false }) {
       {err && <p className={s.error} role="alert">{err}</p>}
       <div className={s.row}>
         <span><b>{p.batch_order_id ? "Covered by batch allotment order" : p.proof_type}</b><br /><small>Reference {p.reference_number} · Version {p.version}</small></span>
-        <span className={s.pill}>{String(p.status).replaceAll("_", " ")}</span>
+        <span className={s.pill}>{String(p.status).toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>
       </div>
       {p.reason && <p className={s.muted}>Admin note: {p.reason}</p>}
       {names.map((name, i) => <button type="button" key={i} className={s.fileBtn} onClick={() => view(i)}>View {name}</button>)}
