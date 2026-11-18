@@ -42,13 +42,14 @@ function drawLetterhead(pdf, asset) {
   pdf.moveTo(310, height - 112).lineTo(width - 20, height - 112).stroke();
   pdf.restore();
   pdf.font("Helvetica").fontSize(8.5).fillColor("#171717");
-  pdf.text("Gaint Clout Technologies Pvt Ltd,", 82, height - 91);
-  pdf.text("Awfis Elite #4th floor, Orbit, Knowledge City,", 82, height - 78);
-  pdf.text("Raidurg, Hyderabad, Telangana 500081", 82, height - 65);
-  pdf.text("CIN: U62013TS2024PTC186957", 82, height - 52);
-  pdf.text("+91 88972 38849", 360, height - 78);
-  pdf.text("info@gaintclout.com", 360, height - 65);
-  pdf.text("https://gaintclout.com/", 360, height - 52);
+  const footer = (text, x, y, width) => pdf.text(text, x, y, { width, height: 12, lineBreak: false, ellipsis: true });
+  footer("Gaint Clout Technologies Pvt Ltd,", 82, height - 91, 265);
+  footer("Awfis Elite #4th floor, Orbit, Knowledge City,", 82, height - 78, 265);
+  footer("Raidurg, Hyderabad, Telangana 500081", 82, height - 65, 265);
+  footer("CIN: U62013TS2024PTC186957", 82, height - 52, 265);
+  footer("+91 88972 38849", 360, height - 78, 190);
+  footer("info@gaintclout.com", 360, height - 65, 190);
+  footer("https://gaintclout.com/", 360, height - 52, 190);
   return true;
 }
 
@@ -63,8 +64,8 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
   const asset = (await q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='offer_letterhead' AND owner_user_id IS NULL")).rows[0];
-  const pdf = new PDFDocument({ size: "A4", margin: 54, autoFirstPage: false });
-  pdf.addPage({ size: "A4", margin: 54 });
+  const pdf = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
+  pdf.addPage({ size: "A4", margin: 0 });
   const hasLetterhead = drawLetterhead(pdf, asset);
   const top = hasLetterhead ? 151 : 60;
   const bottom = hasLetterhead ? 140 : 60;
@@ -82,7 +83,10 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   pdf.pipe(res);
   pdf.fillColor("#111111").font("Helvetica-Bold").fontSize(15).text(title, 54, top, { width: textWidth, align: "center" });
   pdf.font("Helvetica").fontSize(9).text("Reference: " + offer.reference_number, 54, top + 36, { width: textWidth });
-  pdf.fontSize(fontSize).text(body, 54, top + headerHeight, { width: textWidth, lineGap: 3 });
-  pdf.moveDown(1.5).font("Helvetica-Bold").fontSize(10).text(signatory, { width: textWidth });
+  const bodyY = top + headerHeight;
+  pdf.fontSize(fontSize).text(body, 54, bodyY, { width: textWidth, lineGap: 3, height: contentHeight - headerHeight - 42 });
+  const signY = bodyY + pdf.heightOfString(body, { width: textWidth, lineGap: 3, fontSize }) + 18;
+  pdf.font("Helvetica-Bold").fontSize(10).text(signatory, 54, signY, { width: textWidth, height: 28, ellipsis: true });
+  if (pdf.bufferedPageRange().count !== 1) throw new Error("Offer PDF pagination error");
   pdf.end();
 }
