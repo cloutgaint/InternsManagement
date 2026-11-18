@@ -15,6 +15,7 @@ export default function MentorReportsPage({ admin = false }) {
     [creating, setCreating] = useState(false),
     [accessError, setAccessError] = useState(false),
     [loadingAccess, setLoadingAccess] = useState(true),
+    [reviewSearch,setReviewSearch]=useState(""),[reviewStatus,setReviewStatus]=useState("ALL"),[reviewPage,setReviewPage]=useState(1),
     [draft, setDraft] = useState({
       groupId: "",
       periodNo: 1,
@@ -185,8 +186,10 @@ export default function MentorReportsPage({ admin = false }) {
       setErr(e.message);
     }
   }
+  const filteredReviews=reviews.filter(x=>(reviewStatus==="ALL"||x.status===reviewStatus)&&[x.group_name,x.college_name,x.period_no].some(v=>String(v??"").toLowerCase().includes(reviewSearch.toLowerCase())));
+  const reviewPages=Math.max(1,Math.ceil(filteredReviews.length/10)),activeReviewPage=Math.min(reviewPage,reviewPages);
   return (
-    <main className="wrap mentor-reports-page">
+    <main className="wrap mentor-reports-page mentor-reports-modern">
       <div className="intern-head">
         <div>
           <h1>{admin ? "Admin Fortnight Evaluations" : "Fortnight Reports"}</h1>
@@ -465,9 +468,11 @@ export default function MentorReportsPage({ admin = false }) {
           </form>
         </section>
       )}
-      {!accessError && !loadingAccess && <section className="card workflow-section">
-        {reviews.length ? (
-          reviews.map((x) => (
+      {!accessError && !loadingAccess && <section className="card workflow-section fortnight-review-list">
+        <div className="fortnight-list-head"><h2>Saved fortnight evaluations</h2><span>{filteredReviews.length} reports</span></div>
+        <div className="fortnight-list-filters"><label>Search reports<input className="input" type="search" placeholder="Project, college or period" value={reviewSearch} onChange={e=>{setReviewSearch(e.target.value);setReviewPage(1);}}/></label><label>Status<select className="input" value={reviewStatus} onChange={e=>{setReviewStatus(e.target.value);setReviewPage(1);}}><option value="ALL">All statuses</option>{[...new Set(reviews.map(x=>x.status).filter(Boolean))].map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</select></label></div>
+        {filteredReviews.length ? (
+          filteredReviews.slice((activeReviewPage-1)*10,activeReviewPage*10).map((x) => (
             <div className="workflow-row" key={x.id}>
               <div>
                 <b>
@@ -496,8 +501,9 @@ export default function MentorReportsPage({ admin = false }) {
             </div>
           ))
         ) : (
-          <p className="muted">No fortnight reviews yet.</p>
+          <p className="muted">{reviews.length?"No matching evaluations. Try changing the filters.":"No fortnight reviews yet."}</p>
         )}
+        {filteredReviews.length>10&&<div className="fortnight-pagination"><span>Page {activeReviewPage} of {reviewPages}</span><div className="action-row"><button className="btn secondary" disabled={activeReviewPage===1} onClick={()=>setReviewPage(v=>Math.max(1,v-1))}>Previous</button><button className="btn secondary" disabled={activeReviewPage===reviewPages} onClick={()=>setReviewPage(v=>Math.min(reviewPages,v+1))}>Next</button></div></div>}
       </section>}
       {!accessError && !loadingAccess && report && (
         <section className="card fortnight-report">
@@ -596,6 +602,10 @@ export default function MentorReportsPage({ admin = false }) {
           </small>
         </section>
       )}
+      <style jsx global>{`
+/* Fortnight evaluation workspace */
+.mentor-reports-modern{color:#111}.mentor-reports-modern .card{border-radius:20px;padding:24px}.mentor-reports-modern .verification-title{display:flex;align-items:center;justify-content:space-between;gap:16px}.mentor-reports-modern .input{min-height:44px;border:1.5px solid #7ea7ef;border-radius:10px;color:#111}.mentor-reports-modern .fortnight-list-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.mentor-reports-modern .fortnight-list-head h2{margin:0;font-size:21px}.mentor-reports-modern .fortnight-list-head span{background:#eef1fb;border-radius:999px;padding:8px 12px;font-size:12px}.mentor-reports-modern .fortnight-list-filters{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin:20px 0}.mentor-reports-modern .fortnight-list-filters label{display:flex;flex-direction:column;gap:5px;font-size:12px}.mentor-reports-modern .fortnight-list-filters .input{margin:0}.mentor-reports-modern .fortnight-review-list .workflow-row{padding:16px 0}.mentor-reports-modern .fortnight-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:18px;font-size:12px}@media(max-width:700px){.mentor-reports-modern .card{padding:16px}.mentor-reports-modern .verification-title{flex-direction:column;align-items:stretch}.mentor-reports-modern .fortnight-list-filters{grid-template-columns:1fr}.mentor-reports-modern .fortnight-list-head{align-items:flex-start;flex-direction:column}}
+`}</style>
     </main>
   );
 }
