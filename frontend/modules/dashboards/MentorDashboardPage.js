@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import {MentorQueue,ReviewCard,InternHealthCard,Skeleton,EmptyState} from "@/shared/mentor/ReviewComponents";
 export default function MentorDashboardPage() {
   const [d, setD] = useState(null),
     [msg, setMsg] = useState(""),
@@ -76,13 +77,14 @@ export default function MentorDashboardPage() {
         {err ? (
           <p className="error">{err}</p>
         ) : (
-          <p>Loading mentor workspace…</p>
+          <Skeleton/>
         )}
       </main>
     );
   return (
     <main className="wrap mentor-dashboard-modern">
-      <header className="mentor-dash-heading"><div><h1>Mentor Dashboard</h1><p className="muted">Manage weekly plans, review assigned projects and track evaluations.</p></div><a className="btn" href="/mentor/tasks">Create / Edit Tasks</a></header>
+      <header className="mentor-dash-heading"><div><h1>Mentor workspace</h1><p className="muted">Manage weekly plans, review assigned projects and track evaluations.</p></div><a className="btn" href="/mentor/tasks">Create / Edit Tasks</a></header>
+      <MentorQueue count={d.submissions?.length||0} links={[{label:"Review task submissions",href:"/mentor?section=reviews"},{label:"Final submissions",href:"/mentor/final-submissions"},{label:"Face approvals",href:"/mentor/face-approvals"},{label:"Intern operations",href:"/mentor/operations"}]}/>
       <nav className="card mentor-dash-quick" aria-label="Mentor quick actions"><div><h2>Quick actions</h2><p className="muted">Access your most-used mentor workspaces.</p></div><div className="mentor-dash-actions"><a className="btn secondary" href="/mentor/task-schedule">Task Schedule</a><a className="btn secondary" href="/mentor/reports">Fortnight Reports</a><a className="btn secondary" href="/mentor/klu-fortnight">KLU Fortnight Reports</a><a className="btn secondary" href="/mentor/final-submissions">Final Project Reviews</a><a className="btn secondary" href="/mentor/final-evaluations">Final Evaluations</a><a className="btn secondary" href="/mentor/operations">Intern Operations</a><a className="btn secondary" href="/mentor/profile">My Profile / Signature</a></div></nav>
       {msg && <p className="success">{msg}</p>}
       {err && <p className="error">{err}</p>}
@@ -100,30 +102,20 @@ export default function MentorDashboardPage() {
       <section className="card mentor-dash-section">
         <h2>Project team members</h2>
         <p className="muted">Every mentor assigned to a project can see its complete team. Directly assigned interns are marked separately.</p>
-        {(d.groups||[]).map((g)=><div key={g.id} className="workflow-row"><div><b>{g.name}</b><div className="muted">{(teamMembers[g.id]||[]).map(m=>m.full_name+(m.is_my_intern?" (My intern)":" (Teammate)")).join(" · ")||"No active team members"}</div></div></div>)}
-        {!d.groups?.length&&<p className="muted">No projects assigned yet.</p>}
+        {(d.groups||[]).map(g=><InternHealthCard key={g.id} name={g.name} members={(teamMembers[g.id]||[]).map(m=>m.full_name+(m.is_my_intern?" (My intern)":" (Teammate)")).join(" · ")}/>) }
+        {!d.groups?.length&&<EmptyState title="No assigned projects" description="Your assigned project teams will appear here when available."/>}
       </section>
       <div className="mentor-dash-evaluations">
         <section className="card mentor-dash-section">
           <h2>Pending task evaluations</h2>
           {!d.submissions.length ? (
-            <p className="muted">No submissions awaiting evaluation.</p>
+            <EmptyState title="Review queue clear" description="No task submissions are currently awaiting evaluation."/>
           ) : (
-            d.submissions.map((s) => (
-              <div className="workflow-row" key={s.id}>
-                <div>
-                  <b>{s.title}</b>
-                  <div>{s.full_name}</div>
-                </div>
-                <button className="btn" onClick={() => evaluate(s)}>
-                  Evaluate
-                </button>
-              </div>
-            ))
+            d.submissions.map(s=><ReviewCard key={s.id} title={s.title} student={s.full_name} onReview={()=>evaluate(s)}/>)
           )}
         </section>
       </div>
-      <style jsx global>{` .mentor-dashboard-modern{max-width:1240px;width:100%;margin:0 auto;padding:32px 20px 64px;box-sizing:border-box;color:#111;display:block;clear:both}.mentor-dashboard-modern .mentor-dash-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.mentor-dashboard-modern .mentor-dash-heading h1{font-size:clamp(26px,3vw,34px);margin:0 0 8px;color:#111}.mentor-dashboard-modern .mentor-dash-heading p{margin:0;font-size:14px}.mentor-dashboard-modern .card{border-radius:20px;border:1px solid #dce7e2;box-shadow:0 5px 18px #122c2010}.mentor-dashboard-modern .mentor-dash-quick{padding:22px 24px;margin-bottom:18px}.mentor-dashboard-modern .mentor-dash-quick h2{font-size:20px;margin:0 0 5px}.mentor-dashboard-modern .mentor-dash-quick p{font-size:13px;margin:0 0 16px}.mentor-dashboard-modern .mentor-dash-actions{display:flex;flex-wrap:wrap;gap:10px}.mentor-dashboard-modern .mentor-dash-actions .btn{min-height:44px;border-radius:999px}.mentor-dashboard-modern .mentor-dash-quick{display:block;clear:both}.mentor-dashboard-modern .mentor-dash-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:18px 0}.mentor-dashboard-modern .mentor-dash-metric{min-width:0;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:22px 24px;text-decoration:none;color:#111;min-height:145px;transition:transform .15s ease,box-shadow .15s ease}.mentor-dashboard-modern .mentor-dash-metric:hover{transform:translateY(-2px);box-shadow:0 8px 24px #122c2020}.mentor-dashboard-modern .mentor-dash-metric:focus-visible{outline:3px solid #6e5bf7;outline-offset:3px}.mentor-dashboard-modern .mentor-dash-metric span{font-size:13px;font-weight:700}.mentor-dashboard-modern .mentor-dash-metric strong{font-size:32px;line-height:1;color:#111}.mentor-dashboard-modern .mentor-dash-metric small{font-size:12px;color:#4c5375;font-weight:650}.mentor-dashboard-modern .mentor-dash-section{display:block;width:100%;box-sizing:border-box;padding:22px 24px;margin-bottom:18px}.mentor-dashboard-modern .mentor-dash-evaluations{display:block;width:100%}.mentor-dashboard-modern .mentor-dash-section h2{font-size:20px;margin:0 0 12px}.mentor-dashboard-modern .mentor-dash-section .workflow-row{padding:16px 0;gap:14px}.mentor-dashboard-modern .mentor-dash-section .workflow-row .muted{font-size:13px;line-height:1.55;margin-top:5px}.mentor-dashboard-modern .btn{border-radius:999px!important;min-height:44px}.mentor-dashboard-modern .mentor-dash-heading>.btn{white-space:nowrap}.mentor-dashboard-modern .mentor-dash-metrics>*{min-width:0}.mentor-dashboard-modern .mentor-dash-heading h1{line-height:1.25}.mentor-dashboard-modern .mentor-dash-actions .btn{display:inline-flex;align-items:center;justify-content:center;white-space:normal;text-align:center}@media(max-width:800px){.mentor-dashboard-modern .mentor-dash-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.mentor-dashboard-modern{padding-top:18px}.mentor-dashboard-modern .mentor-dash-heading{flex-direction:column;align-items:stretch}.mentor-dashboard-modern .mentor-dash-heading>.btn{align-self:flex-start}.mentor-dashboard-modern .mentor-dash-metrics{grid-template-columns:1fr;gap:12px}.mentor-dashboard-modern .mentor-dash-metric{min-height:120px}.mentor-dashboard-modern .mentor-dash-quick,.mentor-dashboard-modern .mentor-dash-section{padding:16px}.mentor-dashboard-modern .mentor-dash-actions{display:grid;grid-template-columns:1fr 1fr}.mentor-dashboard-modern .mentor-dash-actions .btn{white-space:normal;text-align:center}.mentor-dashboard-modern .mentor-dash-section .workflow-row{align-items:stretch;flex-direction:column}.mentor-dashboard-modern .mentor-dash-section .workflow-row .btn{align-self:flex-start}} `}</style>
+      <style jsx global>{` .mentor-dashboard-modern{max-width:1240px;width:100%;margin:0 auto;padding:32px 20px 64px;box-sizing:border-box;color:#111;display:block;clear:both}.mentor-dashboard-modern .mentor-dash-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.mentor-dashboard-modern .mentor-dash-heading h1{font-size:clamp(26px,3vw,34px);margin:0 0 8px;color:#111}.mentor-dashboard-modern .mentor-dash-heading p{margin:0;font-size:14px}.mentor-dashboard-modern .card{border-radius:20px;border:1px solid #dce7e2;box-shadow:0 5px 18px #122c2010}.mentor-dashboard-modern .mentor-dash-quick{padding:22px 24px;margin-bottom:18px}.mentor-dashboard-modern .mentor-dash-quick h2{font-size:20px;margin:0 0 5px}.mentor-dashboard-modern .mentor-dash-quick p{font-size:13px;margin:0 0 16px}.mentor-dashboard-modern .mentor-dash-actions{display:flex;flex-wrap:wrap;gap:10px}.mentor-dashboard-modern .mentor-dash-actions .btn{min-height:44px;border-radius:999px}.mentor-dashboard-modern .mentor-dash-quick{display:block;clear:both}.mentor-dashboard-modern .mentor-dash-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:18px 0}.mentor-dashboard-modern .mentor-dash-metric{min-width:0;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:22px 24px;text-decoration:none;color:#111;min-height:145px;transition:transform .15s ease,box-shadow .15s ease}.mentor-dashboard-modern .mentor-dash-metric:hover{transform:translateY(-2px);box-shadow:0 8px 24px #122c2020}.mentor-dashboard-modern .mentor-dash-metric:focus-visible{outline:3px solid #2563eb;outline-offset:3px}.mentor-dashboard-modern .mentor-dash-metric span{font-size:13px;font-weight:700}.mentor-dashboard-modern .mentor-dash-metric strong{font-size:32px;line-height:1;color:#111}.mentor-dashboard-modern .mentor-dash-metric small{font-size:12px;color:#4c5375;font-weight:650}.mentor-dashboard-modern .mentor-dash-section{display:block;width:100%;box-sizing:border-box;padding:22px 24px;margin-bottom:18px}.mentor-dashboard-modern .mentor-dash-evaluations{display:block;width:100%}.mentor-dashboard-modern .mentor-dash-section h2{font-size:20px;margin:0 0 12px}.mentor-dashboard-modern .mentor-dash-section .workflow-row{padding:16px 0;gap:14px}.mentor-dashboard-modern .mentor-dash-section .workflow-row .muted{font-size:13px;line-height:1.55;margin-top:5px}.mentor-dashboard-modern .btn{border-radius:999px!important;min-height:44px}.mentor-dashboard-modern .mentor-dash-heading>.btn{white-space:nowrap}.mentor-dashboard-modern .mentor-dash-metrics>*{min-width:0}.mentor-dashboard-modern .mentor-dash-heading h1{line-height:1.25}.mentor-dashboard-modern .mentor-dash-actions .btn{display:inline-flex;align-items:center;justify-content:center;white-space:normal;text-align:center}@media(max-width:800px){.mentor-dashboard-modern .mentor-dash-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.mentor-dashboard-modern{padding-top:18px}.mentor-dashboard-modern .mentor-dash-heading{flex-direction:column;align-items:stretch}.mentor-dashboard-modern .mentor-dash-heading>.btn{align-self:flex-start}.mentor-dashboard-modern .mentor-dash-metrics{grid-template-columns:1fr;gap:12px}.mentor-dashboard-modern .mentor-dash-metric{min-height:120px}.mentor-dashboard-modern .mentor-dash-quick,.mentor-dashboard-modern .mentor-dash-section{padding:16px}.mentor-dashboard-modern .mentor-dash-actions{display:grid;grid-template-columns:1fr 1fr}.mentor-dashboard-modern .mentor-dash-actions .btn{white-space:normal;text-align:center}.mentor-dashboard-modern .mentor-dash-section .workflow-row{align-items:stretch;flex-direction:column}.mentor-dashboard-modern .mentor-dash-section .workflow-row .btn{align-self:flex-start}} `}</style>
       {taskEval && (
         <div className="modal-backdrop" onMouseDown={() => setTaskEval(null)}>
           <section
