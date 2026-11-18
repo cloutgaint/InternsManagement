@@ -36,10 +36,11 @@ function drawLetterhead(pdf, asset) {
   if (!logo) return false;
   // GAINT's uploaded DOCX has the company logo at the top, a gold right rule,
   // and company contact details at the bottom. Keep the centre clear for the letter.
-  pdf.image(logo, 92, 30, { fit: [210, 72] });
-  pdf.save().lineWidth(4).strokeColor("#ffc400").moveTo(width - 20, 0).lineTo(width - 20, height).stroke();
-  pdf.lineWidth(2).moveTo(24, 118).lineTo(width - 20, 118).stroke();
-  pdf.moveTo(310, height - 112).lineTo(width - 20, height - 112).stroke();
+  pdf.image(logo, 68, 23, { fit: [282, 91] });
+  pdf.save().lineWidth(5).strokeColor("#ffbf00").moveTo(width - 16, 0).lineTo(width - 16, height).stroke();
+  pdf.lineWidth(3).moveTo(0, 126).lineTo(width - 16, 126).stroke();
+  pdf.moveTo(0, height - 111).lineTo(width - 16, height - 111).stroke();
+  pdf.lineWidth(1.5).moveTo(335,height-95).lineTo(335,height-17).stroke();
   pdf.restore();
   pdf.font("Helvetica").fontSize(8.5).fillColor("#171717");
   const footer = (text, x, y, width) => pdf.text(text, x, y, { width, height: 12, lineBreak: false, ellipsis: true });
@@ -61,17 +62,18 @@ function formattedDate(value) {
 }
 
 function watermark(pdf) {
-  const cx = 307, cy = 419, nodes = [
-    [-108,-94],[-22,-138],[82,-112],[144,-28],[126,82],[38,135],[-78,115],[-150,25],
-    [-36,-32],[58,-36],[22,54],[-63,49]
+  const cx = 300, cy = 417, nodes = [
+    [-151,-131],[-37,-161],[104,-135],[177,-37],[150,115],[46,177],[-115,143],[-178,18],
+    [-46,-39],[68,-40],[33,65],[-80,59]
   ];
-  pdf.save().strokeColor("#e5e9e4").fillColor("#f1f5f2").lineWidth(0.8).opacity(0.42);
+  const pastel=["#f5d9d2","#f8e2c4","#f1edc6","#e2f1d8","#d9eaf5","#e3e5f8"];
+  pdf.save().opacity(0.64).lineWidth(1.3);
   nodes.forEach(([x,y],i) => {
-    for (const j of [(i+1)%nodes.length,(i+4)%nodes.length]) {
-      pdf.moveTo(cx+x,cy+y).lineTo(cx+nodes[j][0],cy+nodes[j][1]).stroke();
+    for (const j of [(i+1)%nodes.length,(i+3)%nodes.length,(i+7)%nodes.length]) {
+      pdf.strokeColor(pastel[(i+j)%pastel.length]).moveTo(cx+x,cy+y).lineTo(cx+nodes[j][0],cy+nodes[j][1]).stroke();
     }
   });
-  nodes.forEach(([x,y],i) => pdf.circle(cx+x,cy+y,i<8?12:9).fill());
+  nodes.forEach(([x,y],i) => pdf.fillColor(pastel[i%pastel.length]).circle(cx+x,cy+y,i<8?19:14).fill());
   pdf.restore();
 }
 
@@ -109,7 +111,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   }
   watermark(pdf);
   const left = 66, right = width - 66, textWidth = right - left;
-  const top = 151;
+  const top = 143;
   pdf.font("Helvetica-Bold").fontSize(16).fillColor("#141414")
     .text("Internship Offer Letter", left, top, { width: textWidth, align: "center", lineBreak: false });
   pdf.save().strokeColor("#171717").lineWidth(0.7).moveTo(width/2-89,top+22).lineTo(width/2+89,top+22).stroke().restore();
@@ -122,7 +124,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   // offer terms, is what changes here.
   const cleanBody = body.trim().replace(/^Dear[^\n]*,\s*/i, "").replace(/\n\s*Regards,?[\s\S]*$/i, "").trim();
   const bodyTop = top + 158;
-  const bottomLimit = height - 202;
+  const bottomLimit = height - 225;
   const signatory = offer.issued_snapshot?.signatory || offer.signatory || "Authorized Signatory";
   const maxBodyHeight = bottomLimit - bodyTop;
   let fontSize = 11;
@@ -137,18 +139,18 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   }
   pdf.font("Helvetica").fontSize(fontSize).fillColor("#171717")
     .text(cleanBody, left, bodyTop, { width: textWidth, lineGap: 5, paragraphGap: 9, height: maxBodyHeight });
-  const closingY = Math.max(bodyTop + bodyHeight + 28, height - 234);
+  const closingY = Math.max(bodyTop + bodyHeight + 23, height - 256);
   write(pdf, "With best wishes,", left, closingY, textWidth, 10);
   if (signature) {
-    try { pdf.image(signature.image_data, left, closingY+23, { fit: [128, 48] }); }
+    try { pdf.image(signature.image_data, left-4, closingY+16, { fit: [192, 70] }); }
     catch { /* Invalid image must not break the issued document. */ }
   }
   if (stamp) {
-    try { pdf.image(stamp.image_data, left+133, closingY+18, { fit: [83, 77] }); }
+    try { pdf.image(stamp.image_data, left+196, closingY+22, { fit: [94, 88] }); }
     catch { /* Invalid historic stamp must not prevent offer download. */ }
   }
-  write(pdf, signatory, left, closingY+93, textWidth, 10, true, { height: 24, ellipsis: true });
-  write(pdf, "For Gaint Clout Technologies Pvt. Ltd.", left, closingY+110, textWidth, 9);
+  write(pdf, signatory, left, closingY+103, textWidth, 10, true, { height: 24, ellipsis: true });
+  write(pdf, "For Gaint Clout Technologies Pvt. Ltd.", left, closingY+119, textWidth, 9);
   if (pdf.bufferedPageRange().count !== 1) throw new Error("Offer PDF pagination error");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", disposition + '; filename="GAINT-Internship-Offer.pdf"');
