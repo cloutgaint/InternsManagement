@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { api } from "@/shared/api/client";
+import CoreSpinLoader from "@/shared/ui/CoreSpinLoader";
 const modules = [
   ["🏫", "College Master", "Add, edit and manage colleges", "/admin/colleges"],
   [
@@ -233,9 +234,7 @@ export default function AdminDashboardPage() {
             one place.
           </p>
         </div>
-        <span className="admin-live">
-          <span aria-hidden="true">●</span> Live overview
-        </span>
+        {loading ? <CoreSpinLoader label="Loading overview" size="sm" inline/> : <span className="admin-live"><span aria-hidden="true">●</span> Live overview</span>}
       </header>
       {error && (
         <p className="error" role="alert">
