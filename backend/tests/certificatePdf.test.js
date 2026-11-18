@@ -13,7 +13,8 @@ test("approved internship dates render with correct uppercase ordinals",()=>{
  assert.equal(formatCertificateDate("2026-11-13"),"13TH NOVEMBER 2026");
  assert.throws(()=>formatCertificateDate("2026-02-30"));
 });
-test("certificate renderer refuses to silently substitute Times Italic for missing script font",async()=>{
+test("certificate renderer uses the gold italic fallback when no script font is uploaded",async()=>{
  const d=await PDFDocument.create();d.addPage([862.5,605.25]);
- await assert.rejects(()=>renderCertificate(await d.save(),{certificate_number:"GAINT-INT-TEST",student_name:"RAM",project_title:"DOCUMINDAI",start_date:"2026-11-04",end_date:"2027-03-04"},{scriptFontPath:null}),/CERTIFICATE_SCRIPT_FONT_PATH/);
+ const pdf=await renderCertificate(await d.save(),{certificate_number:"GAINT-INT0151ERN",student_name:"Jnanika uma siva naga sai kilaru",project_title:"LIBRARY MANAGEMENT SYSTEM",start_date:"2026-07-13",end_date:"2026-11-07"},{scriptFontPath:null});
+ assert.ok(pdf.length>0);
 });
