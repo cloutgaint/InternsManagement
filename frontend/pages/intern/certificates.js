@@ -1,2 +1,2 @@
-import InternCertificatesPage from "@/app/intern/certificates/page";
+import InternCertificatesPage from "@/modules/certificates/InternCertificatesPage";
 export default InternCertificatesPage;
