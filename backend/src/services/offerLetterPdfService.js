@@ -130,11 +130,22 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   const { width, height } = pdf.page;
   const background = await letterheadBackground(letterhead);
   const branded = Boolean(background);
-  if (background) pdf.image(background, 0, 0, { width, height });
+  if (background) {
+    pdf.image(background, 0, 0, { width, height });
+    // Match the original asymmetric GAINT letterhead: top-right gold edge,
+    // bottom-left gold edge. The uploaded blank DOCX draws both on the right.
+    const footerTop = height - 111;
+    pdf.save();
+    pdf.fillColor("#ffffff").rect(width - 18, footerTop + 2, 18, height - footerTop - 2).fill();
+    pdf.fillColor("#ffbf00").rect(0, footerTop + 2, 17, height - footerTop - 2).fill();
+    pdf.restore();
+  }
   if (!branded) {
     pdf.save().fillColor("#ffbf00").rect(width-17,0,17,height).fill().strokeColor("#ffbf00").lineWidth(3);
     pdf.moveTo(0,126).lineTo(width-17,126).stroke();
-    pdf.moveTo(0,height-111).lineTo(width-17,height-111).stroke();
+    pdf.moveTo(17,height-111).lineTo(width,height-111).stroke();
+    pdf.fillColor("#ffbf00").rect(0,height-109,17,109).fill();
+    pdf.fillColor("#ffffff").rect(width-17,height-109,17,109).fill();
     pdf.restore();
     write(pdf,"GAINT",62,48,260,31,true);
     write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
