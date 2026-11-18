@@ -1,3 +1,9 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+const execFileAsync = promisify(execFile);
 import PDFDocument from "pdfkit";
 import { inflateRawSync } from "node:zlib";
 import { q } from "../common/database/index.js";
@@ -56,6 +62,28 @@ function drawLetterhead(pdf, asset) {
 }
 
 
+// Render the actual uploaded Word/PDF letterhead rather than approximating its
+// logo, borders and footer with PDFKit. Required: LibreOffice (DOCX) and Poppler.
+async function letterheadBackground(asset) {
+  if (!asset) return null;
+  if (["image/png","image/jpeg"].includes(asset.mime_type)) return asset.image_data;
+  const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (![docx,"application/pdf"].includes(asset.mime_type)) throw Object.assign(new Error("Unsupported company letterhead format"),{status:422});
+  const dir=await mkdtemp(join(tmpdir(),"gaint-offer-"));
+  try {
+    let pdfPath=join(dir,"letterhead.pdf");
+    if(asset.mime_type===docx){
+      const docxPath=join(dir,"letterhead.docx");
+      await writeFile(docxPath,asset.image_data,{mode:0o600});
+      try {await execFileAsync("libreoffice",["-env:UserInstallation=file://"+join(dir,"lo-profile"),"--headless","--convert-to","pdf","--outdir",dir,docxPath],{timeout:30000,maxBuffer:1024*1024});}
+      catch {throw Object.assign(new Error("DOCX letterhead conversion requires LibreOffice on the backend server"),{status:503});}
+    } else await writeFile(pdfPath,asset.image_data,{mode:0o600});
+    try {await execFileAsync("pdftoppm",["-f","1","-l","1","-singlefile","-r","180","-png",pdfPath,join(dir,"letterhead")],{timeout:30000,maxBuffer:1024*1024});}
+    catch {throw Object.assign(new Error("Letterhead PDF rendering requires Poppler pdftoppm on the backend server"),{status:503});}
+    return await readFile(join(dir,"letterhead.png"));
+  } finally {await rm(dir,{recursive:true,force:true});}
+}
+
 function formattedDate(value) {
   if (!value) return "—";
   const date = new Date(value);
@@ -100,7 +128,9 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   const pdf = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
   pdf.addPage({ size: "A4", margin: 0 });
   const { width, height } = pdf.page;
-  const branded = drawLetterhead(pdf, letterhead);
+  const background = await letterheadBackground(letterhead);
+  const branded = Boolean(background);
+  if (background) pdf.image(background, 0, 0, { width, height });
   if (!branded) {
     pdf.save().fillColor("#ffbf00").rect(width-17,0,17,height).fill().strokeColor("#ffbf00").lineWidth(3);
     pdf.moveTo(0,126).lineTo(width-17,126).stroke();
@@ -110,6 +140,8 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
     write(pdf,"Gaint Clout Technologies Pvt Ltd | Hyderabad | info@gaintclout.com",54,height-73,width-108,8);
   }
+  // The supplied blank GAINT DOCX does not contain the sample globe artwork.
+  // Keep the approximate watermark only until an approved original is supplied.
   watermark(pdf);
   const left = 66, right = width - 66, textWidth = right - left;
   const top = 143;
