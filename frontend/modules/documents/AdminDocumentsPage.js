@@ -73,7 +73,7 @@ export default function AdminDocumentsPage() {
           </div>
         )) : <p className="muted">{loading?"Loading documents…":docs.length?"No documents match your search.":"No documents published yet."}</p>}
         {visibleDocs.length>8&&<div className="documents-pagination"><span>Showing {(page-1)*8+1}–{Math.min(page*8,visibleDocs.length)} of {visibleDocs.length}</span><div className="action-row"><button type="button" className="btn secondary" disabled={page===1} onClick={()=>setDocPage(v=>Math.max(1,v-1))}>Previous</button><span>{page} / {totalPages}</span><button type="button" className="btn secondary" disabled={page===totalPages} onClick={()=>setDocPage(v=>v+1)}>Next</button></div></div>}
-      </section></div>
+      </section></div>}
       {activeTab==="announcements"&&<section id="documents-panel-announcements" role="tabpanel" aria-labelledby="documents-tab-announcements" className="card">
         <h2>Send announcement</h2><p className="muted">Choose recipients and write a clear message before sending.</p>
         <form className="form-grid" onSubmit={announce}>
