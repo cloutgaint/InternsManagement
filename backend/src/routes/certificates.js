@@ -56,7 +56,7 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
   const available=W-130*sx;
   let nameSize=34*scale;
   pdf.font("Times-Italic");
-  while(nameSize>18*scale&&pdf.widthOfString(name,{font:"Times-Italic",size:nameSize})>available)nameSize-=1*scale;
+  while(nameSize>18*scale){pdf.fontSize(nameSize);if(pdf.widthOfString(name)<=available)break;nameSize-=1*scale;}
   pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,202*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
   const project=String(c.project_title||"Internship Project").trim().toUpperCase();
   center("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",257,10,"#233a68","Helvetica",115,115);
