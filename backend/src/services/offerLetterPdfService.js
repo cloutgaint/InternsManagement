@@ -37,10 +37,11 @@ function drawLetterhead(pdf, asset) {
   // GAINT's uploaded DOCX has the company logo at the top, a gold right rule,
   // and company contact details at the bottom. Keep the centre clear for the letter.
   pdf.image(logo, 68, 23, { fit: [282, 91] });
-  pdf.save().lineWidth(5).strokeColor("#ffbf00").moveTo(width - 16, 0).lineTo(width - 16, height).stroke();
-  pdf.lineWidth(3).moveTo(0, 126).lineTo(width - 16, 126).stroke();
-  pdf.moveTo(0, height - 111).lineTo(width - 16, height - 111).stroke();
-  pdf.lineWidth(1.5).moveTo(335,height-95).lineTo(335,height-17).stroke();
+  pdf.save().fillColor("#ffbf00").rect(width - 17, 0, 17, height).fill();
+  pdf.strokeColor("#ffbf00");
+  pdf.lineWidth(3).moveTo(0, 126).lineTo(width - 17, 126).stroke();
+  pdf.moveTo(0, height - 111).lineTo(width - 17, height - 111).stroke();
+  pdf.lineWidth(2).moveTo(335,height-95).lineTo(335,height-17).stroke();
   pdf.restore();
   pdf.font("Helvetica").fontSize(8.5).fillColor("#171717");
   const footer = (text, x, y, width) => pdf.text(text, x, y, { width, height: 12, lineBreak: false, ellipsis: true });
@@ -66,14 +67,14 @@ function watermark(pdf) {
     [-151,-131],[-37,-161],[104,-135],[177,-37],[150,115],[46,177],[-115,143],[-178,18],
     [-46,-39],[68,-40],[33,65],[-80,59]
   ];
-  const pastel=["#f5d9d2","#f8e2c4","#f1edc6","#e2f1d8","#d9eaf5","#e3e5f8"];
-  pdf.save().opacity(0.64).lineWidth(1.3);
+  const pastel=["#f0c7c0","#f5ddbd","#ece9b7","#d5eacb","#cde4ef","#dadcf1"];
+  pdf.save().opacity(0.75).lineWidth(0.55);
   nodes.forEach(([x,y],i) => {
-    for (const j of [(i+1)%nodes.length,(i+3)%nodes.length,(i+7)%nodes.length]) {
+    for (const j of [(i+1)%nodes.length,(i+3)%nodes.length,(i+5)%nodes.length,(i+7)%nodes.length]) {
       pdf.strokeColor(pastel[(i+j)%pastel.length]).moveTo(cx+x,cy+y).lineTo(cx+nodes[j][0],cy+nodes[j][1]).stroke();
     }
   });
-  nodes.forEach(([x,y],i) => pdf.fillColor(pastel[i%pastel.length]).circle(cx+x,cy+y,i<8?19:14).fill());
+  nodes.forEach(([x,y],i) => pdf.fillColor(pastel[i%pastel.length]).circle(cx+x,cy+y,i<8?18:12).fill());
   pdf.restore();
 }
 
@@ -101,9 +102,9 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   const { width, height } = pdf.page;
   const branded = drawLetterhead(pdf, letterhead);
   if (!branded) {
-    pdf.save().strokeColor("#ffc400").lineWidth(4).moveTo(width-20,0).lineTo(width-20,height).stroke();
-    pdf.moveTo(30,122).lineTo(width-20,122).stroke();
-    pdf.moveTo(30,height-112).lineTo(width-20,height-112).stroke();
+    pdf.save().fillColor("#ffbf00").rect(width-17,0,17,height).fill().strokeColor("#ffbf00").lineWidth(3);
+    pdf.moveTo(0,126).lineTo(width-17,126).stroke();
+    pdf.moveTo(0,height-111).lineTo(width-17,height-111).stroke();
     pdf.restore();
     write(pdf,"GAINT",62,48,260,31,true);
     write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
