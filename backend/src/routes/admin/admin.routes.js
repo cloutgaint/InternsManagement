@@ -1201,7 +1201,7 @@ r.post("/offer-letters/:id/reissue", async (req, res) => {
   if(!current)return res.status(409).json({error:"The original internship allocation no longer exists"});
   const dateOnly=value=>value instanceof Date?value.toISOString().slice(0,10):String(value||"").slice(0,10);
   const from=dateOnly(req.body.fromDate||current.intern_start),to=dateOnly(req.body.toDate||current.intern_end);
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(from)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(to)||to<from)
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||to<from)
     return res.status(400).json({error:"Valid offer dates are required and the end date cannot precede the start date"});
   const version = (
     await q(
