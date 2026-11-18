@@ -137,7 +137,7 @@ export default function AdminOffersPage() {
           {letters.filter((x) => ["ISSUED", "REISSUED"].includes(x.status)).length} issued
         </span>
       </div>
-      <section className="card letterhead-settings"><h2>Company letterhead settings</h2><p className="muted">Upload your company letterhead. Supported formats: PDF, DOCX, PNG and JPG (maximum 4 MB).</p><p className="muted">The uploaded letterhead is applied to the offer PDF preview and intern download.</p>{letterhead&&<p className="muted">Current letterhead: {letterhead.mime_type.split("/").pop()} · Updated {new Date(letterhead.updated_at).toLocaleString()}</p>}<div className="form-field"><label htmlFor="offer-letterhead-file">Choose letterhead</label><input id="offer-letterhead-file" className="input" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;setLetterheadError(file&&file.size>4*1024*1024?"File must be 4 MB or smaller.":"");setLetterheadFile(file&&file.size<=4*1024*1024?file:null)}} /></div><div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!letterheadFile||letterheadBusy} onClick={uploadLetterhead}>Upload letterhead</button>{letterhead&&<><button className="btn secondary" type="button" onClick={previewLetterhead}>View file</button><button className="btn danger" type="button" disabled={letterheadBusy} onClick={removeLetterhead}>Remove</button></>}</div>{letterheadError&&<p className="error" role="alert">{letterheadError}</p>}{letterheadMessage&&<p className="success" role="status">{letterheadMessage}</p>}</section>
+      <section className="card letterhead-settings"><h2>Company letterhead settings</h2><p className="muted">Upload your company letterhead. Supported formats: PDF, DOCX, PNG and JPG (maximum 4 MB).</p><p className="muted">The uploaded letterhead is applied to the offer PDF preview and intern download.</p>{letterhead&&<p className="muted">Uploaded letterhead: {letterhead.original_filename || ({ "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"Company letterhead.docx","application/pdf":"Company letterhead.pdf","image/png":"Company letterhead.png","image/jpeg":"Company letterhead.jpg" }[letterhead.mime_type] || "Company letterhead")} · Updated {new Date(letterhead.updated_at).toLocaleString()}</p>}<div className="form-field"><label htmlFor="offer-letterhead-file">Choose letterhead</label><input id="offer-letterhead-file" className="input letterhead-file-input" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;setLetterheadError(file&&file.size>4*1024*1024?"File must be 4 MB or smaller.":"");setLetterheadFile(file&&file.size<=4*1024*1024?file:null)}} /></div><div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!letterheadFile||letterheadBusy} onClick={uploadLetterhead}>Upload letterhead</button>{letterhead&&<><button className="btn secondary" type="button" onClick={previewLetterhead}>View file</button><button className="btn danger" type="button" disabled={letterheadBusy} onClick={removeLetterhead}>Remove</button></>}</div>{letterheadError&&<p className="error" role="alert">{letterheadError}</p>}{letterheadMessage&&<p className="success" role="status">{letterheadMessage}</p>}</section>
       {!templates.length && (
         <section className="card">
           <h2>Create Offer Letter Template</h2>{feedbackArea==="createTemplate"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
@@ -323,7 +323,19 @@ export default function AdminOffersPage() {
           </section>
         </div>
       )}
-      <style jsx global>{`.admin-offers-page{max-width:1240px;margin-inline:auto;padding:24px 28px 72px;color:#111}
+      <style jsx global>{`.admin-offers-page .letterhead-settings{display:flex;flex-direction:column;gap:12px}
+.admin-offers-page .letterhead-settings h2{margin-bottom:0}
+.admin-offers-page .letterhead-settings p{margin:0;line-height:1.5}
+.admin-offers-page .letterhead-settings .form-field{margin:4px 0}
+.admin-offers-page .letterhead-settings .form-field label{display:block;font-weight:650;margin-bottom:8px;color:#111}
+.admin-offers-page .letterhead-file-input{height:auto;min-height:54px;padding:9px 12px;border:1.5px solid #93b4ed;border-radius:10px;background:#f8fbff}
+.admin-offers-page .letterhead-file-input::file-selector-button{padding:9px 16px;margin-right:14px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#111;font:inherit;font-weight:650;cursor:pointer}
+.admin-offers-page .letterhead-file-input::file-selector-button:hover{background:#dbeafe}
+.admin-offers-page .letterhead-settings .action-row{justify-content:flex-start!important;gap:10px}
+.admin-offers-page .letterhead-settings .btn{min-height:42px;min-width:116px;border-radius:10px}
+.admin-offers-page .letterhead-settings .btn:not(.secondary):not(.danger){background:#2563eb;border-color:#2563eb}
+.admin-offers-page .letterhead-settings .btn:not(.secondary):not(.danger):hover{background:#1d4ed8;border-color:#1d4ed8}
+.admin-offers-page{max-width:1240px;margin-inline:auto;padding:24px 28px 72px;color:#111}
 .admin-offers-page .intern-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin:18px 0 26px}
 .admin-offers-page .intern-head h1{font-size:clamp(28px,3vw,36px);font-weight:700;letter-spacing:-.035em;color:#111;margin:0 0 8px}
 .admin-offers-page .intern-head p{font-size:15px;line-height:1.6;color:#525252;margin:0}
