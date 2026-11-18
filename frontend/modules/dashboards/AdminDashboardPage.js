@@ -219,15 +219,15 @@ export default function AdminDashboardPage() {
       value: data?.certificates_issued || 0,
       sub: "Completed certificate workflow",
       href: "/admin/completion",
-      tone: "purple",
+      tone: "green",
     },
   ];
   return (
     <main className="wrap admin-home">
       <header className="admin-home-header">
         <div>
-          <span className="admin-eyebrow">ADMIN WORKSPACE</span>
-          <h1>Admin Dashboard</h1>
+          <span className="admin-eyebrow">Operations overview</span>
+          <h1>Operations dashboard</h1>
           <p className="muted">
             Manage student onboarding, internship operations and approvals from
             one place.
@@ -267,13 +267,13 @@ export default function AdminDashboardPage() {
         ))}
       </section>
       {!loading && pending>0 && <section className="card" aria-label="Pending operations breakdown" style={{marginTop:14,padding:16}}>
-        <h2 style={{margin:"0 0 10px",fontSize:16}}>Pending Operations Breakdown</h2>
+        <h2 style={{margin:"0 0 10px",fontSize:16}}>Pending operations breakdown</h2>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{pendingItems.filter(item=>count(item.key)>0).map(item=><Link key={item.key} href={item.href} style={{display:"inline-flex",alignItems:"center",gap:8,border:"1px solid #dce6e0",borderRadius:10,padding:"9px 12px",color:"inherit",textDecoration:"none"}}><strong style={{color:"#b91c1c"}}>{count(item.key)}</strong><span>{item.label}</span><span aria-hidden="true"><ArrowIcon /></span></Link>)}</div>
       </section>}
       <section className="admin-queue-section">
         <div className="admin-section-heading">
           <div>
-            <h2>Action Center</h2>
+            <h2>Requires attention</h2>
             <p className="muted">
               Jump straight to the workspace that needs attention.
             </p>
@@ -333,7 +333,7 @@ export default function AdminDashboardPage() {
       <section className="admin-workspaces">
         <div className="admin-section-heading">
           <div>
-            <h2>Management Workspaces</h2>
+            <h2>Management workspaces</h2>
             <p className="muted">
               All administrative modules, grouped in one consistent grid.
             </p>
@@ -361,13 +361,13 @@ export default function AdminDashboardPage() {
       .admin-home .admin-overview-icon,.admin-home .admin-workspace-icon,.admin-home .admin-queue-link>span:first-child{color:#0a6748;background:#e3f4e9}
       .admin-home .admin-overview-card.tone-amber .admin-overview-icon{color:#9c671c;background:#fff0d2}
       .admin-home .admin-overview-card.tone-blue .admin-overview-icon{color:#3464aa;background:#e1edff}
-      .admin-home .admin-overview-card.tone-purple .admin-overview-icon{color:#7b52a6;background:#eee2ff}
+      .admin-home .admin-overview-card.tone-purple .admin-overview-icon{color:#075e46;background:#e8f5ee}
       .admin-home .admin-workspace-icon svg,.admin-home .admin-overview-icon svg,.admin-home .admin-queue-link>span:first-child svg{display:block;width:22px;height:22px}
       .admin-home .admin-workspace-card:nth-child(4n+2) .admin-workspace-icon{color:#3464aa;background:#e8f0ff}
       .admin-home .admin-workspace-card:nth-child(4n+3) .admin-workspace-icon{color:#986419;background:#fff2dc}
-      .admin-home .admin-workspace-card:nth-child(4n+4) .admin-workspace-icon{color:#7751a0;background:#f1eaff}
+      .admin-home .admin-workspace-card:nth-child(4n+4) .admin-workspace-icon{color:#075e46;background:#e8f5ee}
 
-.admin-home{max-width:1320px;padding:28px 28px 60px;color:#172c21}
+.admin-home{max-width:1320px;padding:28px 28px 60px;color:#0f172a}
 .admin-home-header{margin-bottom:25px;align-items:center}
 .admin-home-header h1{font-size:clamp(28px,2.7vw,36px);letter-spacing:-1.1px;margin:7px 0 8px}
 .admin-home-header .muted{font-size:13px;color:#6a7b70}
@@ -380,7 +380,7 @@ export default function AdminDashboardPage() {
 .admin-home .admin-overview-title{font-size:12px;font-weight:750;color:#395448}
 .admin-home .admin-overview-card strong{font-size:37px;letter-spacing:-1.4px;line-height:1.22;margin:4px 0}
 .admin-home .admin-overview-card small{font-size:11px;line-height:1.5}
-.admin-home .admin-card-chevron{display:grid;place-items:center;width:29px;height:29px;flex:none;border-radius:9px;color:#48705b;background:#ffffffa3}
+.admin-home .admin-card-chevron{display:grid;place-items:center;width:29px;height:29px;flex:none;border-radius:9px;color:#48705b;background:#f6f8fc}
 .admin-home .admin-section-heading{margin-bottom:15px}
 .admin-home .admin-section-heading h2{font-size:19px;font-weight:800;letter-spacing:-.5px;margin-bottom:5px}
 .admin-home .admin-section-heading p{font-size:12px;color:#6a7d71}
