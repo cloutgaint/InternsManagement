@@ -32,6 +32,9 @@ export default function AdminQuestionsPage() {
     [form, setForm] = useState(empty),
     [editId, setEditId] = useState(null),
     [questionTab, setQuestionTab] = useState("ALL"),
+    [workspace, setWorkspace] = useState("library"),
+    [libraryPage, setLibraryPage] = useState(1),
+    [libraryPageSize, setLibraryPageSize] = useState(10),
     [filter, setFilter] = useState({
       q: "",
       domain: "",
@@ -75,6 +78,7 @@ export default function AdminQuestionsPage() {
   const fullStackFilter = !filter.domain || fullStackIds.includes(filter.domain);
   const selectQuestionTab = (tab) => {
     setQuestionTab(tab);
+    setLibraryPage(1);
     const domainId = fullStackFilter ? filter.domain : tab === "ALL" ? "" : questionDomains[tab] || "";
     setFilter(current => ({ ...current, domain: domainId }));
     if (domainId || (fullStackFilter && tab !== "ALL")) {
@@ -98,6 +102,9 @@ export default function AdminQuestionsPage() {
       ),
     [rows, filter, questionTab, questionDomains, fullStackFilter, fullStackIds],
   );
+  const pageCount = Math.max(1, Math.ceil(visible.length / libraryPageSize));
+  const currentPage = Math.min(libraryPage, pageCount);
+  const paginatedQuestions = visible.slice((currentPage-1)*libraryPageSize,currentPage*libraryPageSize);
   const generatedRows = aiDrafts;
   const editingAiDraft = Boolean(editId && rows.find((question) => question.id === editId)?.source === "AI" && rows.find((question) => question.id === editId)?.status === "DRAFT");
   function reset() {
@@ -107,6 +114,7 @@ export default function AdminQuestionsPage() {
   function edit(x) {
     setFeedbackArea("save"); setErr(""); setMsg("");
     setEditId(x.id);
+    setWorkspace("manual");
     setForm({
       domainId: x.domain_id || "",
       topic: x.topic || "",
@@ -318,7 +326,7 @@ export default function AdminQuestionsPage() {
   }
   const domainName = (id) => domains.find((x) => x.id === id)?.name || "Common";
   return (
-    <main className="wrap">
+    <main className="wrap question-bank-page">
       <div className="intern-head">
         <div>
           <h1>Question Bank</h1>
@@ -332,7 +340,8 @@ export default function AdminQuestionsPage() {
           {rows.length} total
         </span>
       </div>
-      <AdminQuestionAiPanel
+      <nav className="question-workspace-tabs" aria-label="Question Bank workspaces">{[["library","Question Library"],["ai","Generate with AI"],["manual",editId?"Edit Question":"Add Question"]].map(([id,label])=><button key={id} type="button" aria-current={workspace===id?"page":undefined} className={workspace===id?"is-active":""} onClick={()=>setWorkspace(id)}>{label}</button>)}</nav>
+      {workspace==="ai" && <AdminQuestionAiPanel
         ai={ai}
         setAi={setAi}
         domains={domains}
@@ -355,7 +364,7 @@ export default function AdminQuestionsPage() {
         removeGenerated={removeGenerated}
         domainName={domainName}
       />
-      <AdminQuestionEditor
+      {workspace==="manual" && <AdminQuestionEditor
         editId={editId}
         reset={reset}
         feedbackArea={feedbackArea}
@@ -368,7 +377,7 @@ export default function AdminQuestionsPage() {
         editingAiDraft={editingAiDraft}
         busy={busy}
       />
-      <section className="card workflow-section">
+      {workspace==="library" && <section className="card workflow-section question-library">
         <div className="verification-title">
           <div>
             <h2>Question Library</h2>{(feedbackArea==="reviewAI"||feedbackArea==="library")&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
@@ -390,12 +399,12 @@ export default function AdminQuestionsPage() {
             className="input"
             placeholder="Search question or topic…"
             value={filter.q}
-            onChange={(e) => setFilter((x) => ({ ...x, q: e.target.value }))}
+            onChange={(e) => {setFilter((x) => ({ ...x, q: e.target.value }));setLibraryPage(1);}}
           />
           <select
             className="input"
             value={filter.domain}
-            onChange={(e) => { setFilter((x) => ({ ...x, domain: e.target.value })); setQuestionTab("ALL"); }}
+            onChange={(e) => { setFilter((x) => ({ ...x, domain: e.target.value })); setQuestionTab("ALL"); setLibraryPage(1); }}
           >
             <option value="">All domains</option>
             {domains.map((d) => (
@@ -407,9 +416,7 @@ export default function AdminQuestionsPage() {
           <select
             className="input"
             value={filter.difficulty}
-            onChange={(e) =>
-              setFilter((x) => ({ ...x, difficulty: e.target.value }))
-            }
+            onChange={(e) => {setFilter((x) => ({ ...x, difficulty: e.target.value }));setLibraryPage(1);}}
           >
             <option value="">All difficulty</option>
             <option>EASY</option>
@@ -419,7 +426,7 @@ export default function AdminQuestionsPage() {
           <select
             className="input"
             value={filter.type}
-            onChange={(e) => setFilter((x) => ({ ...x, type: e.target.value }))}
+            onChange={(e) => {setFilter((x) => ({ ...x, type: e.target.value }));setLibraryPage(1);}}
           >
             <option value="">All types</option>
             {QUESTION_TYPES.map(([id, label]) => <option value={id} key={id}>{label}</option>)}
@@ -427,9 +434,7 @@ export default function AdminQuestionsPage() {
           <select
             className="input"
             value={filter.status}
-            onChange={(e) =>
-              setFilter((x) => ({ ...x, status: e.target.value }))
-            }
+            onChange={(e) => {setFilter((x) => ({ ...x, status: e.target.value }));setLibraryPage(1);}}
           >
             <option value="">All status</option>
             <option>DRAFT</option>
@@ -440,7 +445,7 @@ export default function AdminQuestionsPage() {
         {!visible.length ? (
           <p className="muted">No questions match the selected filters.</p>
         ) : (
-          visible.map((x) => (
+          paginatedQuestions.map((x) => (
             <div className="question-row" key={x.id}>
               <div className="question-main">
                 <div className="question-tags">
@@ -506,7 +511,26 @@ export default function AdminQuestionsPage() {
             </div>
           ))
         )}
-      </section>
+        {visible.length>0&&<div className="question-library-pagination"><span>Showing {(currentPage-1)*libraryPageSize+1}–{Math.min(currentPage*libraryPageSize,visible.length)} of {visible.length} questions</span><div><label>Rows per page <select value={libraryPageSize} onChange={e=>{setLibraryPageSize(Number(e.target.value));setLibraryPage(1);}}>{[5,10,20,50].map(n=><option key={n} value={n}>{n}</option>)}</select></label><button className="btn secondary" disabled={currentPage===1} onClick={()=>setLibraryPage(p=>Math.max(1,p-1))}>Previous</button><span>Page {currentPage} of {pageCount}</span><button className="btn secondary" disabled={currentPage===pageCount} onClick={()=>setLibraryPage(p=>Math.min(pageCount,p+1))}>Next</button></div></div>}
+      </section>}
+      <style jsx global>{`
+      .question-bank-page{color:#111}.question-bank-page .question-workspace-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;padding:6px;border:1px solid #dce8e0;border-radius:14px;background:#eef5f0}
+      .question-bank-page .question-workspace-tabs button{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:10px;background:transparent;color:#234b37;font-weight:700;cursor:pointer}
+      .question-bank-page .question-workspace-tabs button.is-active{background:#065f46;color:#fff}
+      .question-bank-page .question-workspace-tabs button:hover:not(.is-active){background:#dcece2;color:#111}
+      .question-bank-page .card{border-radius:16px;padding:24px}.question-bank-page .input{border:1.5px solid #7ea7ef;border-radius:9px;min-height:44px;color:#111}
+      .question-bank-page .btn{min-height:40px;background:#065f46;color:#fff}.question-bank-page .btn:hover:not(:disabled){background:#064e3b;color:#fff}
+      .question-bank-page .btn.secondary{background:#e8f5ee;color:#075b3b}.question-bank-page .btn.secondary:hover:not(:disabled){background:#065f46;color:#fff}
+      .question-bank-page .btn.danger{background:#b42332;color:#fff}.question-bank-page .btn.danger:hover:not(:disabled){background:#91202a;color:#fff}
+      .question-bank-page .question-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 0}
+      .question-bank-page .question-row .action-row{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px;max-width:350px}
+      .question-bank-page .question-row .action-row .input{width:auto;max-width:160px;margin:0}
+      .question-bank-page .question-library-pagination{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;padding-top:18px;margin-top:12px;border-top:1px solid #dce8e0;font-size:12px}
+      .question-bank-page .question-library-pagination>div{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+      .question-bank-page .question-library-pagination label{display:flex;align-items:center;gap:8px;font-size:12px}
+      .question-bank-page .question-library-pagination select{width:auto;min-height:40px;margin:0;border-radius:8px;padding:7px}
+      @media(max-width:760px){.question-bank-page .question-row{grid-template-columns:1fr}.question-bank-page .question-row .action-row{justify-content:flex-start;max-width:none}.question-bank-page .card{padding:16px}}
+      `}</style>
     </main>
   );
 }
