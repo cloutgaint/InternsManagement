@@ -84,7 +84,7 @@ export default function MentorOperationsPage() {
                 </small>
               </div>
               <span className="status-pill">{x.status}</span>
-              <span>{x.working_minutes || 0} min</span>
+              <span aria-label={`Recorded working duration: ${x.working_minutes || 0} minutes`} style={{fontWeight:600,whiteSpace:"nowrap"}}>Worked: {Math.floor((Number(x.working_minutes)||0)/60)>0?`${Math.floor((Number(x.working_minutes)||0)/60)} hr `:""}{(Number(x.working_minutes)||0)%60} min</span>
             </div>
           ))}
         </section>
