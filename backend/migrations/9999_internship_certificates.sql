@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS internship_certificates (
  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ISSUED','REVOKED')),
  issued_at TIMESTAMPTZ,
  issued_by UUID,
+ template_id INTEGER REFERENCES internship_certificate_templates(id),
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
