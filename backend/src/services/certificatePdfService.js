@@ -8,7 +8,7 @@ import {readFile} from "node:fs/promises";
 // Admins can override positions by providing CERTIFICATE_LAYOUT_JSON.
 export const DEFAULT_LAYOUT=Object.freeze({
  referenceWidth:862.5,referenceHeight:605.25,
- certificateId:{cx:0.5,top:0.115,maxWidth:0.38,fontSize:10,minSize:8},
+ certificateId:{cx:0.5,top:0.085,maxWidth:0.38,fontSize:10,minSize:8},
  recipient:{cx:0.5,top:0.393,maxWidth:0.68,height:0.078,fontSize:35,minSize:18},
  body:{cx:0.5,top:0.574,maxWidth:0.77,bottom:0.744,fontSize:9.6,minSize:7.2,lineHeight:1.55}
 });
@@ -61,9 +61,9 @@ export async function renderCertificate(template,certificate,{scriptFontPath=pro
  const ink=rgb(0.13,0.22,0.40),gold=rgb(0.79,0.60,0.09);
  const titleFont=await doc.embedFont(StandardFonts.TimesRoman);
  const heading={cx:0.5};
- centered(page,titleFont,"CERTIFICATE",0.123,52*scale,heading,ink);
- centered(page,titleFont,"Of Internship",0.218,24*scale,heading,ink);
- centered(page,regular,"We Present This Certificate To",0.290,13*scale,heading,ink);
+ centered(page,titleFont,"CERTIFICATE",0.135,52*scale,heading,ink);
+ centered(page,titleFont,"Of Internship",0.233,24*scale,heading,ink);
+ centered(page,regular,"We Present This Certificate To",0.300,13*scale,heading,ink);
  const id="Certificate ID: "+String(certificate.certificate_number||"");
  const idRegion=layout.certificateId;
  const idSize=fitted(bold,id,idRegion.fontSize*scale,idRegion.minSize*scale,box.width*idRegion.maxWidth);
