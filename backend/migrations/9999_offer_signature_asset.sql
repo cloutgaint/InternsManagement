@@ -16,3 +16,7 @@ ALTER TABLE report_brand_assets
 CREATE UNIQUE INDEX IF NOT EXISTS uq_report_brand_offer_signature
  ON report_brand_assets(asset_key)
  WHERE asset_key='offer_signature';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_report_brand_offer_watermark
+ ON report_brand_assets(asset_key)
+ WHERE asset_key='offer_watermark';
