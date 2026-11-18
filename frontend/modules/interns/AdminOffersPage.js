@@ -124,6 +124,7 @@ export default function AdminOffersPage() {
       setSelected(l);
       if (l.status === "DRAFT") {
         await api("/admin/offer-letters/" + l.id + "/mark-previewed", { method: "POST", body: "{}" });
+        setPreview(current=>current?.id===l.id?{...current,status:"PREVIEWED"}:current);
         load();
       }
     } catch (e) {
@@ -358,7 +359,7 @@ export default function AdminOffersPage() {
             {editError&&<p className="error" role="alert">{editError}</p>}{editMessage&&<p className="success" role="status">{editMessage}</p>}
             <div className="action-row">
               {editingOffer?<><button className="btn" disabled={editBusy||!editBody.trim()||!editSignatory.trim()} onClick={saveOfferContent}>Save changes</button><button className="btn secondary" disabled={editBusy} onClick={()=>setEditingOffer(false)}>Cancel</button></>:<>{["DRAFT","PREVIEWED","APPROVED"].includes(preview.status)&&<button className="btn secondary" onClick={()=>setEditingOffer(true)}>Edit content</button>}{["ISSUED","REISSUED","REVOKED"].includes(preview.status)&&<button className="btn secondary" disabled={editBusy} onClick={startOfferRevision}>Create revision to edit</button>}</>}
-              {!editingOffer && preview.status === "DRAFT" && (
+              {!editingOffer && preview.status === "PREVIEWED" && (
                 <button
                   className="btn"
                   onClick={() => action(preview, "approve")}
