@@ -206,7 +206,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     catch { /* Invalid historic stamp must not prevent offer download. */ }
   }
   write(pdf, signatory, left, closingY+103, textWidth, 10, true, { height: 24, ellipsis: true });
-  write(pdf, "For Gaint Clout Technologies Pvt. Ltd.", left, closingY+119, textWidth, 9);
+
   if (pdf.bufferedPageRange().count !== 1) throw new Error("Offer PDF pagination error");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", disposition + '; filename="GAINT-Internship-Offer.pdf"');
