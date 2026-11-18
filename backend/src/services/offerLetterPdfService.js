@@ -121,7 +121,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   let body = offer.issued_snapshot?.rendered_body || offer.template_body || "";
   if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
-  const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp','offer_signature')")).rows;
+  const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp','offer_signature','offer_watermark')")).rows;
   const letterhead = assets.find(x => x.asset_key === "offer_letterhead");
   const stamp = assets.find(x => x.asset_key === "company_stamp" && ["image/png","image/jpeg"].includes(x.mime_type));
   const signature = assets.find(x => x.asset_key === "offer_signature" && ["image/png","image/jpeg"].includes(x.mime_type));
@@ -140,9 +140,15 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
     write(pdf,"Gaint Clout Technologies Pvt Ltd | Hyderabad | info@gaintclout.com",54,height-73,width-108,8);
   }
-  // The supplied blank GAINT DOCX does not contain the sample globe artwork.
-  // Keep the approximate watermark only until an approved original is supplied.
-  watermark(pdf);
+  const uploadedWatermark = assets.find(x => x.asset_key === "offer_watermark" && ["image/png","image/jpeg"].includes(x.mime_type));
+  if (uploadedWatermark) {
+    // The watermark is placed behind the letter content; preserve image aspect ratio.
+    pdf.save().opacity(0.24);
+    try { pdf.image(uploadedWatermark.image_data, 95, 258, { fit: [395, 365], align: "center", valign: "center" }); }
+    finally { pdf.restore(); }
+  } else {
+    watermark(pdf);
+  }
   const left = 66, right = width - 66, textWidth = right - left;
   const top = 143;
   pdf.font("Helvetica-Bold").fontSize(16).fillColor("#141414")
