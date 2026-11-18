@@ -41,6 +41,7 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
  const t=(await q("SELECT pdf_data FROM internship_certificate_templates WHERE id=COALESCE($1,(SELECT id FROM internship_certificate_templates ORDER BY uploaded_at DESC,id DESC LIMIT 1))",[req.certificate.template_id])).rows[0];
  if(!t)return res.status(409).json({error:"Admin must upload a certificate PDF template first"});
  const font=(await q("SELECT font_data FROM internship_certificate_fonts ORDER BY uploaded_at DESC,id DESC LIMIT 1")).rows[0];
+ if(!font?.font_data&&!process.env.CERTIFICATE_SCRIPT_FONT_PATH)return res.status(409).json({error:"Upload a licensed TTF/OTF recipient script font under Official certificate template before previewing the PDF."});
  const pdf=await renderCertificate(t.pdf_data,req.certificate,{scriptFontBytes:font?.font_data||null});
  res.setHeader("Content-Type","application/pdf");
  res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${req.certificate.certificate_number}.pdf"`);
