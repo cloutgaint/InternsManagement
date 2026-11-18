@@ -13,6 +13,7 @@ import mentorRoutes from "./routes/mentor/index.js";
 import kluFortnightRoutes from "./routes/kluFortnight.js";
 import reportBrandAssetsRoutes from "./routes/reportBrandAssets.js";
 import notificationRoutes from "./routes/notifications.js";
+import certificateRoutes from "./routes/certificates.js";
 import publicRoutes from "./routes/public.js";
 import { errorHandler } from "./common/middleware/error-handler.js";
 import { q } from "./common/database/index.js";
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/mentor", mentorRoutes);
   app.use("/api/klu-fortnight", kluFortnightRoutes);
   app.use("/api/report-assets", reportBrandAssetsRoutes);
+  app.use("/api/certificates", express.json({limit:"11mb"}), certificateRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use(
     "/api/public",
