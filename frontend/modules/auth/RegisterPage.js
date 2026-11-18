@@ -331,7 +331,6 @@ export default function RegisterPage() {
                 aria-invalid={!!resumeError}
                 aria-describedby={resumeError?"resume-drive-error":undefined}
                 placeholder="https://drive.google.com/... or https://yourportfolio.com"
-                name="resumePortfolioUrl"
                 value={f.resumePortfolioUrl}
                 onChange={(e) => {set("resumePortfolioUrl",e.target.value);if(resumeError)setResumeError("");}}
               />
