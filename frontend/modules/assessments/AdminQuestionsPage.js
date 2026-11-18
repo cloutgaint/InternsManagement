@@ -527,7 +527,7 @@ export default function AdminQuestionsPage() {
       .question-bank-page .question-row .action-row .input{width:auto;max-width:160px;margin:0}
       .question-bank-page .question-library-pagination{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;padding-top:18px;margin-top:12px;border-top:1px solid #dce8e0;font-size:12px}
       .question-bank-page .question-library-pagination>div{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-      .question-bank-page .question-library-pagination label{display:flex;align-items:center;gap:8px;font-size:12px}
+      .question-bank-page .question-library-pagination label{display:inline-flex;flex-direction:row;align-items:center;gap:8px;font-size:12px;white-space:nowrap;flex:0 0 auto;min-width:max-content}
       .question-bank-page .question-library-pagination select{width:auto;min-height:40px;margin:0;border-radius:8px;padding:7px}
       @media(max-width:760px){.question-bank-page .question-row{grid-template-columns:1fr}.question-bank-page .question-row .action-row{justify-content:flex-start;max-width:none}.question-bank-page .card{padding:16px}}
       `}</style>
