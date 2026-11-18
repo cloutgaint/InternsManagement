@@ -6,35 +6,35 @@ import { api, apiBlob } from "@/shared/api/client";
 const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 
 const card =
-  "rounded-[14px] border border-[#dbe5df] bg-white p-[18px] shadow-[0_8px_28px_rgba(20,45,31,.055)]";
+  "rounded-2xl border border-[#e2e8e5] bg-white p-6 shadow-[0_8px_30px_rgba(15,35,30,.045)] max-[600px]:p-[18px]";
 const button =
-  "inline-flex items-center justify-center text-center cursor-pointer rounded-[9px] border-0 font-bold transition-all duration-[180ms] ease-[ease] hover:-translate-y-px hover:bg-[#06472f]";
+  "inline-flex min-h-10 items-center justify-center text-center cursor-pointer rounded-[9px] border-0 font-bold transition-all duration-[180ms] ease-[ease] hover:-translate-y-px hover:bg-[#06472f]";
 const primary = "bg-[#0c5132] text-white";
-const secondary = "bg-[#e8f0eb] text-[#123]";
+const secondary = "bg-[#e8f0eb] text-[#111827]";
 const regular = "px-4 py-[11px]";
 const compact = "px-3 py-2";
 const displayStatus = (value) => String(value || "Pending").toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const s = {
-  page: "mx-auto max-w-[1200px] px-7 pb-7 pt-[34px] max-[600px]:px-[18px] max-[600px]:pb-[18px]",
+  page: "mx-auto max-w-[1320px] px-7 pb-12 pt-9 text-[#111827] max-[600px]:px-4 max-[600px]:pt-5",
   error: "rounded-lg border border-current bg-[#ffe9e9] p-2.5 text-[#8b1f1f]",
   success: "rounded-lg border border-current bg-[#e8f7ed] p-2.5 text-[#176331]",
-  muted: "text-[#65756c]",
+  muted: "text-[#52645e]",
   card,
-  head: "mb-[18px] flex items-start justify-between gap-[18px] max-[520px]:block",
+  head: "mb-7 flex items-start justify-between gap-5 max-[600px]:flex-col",
   title: "m-0 mb-1.5",
   badge: "inline-block rounded-full bg-[#e8f0eb] px-[9px] py-1 text-[12px] max-[520px]:mt-2.5",
-  summary: "mb-[18px] grid grid-cols-4 gap-4 max-[850px]:grid-cols-2 max-[520px]:grid-cols-1",
-  summaryValue: "m-0 mt-2 text-[17px]",
-  tabs: "mx-0 mb-[15px] mt-[18px] flex flex-wrap gap-[7px] rounded-[13px] border border-[#dce7e0] bg-[#eaf1ed] p-1.5 max-[680px]:flex-nowrap max-[680px]:overflow-x-auto max-[680px]:[scrollbar-width:thin]",
-  tab: "cursor-pointer rounded-[9px] border-0 px-[15px] py-[11px] text-[13px] font-bold [font-family:inherit] transition-colors duration-150 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#4ca77a] max-[680px]:flex-none max-[680px]:whitespace-nowrap max-[680px]:px-3 max-[680px]:py-2.5",
+  summary: "mb-6 grid grid-cols-4 gap-4 max-[950px]:grid-cols-2 max-[520px]:grid-cols-1 [&>div]:min-h-[114px]",
+  summaryValue: "m-0 mt-3 text-[18px] font-bold leading-snug text-[#111827]",
+  tabs: "mx-0 mb-5 flex flex-wrap gap-1.5 rounded-xl border border-[#e0e9e5] bg-[#edf3f0] p-2 max-[850px]:flex-nowrap max-[850px]:overflow-x-auto max-[850px]:[scrollbar-width:thin]",
+  tab: "cursor-pointer rounded-lg border-0 px-[17px] py-3 text-[13px] font-semibold [font-family:inherit] transition-colors duration-150 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#4ca77a] max-[680px]:flex-none max-[680px]:whitespace-nowrap max-[680px]:px-3 max-[680px]:py-2.5",
   tabActive: "bg-[#075e3e] text-white shadow-[0_3px_10px_#0b573b24]",
   tabIdle: "bg-transparent text-[#50665a] hover:bg-[#dcebe1] hover:text-[#155b3a]",
-  sections: "mt-[18px] grid grid-cols-2 gap-4 max-[850px]:grid-cols-1",
-  sectionTitle: "mt-0 text-[19px]",
-  sectionTitleInRow: "mb-[5px] mt-0 text-[19px]",
-  titleRow: "flex items-start justify-between gap-4 max-[900px]:flex-col",
+  sections: "mt-5 grid grid-cols-2 items-start gap-5 max-[900px]:grid-cols-1 [&>section]:min-w-0",
+  sectionTitle: "mt-0 mb-4 text-[19px] font-bold text-[#111827]",
+  sectionTitleInRow: "mb-3 mt-0 text-[19px] font-bold text-[#111827]",
+  titleRow: "flex items-start justify-between gap-4 max-[600px]:flex-col",
   row: "flex items-center justify-between gap-4 border-b border-[#e4ebe7] py-[11px] last:border-b-0",
-  actions: "flex flex-wrap items-center justify-end gap-2",
+  actions: "flex flex-wrap items-center justify-end gap-2 max-[600px]:justify-start",
   pill: "inline-flex min-h-[28px] items-center justify-center whitespace-nowrap rounded-full bg-[#edf2ef] px-3 py-1 text-center text-[12px] font-bold leading-none text-[#123]",
   formActions: "mt-[18px] flex justify-end",
   btn: [button, primary, regular, "min-w-[170px] max-[760px]:w-full"].join(" "),
@@ -171,7 +171,7 @@ export default function InternDashboardPage() {
       setErr(e.message);
     }
   }
-  const pane = (key) => s.card + (tab === key ? "" : " hidden");
+  const pane = (key) => s.card + (tab === key ? (["reviews","completion"].includes(key) ? " col-span-2 max-[900px]:col-span-1" : "") : " hidden");
   const present = (data.attendance || []).filter(
     (x) => x.status === "PRESENT",
   ).length;
@@ -180,7 +180,7 @@ export default function InternDashboardPage() {
       {msg && <p className={s.success}>{msg}</p>}
       <div className={s.head}>
         <div>
-          <h1 className={s.title}>Intern Dashboard</h1>
+          <h1 className={s.title+" text-[30px] font-bold tracking-tight text-[#111827] max-[600px]:text-[25px]"}>Intern dashboard</h1>
           <p className={s.muted}>
             Welcome back, {p.full_name || "Intern"}. Track your internship
             progress and required actions here.
@@ -196,7 +196,7 @@ export default function InternDashboardPage() {
           <h3 className={s.summaryValue}>{a?.domain_name || "Not assigned"}</h3>
         </div>
         <div className={s.card}>
-          <span className={s.muted}>Internship Period</span>
+          <span className={s.muted}>Internship period</span>
           <h3 className={s.summaryValue}>
             {a
               ? fmt(a.intern_start) + " to " + fmt(a.intern_end)
@@ -210,7 +210,7 @@ export default function InternDashboardPage() {
           </h3>
         </div>
         <div className={s.card}>
-          <span className={s.muted}>Active Tasks</span>
+          <span className={s.muted}>Active tasks</span>
           <h3 className={s.summaryValue}>{(data.tasks || []).length}</h3>
         </div>
       </div>
@@ -339,7 +339,7 @@ export default function InternDashboardPage() {
           </div>
         </section>
         <section className={pane("team")}>
-          <div className={s.titleRow}><h2 className={s.sectionTitleInRow}>Team & Project</h2><div className={s.actions}><a className={s.btnSmall} href="/intern/collaboration">Group Workspace</a><a className={s.btnSmall} href="/intern/final-submission">Final Project Submission</a></div></div>
+          <div className={s.titleRow}><h2 className={s.sectionTitleInRow}>Team & project</h2><div className={s.actions}><a className={s.btnSmall} href="/intern/collaboration">Group Workspace</a><a className={s.btnSmall} href="/intern/final-submission">Final Project Submission</a></div></div>
           {group ? (
             <>
               <p>
@@ -353,11 +353,11 @@ export default function InternDashboardPage() {
               </p>
             </>
           ) : (
-            <p className={s.muted}>Group not assigned yet.</p>
+            <p className={s.muted}>Project not assigned yet.</p>
           )}
         </section>
         <section className={pane("reviews")}>
-          <h2 className={s.sectionTitle}>Fortnight Reviews</h2>
+          <h2 className={s.sectionTitle}>Fortnight reviews</h2><p className={s.muted+" mb-5 text-sm"}>Review outcomes and mentor feedback appear here when published.</p>
           {reviews.length ? (
             reviews.map((x) => (
               <div className={s.row} key={x.id}>
@@ -370,12 +370,12 @@ export default function InternDashboardPage() {
               </div>
             ))
           ) : (
-            <p className={s.muted}>No reviews published yet.</p>
+            <div className="rounded-xl border border-dashed border-[#d7e4dc] bg-[#f8faf9] px-5 py-7 text-center"><p className="mb-1 font-semibold text-[#111827]">No reviews published yet</p><p className={s.muted+" m-0 text-sm"}>Your mentor’s fortnightly feedback will appear here after publication.</p></div>
           )}
         </section>
         <section className={pane("completion")}>
-          <div className={s.titleRow}><h2 className={s.sectionTitleInRow}>Completion & Certificate</h2><a className={s.btnLink} href="/intern/certificate">Open Certificate</a></div>
-          <div className={s.row}>
+          <div className={s.titleRow}><h2 className={s.sectionTitleInRow}>Completion & certificate</h2><a className={s.btnLink} href="/intern/certificate">Open Certificate</a></div>
+          <p className={s.muted+" mb-4 text-sm"}>Track final evaluation, approval and certificate issuance.</p><div className={s.row}>
             <span>Final evaluation</span>
             <b>{completion?.evaluation ? "Completed" : "Pending"}</b>
           </div>
@@ -388,7 +388,7 @@ export default function InternDashboardPage() {
             <b>{displayStatus(completion?.certificate?.status || "Not issued")}</b>
           </div>
         </section>
-        <section className={pane("team")}><h2 className={s.sectionTitle}>Group Workspace</h2><p className={s.muted}>Documents, shared resources and group chat with your mentor.</p><div className={s.formActions}><a className={s.btn} href="/intern/collaboration">Open Group Workspace</a></div></section>
+        <section className={pane("team")}><h2 className={s.sectionTitle}>Group workspace</h2><p className={s.muted+" leading-relaxed"}>Access shared documents, project resources and conversations with your mentor.</p><div className={s.formActions}><a className={s.btn} href="/intern/collaboration">Open Group Workspace</a></div></section>
         <section className={pane("overview")}>
           <div className={s.titleRow}><h2 className={s.sectionTitleInRow}>Notifications</h2><a className={s.btnLink} href="/intern/notifications">View All</a></div>
           {(data.notifications || []).length ? (
