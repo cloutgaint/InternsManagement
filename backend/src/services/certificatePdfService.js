@@ -43,7 +43,7 @@ function wordsIntoLines(text,font,size,maxWidth){
  if(current)lines.push(current);
  return lines;
 }
-export async function renderCertificate(template,certificate,{scriptFontPath=process.env.CERTIFICATE_SCRIPT_FONT_PATH,layout=DEFAULT_LAYOUT}={}){
+export async function renderCertificate(template,certificate,{scriptFontPath=process.env.CERTIFICATE_SCRIPT_FONT_PATH,scriptFontBytes=null,layout=DEFAULT_LAYOUT}={}){
  const doc=await PDFDocument.load(template,{updateMetadata:false});
  if(doc.getPageCount()!==1)throw Error("Certificate template must contain exactly one page");
  const page=doc.getPage(0),box=page.getCropBox();
@@ -51,9 +51,9 @@ export async function renderCertificate(template,certificate,{scriptFontPath=pro
  const regular=await doc.embedFont(StandardFonts.Helvetica);
  const bold=await doc.embedFont(StandardFonts.HelveticaBold);
  let script;
- if(scriptFontPath){
+ if(scriptFontBytes||scriptFontPath){
   doc.registerFontkit(fontkit);
-  script=await doc.embedFont(await readFile(scriptFontPath),{subset:true});
+  script=await doc.embedFont(scriptFontBytes||await readFile(scriptFontPath),{subset:true});
  }else{
   // Fail closed rather than silently replacing the reference script with
   // Times Italic and claiming a matching certificate.
