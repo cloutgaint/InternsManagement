@@ -13,6 +13,8 @@ export default function MentorReportsPage({ admin = false }) {
     [edit, setEdit] = useState(null),
     [groups, setGroups] = useState([]),
     [creating, setCreating] = useState(false),
+    [accessError, setAccessError] = useState(false),
+    [loadingAccess, setLoadingAccess] = useState(true),
     [draft, setDraft] = useState({
       groupId: "",
       periodNo: 1,
@@ -26,17 +28,24 @@ export default function MentorReportsPage({ admin = false }) {
       nextExpectations: "",
       marks: [],
     });
-  const load = () =>
-    api(base + "/reviews")
-      .then(setReviews)
-      .catch((e) => setErr(e.message));
-  useEffect(() => {
-    load();
-    (admin
-      ? api("/admin/fortnight/groups").then(setGroups)
-      : api("/mentor/dashboard").then((x) => setGroups(x.groups || []))
-    ).catch((e) => setErr(e.message));
-  }, []);
+  const load = () => api(base + "/reviews").then(setReviews);
+  async function loadAccess() {
+    setLoadingAccess(true);
+    setAccessError(false);
+    setErr("");
+    const results = await Promise.allSettled([
+      load(),
+      admin ? api("/admin/fortnight/groups").then(setGroups) : api("/mentor/dashboard").then((x) => setGroups(x.groups || []))
+    ]);
+    const failures = results.filter((x) => x.status === "rejected");
+    if (failures.length) {
+      setAccessError(true);
+      setCreating(false);
+      setErr([...new Set(failures.map((x) => x.reason?.message || "Unable to load mentor data"))].join(" · "));
+    }
+    setLoadingAccess(false);
+  }
+  useEffect(() => { loadAccess(); }, []);
   async function chooseGroup(groupId) {
     setErr("");
     setDraft((x) => ({ ...x, groupId, marks: [] }));
@@ -187,13 +196,14 @@ export default function MentorReportsPage({ admin = false }) {
           </p>
         </div>
       </div>
-      {err && <p className="error">{err}</p>}
+      {accessError && <div className="mentor-access-error" role="alert"><strong>Unable to load fortnight evaluations</strong><p>{err || "You do not currently have access to these records."}</p><p>Sign in with an active Mentor account. If the problem continues, ask an administrator to check your mentor profile and assigned role.</p><button className="btn secondary" type="button" onClick={loadAccess}>Try again</button></div>}
+      {!accessError && err && <p className="error" role="alert">{err}</p>}
       {msg && (
         <p className="success" role="status">
           {msg}
         </p>
       )}
-      <section className="card">
+      {!accessError && !loadingAccess && <section className="card">
         <div className="verification-title">
           <div>
             <h2>Fortnight Evaluations</h2>
@@ -341,8 +351,8 @@ export default function MentorReportsPage({ admin = false }) {
             </div>
           </form>
         )}
-      </section>
-      {edit && (
+      </section>}
+      {!accessError && !loadingAccess && edit && (
         <section className="card">
           <h2>{edit.title}</h2>
           <p className="muted">
@@ -455,7 +465,7 @@ export default function MentorReportsPage({ admin = false }) {
           </form>
         </section>
       )}
-      <section className="card workflow-section">
+      {!accessError && !loadingAccess && <section className="card workflow-section">
         {reviews.length ? (
           reviews.map((x) => (
             <div className="workflow-row" key={x.id}>
@@ -488,8 +498,8 @@ export default function MentorReportsPage({ admin = false }) {
         ) : (
           <p className="muted">No fortnight reviews yet.</p>
         )}
-      </section>
-      {report && (
+      </section>}
+      {!accessError && !loadingAccess && report && (
         <section className="card fortnight-report">
           <div className="verification-title">
             <div>
