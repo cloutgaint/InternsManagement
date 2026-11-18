@@ -24,5 +24,48 @@ r.post("/",admin,async(req,res)=>{const {allocationId,projectTitle="",chairmanNa
 r.patch("/:id",admin,certificate,async(req,res)=>{if(req.certificate.status!=="DRAFT")return res.status(409).json({error:"Issued certificates are immutable. Revoke and create a new certificate if corrections are required."});const keys=["project_title","chairman_name","ceo_name"],updates={};for(const k of keys)if(Object.hasOwn(req.body||{},k)){if(typeof req.body[k]!=="string"||req.body[k].length>160)return res.status(400).json({error:"Invalid certificate field"});updates[k]=req.body[k].trim();}if(!Object.keys(updates).length)return res.status(400).json({error:"No changes supplied"});const row=(await q("UPDATE internship_certificates SET project_title=COALESCE($2,project_title),chairman_name=COALESCE($3,chairman_name),ceo_name=COALESCE($4,ceo_name),updated_at=now() WHERE id=$1 RETURNING *",[req.params.id,updates.project_title??null,updates.chairman_name??null,updates.ceo_name??null])).rows[0];await audit(req,"CERTIFICATE_DRAFT_EDITED","internship_certificate",row.id,req.certificate,row);res.json(row);});
 r.post("/:id/issue",admin,certificate,async(req,res)=>{if(req.certificate.status!=="DRAFT")return res.status(409).json({error:"Only draft certificates can be issued"});const template=(await q("SELECT id FROM internship_certificate_templates ORDER BY uploaded_at DESC,id DESC LIMIT 1")).rows[0];if(!template)return res.status(409).json({error:"Upload the official PDF template before issuing certificates"});const row=(await q("UPDATE internship_certificates SET status='ISSUED',issued_at=now(),issued_by=$2,template_id=$3,updated_at=now() WHERE id=$1 AND status='DRAFT' RETURNING *",[req.params.id,req.user.id,template.id])).rows[0];await audit(req,"CERTIFICATE_ISSUED","internship_certificate",row.id,req.certificate,row);res.json(row);});
 r.post("/:id/revoke",admin,certificate,async(req,res)=>{const reason=String(req.body?.reason||"").trim();if(!reason||reason.length>500)return res.status(400).json({error:"A revocation reason is required (maximum 500 characters)"});if(req.certificate.status!=="ISSUED")return res.status(409).json({error:"Only issued certificates can be revoked"});const row=(await q("UPDATE internship_certificates SET status='REVOKED',updated_at=now() WHERE id=$1 RETURNING *",[req.params.id])).rows[0];await audit(req,"CERTIFICATE_REVOKED","internship_certificate",row.id,req.certificate,{...row,reason});res.json(row);});
-r.get("/:id/pdf",certificate,async(req,res)=>{const t=(await q("SELECT pdf_data FROM internship_certificate_templates WHERE id=COALESCE($1,(SELECT id FROM internship_certificate_templates ORDER BY uploaded_at DESC,id DESC LIMIT 1))",[req.certificate.template_id])).rows[0];if(!t)return res.status(409).json({error:"Admin must upload a certificate PDF template first"});const dir=await mkdtemp(join(tmpdir(),"gaint-certificate-"));try{const file=join(dir,"template.pdf");await writeFile(file,t.pdf_data,{mode:0o600});await exec("pdftoppm",["-f","1","-l","1","-singlefile","-r","180","-png",file,join(dir,"template")],{timeout:30000});const image=await readFile(join(dir,"template.png"));const pdf=new PDFDocument({size:"A4",layout:"landscape",margin:0});const W=pdf.page.width,H=pdf.page.height;res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${req.certificate.certificate_number}.pdf"`);pdf.pipe(res);pdf.image(image,0,0,{width:W,height:H});const c=req.certificate;const write=(text,y,size,color="#1e355f",font="Helvetica",x=65,w=W-130)=>{pdf.fillColor(color).font(font).fontSize(size).text(text,x,y,{width:w,align:"center",lineBreak:false,ellipsis:true})};write("Certificate ID: "+c.certificate_number,44,10,"#111111","Helvetica-Bold");write(c.student_name,208,29,"#d0a21e","Times-Italic");write("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED "+(c.project_title||"INTERNSHIP PROJECT").toUpperCase(),276,9);write("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",290,9);write("DURING THE PERIOD FROM "+date(c.start_date)+" TO "+date(c.end_date),307,9);write(c.chairman_name,474,13,"#1e355f","Helvetica-Bold",82,230);write("CHAIRMAN",494,10,"#1e355f","Helvetica",82,230);write(c.ceo_name,474,13,"#1e355f","Helvetica-Bold",W-310,230);write("CEO",494,10,"#1e355f","Helvetica",W-310,230);pdf.end();}finally{await rm(dir,{recursive:true,force:true});}});
+r.get("/:id/pdf",certificate,async(req,res)=>{
+ const t=(await q("SELECT pdf_data FROM internship_certificate_templates WHERE id=COALESCE($1,(SELECT id FROM internship_certificate_templates ORDER BY uploaded_at DESC,id DESC LIMIT 1))",[req.certificate.template_id])).rows[0];
+ if(!t)return res.status(409).json({error:"Admin must upload a certificate PDF template first"});
+ const dir=await mkdtemp(join(tmpdir(),"gaint-certificate-"));
+ try{
+  const file=join(dir,"template.pdf");
+  await writeFile(file,t.pdf_data,{mode:0o600});
+  const {stdout:info}=await exec("pdfinfo",[file],{timeout:15000});
+  const match=info.match(/Page size:\s*([\d.]+) x ([\d.]+) pts/i);
+  if(!match)throw Object.assign(new Error("Unable to determine certificate template dimensions"),{status:422});
+  const W=Number(match[1]),H=Number(match[2]);
+  if(W<=H||W<600||H<400||W>2000||H>1500)throw Object.assign(new Error("Upload a landscape certificate PDF with a standard page size"),{status:422});
+  await exec("pdftoppm",["-f","1","-l","1","-singlefile","-r","180","-png",file,join(dir,"template")],{timeout:30000});
+  const image=await readFile(join(dir,"template.png"));
+  const pdf=new PDFDocument({size:[W,H],margin:0});
+  const c=req.certificate, sx=W/862.5,sy=H/605.25,scale=Math.min(sx,sy);
+  const center=(value,y,size,color="#233a68",font="Helvetica",left=115,right=115)=>{
+   const x=left*sx,width=W-(left+right)*sx;
+   pdf.font(font).fontSize(size*scale).fillColor(color);
+   pdf.text(String(value||""),x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
+  };
+  pdf.image(image,0,0,{width:W,height:H});
+  // The uploaded master already includes both signatures, names and roles.
+  // Never redraw those elements: doing so duplicates the printed signatories.
+  center("Certificate ID: "+c.certificate_number,54,10,"#111111","Helvetica-Bold",170,170);
+  center("CERTIFICATE",83,52,"#213660","Times-Roman",100,100);
+  center("Of Internship",137,25,"#213660","Times-Roman",100,100);
+  center("We Present This Certificate To",171,13,"#213660","Helvetica",110,110);
+  const name=String(c.student_name||"").trim();
+  const available=W-130*sx;
+  let nameSize=34*scale;
+  pdf.font("Times-Italic");
+  while(nameSize>18*scale&&pdf.widthOfString(name,{font:"Times-Italic",size:nameSize})>available)nameSize-=1*scale;
+  pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,202*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
+  const project=String(c.project_title||"Internship Project").trim().toUpperCase();
+  center("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",257,10,"#233a68","Helvetica",115,115);
+  center(project,274,11,"#233a68","Helvetica-Bold",115,115);
+  center("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",292,9,"#233a68","Helvetica",110,110);
+  center("DURING THE PERIOD FROM "+date(c.start_date)+" TO "+date(c.end_date),307,10,"#233a68","Helvetica-Bold",110,110);
+  res.setHeader("Content-Type","application/pdf");
+  res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${c.certificate_number}.pdf"`);
+  pdf.pipe(res);pdf.end();
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
 export default r;
