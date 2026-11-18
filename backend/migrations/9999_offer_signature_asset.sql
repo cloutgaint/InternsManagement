@@ -1,7 +1,7 @@
 -- Extend existing report asset rules without changing stamp/mentor semantics.
 ALTER TABLE report_brand_assets
  DROP CONSTRAINT IF EXISTS report_brand_assets_mime_type_check,
- DROP CONSTRAINT IF EXISTS report_brand_assets_check;
+    DROP CONSTRAINT IF EXISTS report_brand_assets_check;
 
 ALTER TABLE report_brand_assets
  ADD CONSTRAINT report_brand_assets_mime_type_check CHECK (
