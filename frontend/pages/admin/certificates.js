@@ -1,2 +1,2 @@
-import CertificatesPage from "@/app/admin/certificates/page";
-export default CertificatesPage;
+import AdminCertificatesPage from "@/modules/certificates/AdminCertificatesPage";
+export default AdminCertificatesPage;
