@@ -363,7 +363,7 @@ export default function AdminQuestionsPage() {
         regenerateGenerated={regenerateGenerated}
         removeGenerated={removeGenerated}
         domainName={domainName}
-      />
+      />}
       {workspace==="manual" && <AdminQuestionEditor
         editId={editId}
         reset={reset}
@@ -376,7 +376,7 @@ export default function AdminQuestionsPage() {
         domains={domains}
         editingAiDraft={editingAiDraft}
         busy={busy}
-      />
+      />}
       {workspace==="library" && <section className="card workflow-section question-library">
         <div className="verification-title">
           <div>
