@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import Link from "next/link";
 export default function AdminCompletionPage() {
   const [rows, setRows] = useState([]),
     [msg, setMsg] = useState(""),
@@ -64,7 +65,7 @@ export default function AdminCompletionPage() {
   async function download(x){try{const b=await apiBlob("/admin/certificates/"+x.certificate_db_id+"/file"),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(x.certificate_id||"certificate")+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)}catch(e){setErr(e.message)}}
   return (
     <main className="wrap completion-page">
-      <div className="completion-page-heading"><div><span className="completion-page-eyebrow">Internship management</span><h1>Completion & Certificates</h1><p>Review internship outcomes, manage student exits and issue certificates.</p></div><span className="completion-page-count">{rows.length} students</span></div>
+      <div className="completion-page-heading"><div><span className="completion-page-eyebrow">Internship management</span><h1>Completion & Certificates</h1><p>Review internship outcomes, manage student exits and issue certificates.</p></div><span className="completion-page-count">{rows.length} students</span></div><section className="card completion-certificate-entry"><div><h2>Official internship certificates</h2><p>Upload the certificate PDF template, create and edit certificate drafts, preview the layout and issue certificates to eligible interns.</p></div><Link href="/admin/certificates" className="btn completion-certificate-link">Manage certificates</Link></section>
       {dialog&&<div className="completion-dialog-overlay" role="presentation" onMouseDown={(e)=>{if(e.target===e.currentTarget)closeDialog();}}>
         <section className="completion-dialog" role="dialog" aria-modal="true" aria-labelledby="completion-dialog-title" aria-describedby="completion-dialog-description" onKeyDown={(e)=>{if(e.key==="Escape"){e.preventDefault();closeDialog();}}}>
           <div className="completion-dialog-header"><span className="completion-dialog-brand">GAINT SkillBridge</span><button type="button" className="completion-dialog-close" onClick={closeDialog} disabled={dialogBusy} aria-label="Close dialog">×</button></div>
@@ -121,7 +122,7 @@ export default function AdminCompletionPage() {
         </section>
       ))}
       <style jsx global>{`
-        .completion-page{max-width:1200px;margin-inline:auto;padding-bottom:70px}
+        .completion-page{max-width:1200px;margin-inline:auto;padding-bottom:70px}.completion-certificate-entry{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 26px;margin-bottom:24px;border:1px solid #cbdff1;border-radius:18px;background:#f7fbff}.completion-certificate-entry h2{font-size:19px;color:#111827;margin:0 0 6px}.completion-certificate-entry p{color:#475569;margin:0;line-height:1.5}.completion-certificate-link{background:#0868b1!important;color:#fff!important;white-space:nowrap;text-decoration:none;border-radius:10px;padding:12px 18px}.completion-certificate-link:hover{background:#07558f!important}@media(max-width:640px){.completion-certificate-entry{flex-direction:column;align-items:stretch}.completion-certificate-link{text-align:center}}
         .completion-page-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:26px 0 28px}
         .completion-page-eyebrow{display:block;font-size:14px;font-weight:600;color:#08734d;margin-bottom:9px}
         .completion-page-heading h1{font-size:clamp(29px,3vw,38px);line-height:1.2;letter-spacing:-.025em;font-weight:650;margin:0 0 10px;color:#142e24}
