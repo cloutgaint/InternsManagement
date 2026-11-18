@@ -1,3 +1,4 @@
+import { sendOfferPdf } from "../../services/offerLetterPdfService.js";
 import taskPlans from "../shared/task-plans.routes.js";
 import { claimInternsForGroup } from "../../services/groupMembership.js";
 import { mentorHasInternInGroup, mentorOwnsIntern } from "../../services/mentorScope.js";
@@ -1013,6 +1014,11 @@ r.post("/offer-letters", async (req, res) => {
   );
   await audit(req, "OFFER_DRAFTED", "offer_letter", x.id, null, x);
   res.status(201).json(x);
+});
+r.get("/offer-letters/:id/pdf", async (req, res) => {
+  const offer = (await q("SELECT ol.*,olt.body template_body,olt.signatory FROM offer_letters ol LEFT JOIN offer_letter_templates olt ON olt.id=ol.template_id WHERE ol.id=$1", [req.params.id])).rows[0];
+  if (!offer) return res.status(404).json({ error: "Offer letter not found" });
+  await sendOfferPdf(res, offer, { disposition: "inline" });
 });
 r.get("/offer-letters/:id/preview", async (req, res) => {
   const x = (
