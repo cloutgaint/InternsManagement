@@ -5,6 +5,7 @@ const label=s=>String(s||"").replaceAll("_"," ");
 const date=s=>s?String(s).slice(0,10):"—";
 export default function CollegeCoordinatorDashboard(){
   const router=useRouter();
+  const [page,setPage]=useState(1),[pageSize,setPageSize]=useState(10);
   const [data,setData]=useState(null),[err,setErr]=useState(""),[loading,setLoading]=useState(true),[tab,setTab]=useState("overview"),[batch,setBatch]=useState(""),[search,setSearch]=useState(""),[status,setStatus]=useState("ALL");
   useEffect(()=>{
     if(sessionStorage.getItem("role")!=="COLLEGE_COORDINATOR"){router.replace("/login?role=college");return;}
@@ -14,28 +15,29 @@ export default function CollegeCoordinatorDashboard(){
   },[router]);
   const batches=data?.batches||[],all=data?.interns||[];
   const filtered=useMemo(()=>all.filter(i=>(!batch||i.batch_id===batch)&&(!status||status==="ALL"||i.status===status)&&(!search||[i.full_name,i.roll_number,i.batch_name].some(v=>String(v||"").toLowerCase().includes(search.toLowerCase())))),[all,batch,search,status]);
+  const pages=Math.max(1,Math.ceil(filtered.length/pageSize)),currentPage=Math.min(page,pages),visible=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize);
   const active=all.filter(i=>i.status==="ACTIVE").length,unallocated=all.filter(i=>!i.batch_id).length,awaiting=all.filter(i=>i.status!=="ACTIVE").length;
-  const selectBatch=id=>{setBatch(id);setTab("interns");};
+  const selectBatch=id=>{setBatch(id);setTab("interns");setPage(1);};
   return <main className="wrap cc-page">
-    <header className="cc-header"><div><p className="cc-eyebrow">COLLEGE WORKSPACE</p><h1>College Coordinator</h1><p className="muted">{data?.college?.college_name||"College internship monitoring"}</p></div><span className="cc-viewonly">View-only access</span></header>
+    <header className="cc-header"><div><p className="cc-eyebrow">College workspace</p><h1>College coordinator</h1><p className="muted">{data?.college?.college_name||"College internship monitoring"}</p></div><span className="cc-viewonly">View-only access</span></header>
     {err&&<p className="error" role="alert">{err}</p>}
     {loading?<section className="card cc-panel">Loading your college dashboard…</section>:data&&<>
       <nav className="cc-tabs" aria-label="College dashboard sections">
-        {[["overview","Overview"],["batches","Semester Batches"],["interns","College Interns"]].map(([key,title])=><button key={key} type="button" className={tab===key?"cc-tab selected":"cc-tab"} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{title}{key==="batches"&&<span>{batches.length}</span>}{key==="interns"&&<span>{all.length}</span>}</button>)}
+        {[["overview","Overview"],["batches","Semester batches"],["interns","College interns"]].map(([key,title])=><button key={key} type="button" className={tab===key?"cc-tab selected":"cc-tab"} onClick={()=>{setTab(key);setPage(1);}} aria-current={tab===key?"page":undefined}>{title}{key==="batches"&&<span>{batches.length}</span>}{key==="interns"&&<span>{all.length}</span>}</button>)}
       </nav>
       {tab==="overview"&&<div className="cc-stack">
         <section className="cc-stats" aria-label="College statistics">
-          {[["Total Interns",all.length,"All registered students"],["Active Interns",active,"Active accounts"],["Semester Batches",batches.length,"Created for your college"],["Not Allocated",unallocated,"Awaiting batch allocation"]].map(([name,value,hint])=><article className="cc-stat" key={name}><p>{name}</p><strong>{value}</strong><small>{hint}</small></article>)}
+          {[["Total interns",all.length,"All registered students"],["Active interns",active,"Active accounts"],["Semester Batches",batches.length,"Created for your college"],["Not allocated",unallocated,"Awaiting batch allocation"]].map(([name,value,hint])=><article className="cc-stat" key={name}><p>{name}</p><strong>{value}</strong><small>{hint}</small></article>)}
         </section>
         <div className="cc-two">
           <section className="card cc-panel"><div className="cc-section-head"><div><h2>Semester Batches</h2><p>Manage your view by academic intake</p></div><button className="cc-link" onClick={()=>setTab("batches")}>View all</button></div>{batches.length?batches.slice(0,4).map(b=><button key={b.id} className="cc-line cc-click" onClick={()=>selectBatch(b.id)}><span><b>{b.name}</b><small>{b.semester||"Semester not set"} · {b.code}</small></span><span className="cc-count">{b.intern_count} interns</span></button>):<div className="cc-empty">No semester batches created yet. GAINT Admin can create batches and allocate students.</div>}</section>
-          <section className="card cc-panel"><div className="cc-section-head"><div><h2>Student Status</h2><p>Registration and allocation summary</p></div></div><div className="cc-line"><span>Active accounts</span><strong>{active}</strong></div><div className="cc-line"><span>Other registration statuses</span><strong>{awaiting}</strong></div><div className="cc-line"><span>Not allocated to a batch</span><strong>{unallocated}</strong></div><button className="cc-primary" onClick={()=>{setBatch("");setStatus("ALL");setTab("interns");}}>View all interns</button></section>
+          <section className="card cc-panel"><div className="cc-section-head"><div><h2>Student status</h2><p>Registration and allocation summary</p></div></div><div className="cc-line"><span>Active accounts</span><strong>{active}</strong></div><div className="cc-line"><span>Other registration statuses</span><strong>{awaiting}</strong></div><div className="cc-line"><span>Not allocated to a batch</span><strong>{unallocated}</strong></div><button className="cc-primary" onClick={()=>{setBatch("");setStatus("ALL");setTab("interns");}}>View all interns</button></section>
         </div>
       </div>}
       {tab==="batches"&&<section className="card cc-panel"><div className="cc-section-head"><div><h2>Semester Batches</h2><p>Each semester and intake is listed separately.</p></div><span className="cc-muted-count">{batches.length} batches</span></div>{batches.length?<div className="cc-batch-grid">{batches.map(b=><article key={b.id} className="cc-batch"><div className="cc-batch-top"><span className="cc-chip">{b.semester||"Semester not set"}</span><span className="cc-count">{b.intern_count} interns</span></div><h3>{b.name}</h3><p>{b.code}</p><small>{date(b.start_date)} – {date(b.end_date)}</small><button className="cc-secondary" onClick={()=>selectBatch(b.id)}>View batch interns</button></article>)}</div>:<div className="cc-empty">No batches have been created for this college. Contact GAINT Admin to add semester batches.</div>}</section>}
       {tab==="interns"&&<section className="card cc-panel"><div className="cc-section-head"><div><h2>College Interns</h2><p>Students registered under your college</p></div><span className="cc-muted-count">{filtered.length} of {all.length} interns</span></div>
-        <div className="cc-filters"><input aria-label="Search interns" className="input" placeholder="Search name, roll number or batch" value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filter by batch" className="input" value={batch} onChange={e=>setBatch(e.target.value)}><option value="">All batches</option>{batches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.semester||"—"}</option>)}</select><select aria-label="Filter by status" className="input" value={status} onChange={e=>setStatus(e.target.value)}><option value="ALL">All statuses</option>{[...new Set(all.map(i=>i.status).filter(Boolean))].map(s=><option key={s} value={s}>{label(s)}</option>)}</select></div>
-        {filtered.length?<div className="cc-table-wrap"><table className="cc-table"><thead><tr><th>Student</th><th>Roll Number</th><th>Semester</th><th>Batch</th><th>Status</th></tr></thead><tbody>{filtered.map(i=><tr key={i.id}><td><strong>{i.full_name}</strong></td><td>{i.roll_number||"—"}</td><td>{i.year_semester||"—"}</td><td>{i.batch_name||"Not allotted"}</td><td><span className={i.status==="ACTIVE"?"cc-status active":"cc-status"}>{label(i.status)}</span></td></tr>)}</tbody></table></div>:<div className="cc-empty">No interns match these filters.</div>}
+        <div className="cc-filters"><input aria-label="Search interns" className="input" placeholder="Search name, roll number or batch" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/><select aria-label="Filter by batch" className="input" value={batch} onChange={e=>{setBatch(e.target.value);setPage(1);}}><option value="">All batches</option>{batches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.semester||"—"}</option>)}</select><select aria-label="Filter by status" className="input" value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="ALL">All statuses</option>{[...new Set(all.map(i=>i.status).filter(Boolean))].map(s=><option key={s} value={s}>{label(s)}</option>)}</select></div>
+        {filtered.length?<div className="cc-table-wrap"><table className="cc-table"><thead><tr><th>Student</th><th>Roll number</th><th>Semester</th><th>Batch</th><th>Status</th></tr></thead><tbody>{visible.map(i=><tr key={i.id}><td><strong>{i.full_name}</strong></td><td>{i.roll_number||"—"}</td><td>{i.year_semester||"—"}</td><td>{i.batch_name||"Not allotted"}</td><td><span className={i.status==="ACTIVE"?"cc-status active":"cc-status"}>{label(i.status)}</span></td></tr>)}</tbody></table></div>:<div className="cc-empty">No interns match these filters.</div>}\n        {filtered.length>0&&<div className="cc-pagination"><span>Showing {(currentPage-1)*pageSize+1}–{Math.min(currentPage*pageSize,filtered.length)} of {filtered.length}</span><div className="cc-page-actions"><label htmlFor="cc-page-size">Rows per page</label><select id="cc-page-size" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1);}}>{[5,10,20].map(n=><option key={n} value={n}>{n}</option>)}</select><button disabled={currentPage===1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</button><span>Page {currentPage} of {pages}</span><button disabled={currentPage===pages} onClick={()=>setPage(p=>Math.min(pages,p+1))}>Next</button></div></div>}
       </section>}
     </>}
     <style jsx>{`
@@ -70,6 +72,35 @@ export default function CollegeCoordinatorDashboard(){
       .cc-status.active{background:#e5f4eb;color:#14683e}.cc-empty{text-align:center;padding:35px 16px;color:#7b897f;font-size:13px;background:#f8faf8;border-radius:10px}
       @media(max-width:900px){.cc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-two{grid-template-columns:1fr}.cc-batch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
       @media(max-width:600px){.cc-page{padding-top:18px}.cc-header{align-items:flex-start}.cc-header h1{font-size:24px}.cc-viewonly{font-size:10px}.cc-stats,.cc-batch-grid{grid-template-columns:1fr 1fr}.cc-stat{padding:14px}.cc-stat strong{font-size:26px}.cc-panel{padding:16px}.cc-filters{grid-template-columns:1fr}.cc-batch-grid{grid-template-columns:1fr}}
+
+      .cc-page{max-width:1200px;padding:32px 24px 64px;color:#111827}
+      .cc-header{margin-bottom:24px}.cc-header h1{font-size:32px;font-weight:800;color:#111827}
+      .cc-header .muted{color:#344054;font-size:15px}.cc-eyebrow{text-transform:none;letter-spacing:.3px;color:#047857}
+      .cc-tabs{gap:8px;padding:5px;background:#eef3f1;border:1px solid #e2eae7;border-radius:999px;width:max-content;max-width:100%;margin-bottom:24px}
+      .cc-tab{border:0;border-radius:999px;padding:11px 18px;color:#344054;transition:background .2s,box-shadow .2s}
+      .cc-tab.selected{background:#fff;color:#075b38;box-shadow:0 2px 9px #102a2014;border:0}
+      .cc-stat{border-radius:20px;min-height:145px;box-shadow:0 8px 24px #1b453008}
+      .cc-stat:nth-child(1){background:#eef5ff}.cc-stat:nth-child(2){background:#edf9f2}.cc-stat:nth-child(3){background:#f3f0ff}.cc-stat:nth-child(4){background:#fff6ea}
+      .cc-stat p,.cc-stat strong,.cc-stat small{color:#111827}.cc-stat strong{font-size:34px}
+      .cc-panel{border-radius:20px;padding:24px;box-shadow:0 8px 30px #1b453008}
+      .cc-section-head h2{font-size:21px;color:#111827}.cc-section-head p{color:#475467}
+      .cc-batch-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+      .cc-batch{border-radius:16px;background:#fbfdfc;padding:20px;gap:8px;min-height:210px}
+      .cc-batch h3{margin:12px 0 0;color:#111827}.cc-batch p{margin:0}.cc-batch small{font-size:13px}
+      .cc-primary,.cc-secondary{border-radius:999px;padding:12px 20px;transition:transform .15s,box-shadow .15s}
+      .cc-primary{background:linear-gradient(105deg,#8247ff,#5b8bff);box-shadow:0 5px 14px #7057ff30}
+      .cc-secondary{background:#eaf2ff;color:#174ea6}.cc-primary:hover,.cc-secondary:hover{transform:translateY(-1px);box-shadow:0 5px 14px #102a2020}
+      .cc-batch .cc-secondary{transform:none;margin-top:auto}.cc-link{color:#075b38}
+      .cc-filters{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:12px}
+      .cc-filters .input,.cc-page-actions select{height:46px;border:1px solid #377dff;border-radius:10px;background:white;color:#111827;padding:0 12px;font-size:13px}
+      .cc-filters .input:focus,.cc-page-actions select:focus{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb}
+      .cc-table{font-size:14px}.cc-table th{background:#f4f7fb;color:#344054}.cc-table td{color:#111827}.cc-table tr:hover td{background:#f8fbff}
+      .cc-status{border-radius:999px}.cc-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:18px;font-size:13px;color:#344054}
+      .cc-page-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.cc-page-actions label{white-space:nowrap}.cc-page-actions select{height:38px}
+      .cc-page-actions button{border:1px solid #dce4ee;background:#f5f7ff;color:#111827;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}
+      .cc-page-actions button:disabled{opacity:.45;cursor:not-allowed}
+      .cc-tab:focus-visible,.cc-primary:focus-visible,.cc-secondary:focus-visible,.cc-link:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+      @media(max-width:600px){.cc-page{padding:18px 14px 40px}.cc-header h1{font-size:25px}.cc-header{flex-wrap:wrap}.cc-tabs{width:100%;border-radius:14px;overflow-x:auto}.cc-tab{padding:10px 12px;font-size:12px}.cc-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.cc-stat{min-height:120px;padding:14px}.cc-stat strong{font-size:27px}.cc-filters{grid-template-columns:1fr}.cc-page-actions{width:100%;justify-content:flex-start}.cc-table{min-width:660px}}
     `}</style>
   </main>;
 }
