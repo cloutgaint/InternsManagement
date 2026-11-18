@@ -1198,12 +1198,11 @@ r.post("/offer-letters/:id/reissue", async (req, res) => {
       [old.allocation_id],
     )
   ).rows[0];
-  const from = req.body.fromDate || current.intern_start,
-    to = req.body.toDate || current.intern_end;
-  if (to < from)
-    return res
-      .status(400)
-      .json({ error: "Offer To date cannot be before From date" });
+  if(!current)return res.status(409).json({error:"The original internship allocation no longer exists"});
+  const dateOnly=value=>value instanceof Date?value.toISOString().slice(0,10):String(value||"").slice(0,10);
+  const from=dateOnly(req.body.fromDate||current.intern_start),to=dateOnly(req.body.toDate||current.intern_end);
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(from)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(to)||to<from)
+    return res.status(400).json({error:"Valid offer dates are required and the end date cannot precede the start date"});
   const version = (
     await q(
       "SELECT COALESCE(max(version),0)+1 v FROM offer_letter_versions WHERE offer_letter_id=$1",
@@ -1224,7 +1223,7 @@ r.post("/offer-letters/:id/reissue", async (req, res) => {
       ],
     )
   ).rows[0];
-  // Preserve the last issued content as the starting point for this revision.
+  // Preserve the previously issued wording as the starting point for the new draft.
   if(old.issued_snapshot?.rendered_body)await q("UPDATE offer_letters SET draft_body=$2,draft_signatory=$3 WHERE id=$1",[old.id,old.issued_snapshot.rendered_body,old.issued_snapshot.signatory||"Authorized Signatory"]);
   await q(
     "INSERT INTO offer_letter_versions(offer_letter_id,version,snapshot,reason) VALUES($1,$2,$3,$4)",
