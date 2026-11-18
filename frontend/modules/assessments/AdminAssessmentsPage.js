@@ -533,7 +533,7 @@ export default function AdminAssessmentsPage() {
       .admin-assessments-page .assessment-results-table .btn{min-height:38px;padding:8px 13px}
       .admin-assessments-page .assessment-results-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:17px;color:#374151;font-size:12px}
       .admin-assessments-page .assessment-results-pagination{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-      .admin-assessments-page .assessment-results-pagination label{display:flex;align-items:center;gap:7px}
+      .admin-assessments-page .assessment-results-pagination label{display:inline-flex;flex-direction:row;align-items:center;gap:7px;white-space:nowrap;flex:0 0 auto;min-width:max-content}
       .admin-assessments-page .assessment-results-pagination select{width:auto;min-height:38px;margin:0;padding:7px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111}
       .admin-assessments-page .assessment-results-pagination .btn{min-height:38px;padding:8px 12px}
       .admin-assessments-page .assessment-results-empty{text-align:center;padding:48px 16px;border:1px dashed #cbd5e1;border-radius:12px;color:#111}
