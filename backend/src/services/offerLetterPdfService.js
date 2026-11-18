@@ -180,12 +180,14 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     .text(cleanBody, left, bodyTop, { width: textWidth, lineGap: 5, paragraphGap: 9, height: maxBodyHeight });
   const closingY = Math.max(bodyTop + bodyHeight + 23, height - 256);
   write(pdf, "With best wishes,", left, closingY, textWidth, 10);
+  // Keep the handwritten signature and circular stamp visually balanced.
+  // PDFKit's fit option preserves each uploaded image's aspect ratio.
   if (signature) {
-    try { pdf.image(signature.image_data, left-4, closingY+16, { fit: [192, 70] }); }
-    catch { /* Invalid image must not break the issued document. */ }
+    try { pdf.image(signature.image_data, left, closingY+27, { fit: [142, 46], align: "left", valign: "center" }); }
+    catch { /* Invalid historic signature must not prevent offer download. */ }
   }
   if (stamp) {
-    try { pdf.image(stamp.image_data, left+196, closingY+22, { fit: [94, 88] }); }
+    try { pdf.image(stamp.image_data, left+214, closingY+15, { fit: [78, 78], align: "center", valign: "center" }); }
     catch { /* Invalid historic stamp must not prevent offer download. */ }
   }
   write(pdf, signatory, left, closingY+103, textWidth, 10, true, { height: 24, ellipsis: true });
