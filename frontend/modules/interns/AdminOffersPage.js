@@ -29,7 +29,16 @@ export default function AdminOffersPage() {
     [signatureFile,setSignatureFile]=useState(null),
     [signatureBusy,setSignatureBusy]=useState(false),
     [signatureMessage,setSignatureMessage]=useState(""),
-    [signatureError,setSignatureError]=useState("");
+    [signatureError,setSignatureError]=useState(""),
+    [watermark,setWatermark]=useState(null),
+    [watermarkFile,setWatermarkFile]=useState(null),
+    [watermarkBusy,setWatermarkBusy]=useState(false),
+    [watermarkError,setWatermarkError]=useState(""),
+    [watermarkMessage,setWatermarkMessage]=useState("");
+  const loadWatermark=()=>api("/report-assets/offer-watermark").then(x=>setWatermark(x.asset)).catch(e=>setWatermarkError(e.message));
+  async function uploadWatermark(){if(!watermarkFile)return;setWatermarkBusy(true);setWatermarkError("");setWatermarkMessage("");try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(new Error("Unable to read watermark"));reader.readAsDataURL(watermarkFile)});await api("/report-assets/offer-watermark",{method:"PUT",body:JSON.stringify({mimeType:watermarkFile.type,data})});setWatermarkMessage("Globe watermark saved. View offer PDF to check its appearance.");setWatermarkFile(null);await loadWatermark()}catch(e){setWatermarkError(e.message)}finally{setWatermarkBusy(false)}}
+  async function viewWatermark(){try{const blob=await apiBlob("/report-assets/offer-watermark/file");const url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setWatermarkError(e.message)}}
+  async function removeWatermark(){setWatermarkBusy(true);setWatermarkError("");try{await api("/report-assets/offer-watermark",{method:"DELETE"});setWatermarkMessage("Globe watermark removed.");await loadWatermark()}catch(e){setWatermarkError(e.message)}finally{setWatermarkBusy(false)}}
   const loadSignature=()=>api("/report-assets/offer-signature").then(x=>setSignature(x.asset)).catch(e=>setSignatureError(e.message));
   async function uploadSignature(){if(!signatureFile)return;setSignatureBusy(true);setSignatureError("");setSignatureMessage("");try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(new Error("Unable to read signature image"));reader.readAsDataURL(signatureFile)});await api("/report-assets/offer-signature",{method:"PUT",body:JSON.stringify({mimeType:signatureFile.type,data})});setSignatureMessage("Offer signature saved successfully.");setSignatureFile(null);await loadSignature()}catch(e){setSignatureError(e.message)}finally{setSignatureBusy(false)}}
   async function viewSignature(){try{const blob=await apiBlob("/report-assets/offer-signature/file");const url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setSignatureError(e.message)}}
@@ -54,6 +63,7 @@ export default function AdminOffersPage() {
     load();
     loadLetterhead();
     loadSignature();
+    loadWatermark();
   }, []);
   async function createTemplate(e) {setFeedbackArea("createTemplate");
     e.preventDefault();
@@ -151,6 +161,14 @@ export default function AdminOffersPage() {
         </span>
       </div>
       <section className="card letterhead-settings"><h2>Official offer letter template</h2><p className="muted">Upload the approved GAINT letterhead with its original globe watermark, gold borders and footer. PDF is recommended; DOCX, PNG and JPG are also supported (maximum 4 MB).</p><p className="muted">Uploading replaces the current master letterhead for newly generated offer PDFs. Preview an issued offer below to verify the layout before downloading.</p>{letterhead&&<p className="muted">Uploaded letterhead: {letterhead.original_filename || ({ "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"Company letterhead.docx","application/pdf":"Company letterhead.pdf","image/png":"Company letterhead.png","image/jpeg":"Company letterhead.jpg" }[letterhead.mime_type] || "Company letterhead")} · Updated {new Date(letterhead.updated_at).toLocaleString()}</p>}<div className="form-field"><label htmlFor="offer-letterhead-file">Choose letterhead</label><input id="offer-letterhead-file" className="input letterhead-file-input" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;setLetterheadError(file&&file.size>4*1024*1024?"File must be 4 MB or smaller.":"");setLetterheadFile(file&&file.size<=4*1024*1024?file:null)}} /></div><div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!letterheadFile||letterheadBusy} onClick={uploadLetterhead}>Upload letterhead</button>{letterhead&&<><button className="btn secondary" type="button" onClick={previewLetterhead}>View file</button><button className="btn danger" type="button" disabled={letterheadBusy} onClick={removeLetterhead}>Remove</button></>}</div>{letterheadError&&<p className="error" role="alert">{letterheadError}</p>}{letterheadMessage&&<p className="success" role="status">{letterheadMessage}</p>}</section>
+      <section className="card letterhead-settings">
+        <h2>Globe watermark settings</h2>
+        <p className="muted">Upload the original GAINT globe artwork separately from the letterhead. A transparent PNG is recommended. Maximum 2 MB.</p>
+        {watermark&&<p className="muted">Globe watermark uploaded · Updated {new Date(watermark.updated_at).toLocaleString()}</p>}
+        <div className="form-field"><label htmlFor="offer-watermark-file">Choose globe watermark image</label><input id="offer-watermark-file" className="input letterhead-file-input" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;const valid=file&&["image/png","image/jpeg"].includes(file.type)&&file.size<=2*1024*1024;setWatermarkError(file&&!valid?"Select PNG or JPG up to 2 MB.":"");setWatermarkFile(valid?file:null)}}/></div>
+        <div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!watermarkFile||watermarkBusy} onClick={uploadWatermark}>Upload watermark</button>{watermark&&<><button className="btn secondary" type="button" onClick={viewWatermark}>View watermark</button><button className="btn danger" type="button" disabled={watermarkBusy} onClick={removeWatermark}>Remove</button></>}</div>
+        {watermarkError&&<p className="error" role="alert">{watermarkError}</p>}{watermarkMessage&&<p className="success" role="status">{watermarkMessage}</p>}
+      </section>
       <section className="card letterhead-settings">
         <h2>Offer letter signature</h2>
         <p className="muted">Upload the authorized company signatory's signature. It appears above the signatory name in the official offer PDF, beside the company stamp.</p>
