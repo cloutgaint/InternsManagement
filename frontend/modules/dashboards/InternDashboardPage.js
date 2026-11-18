@@ -2,6 +2,7 @@
 import ProofStatusCard from "@/modules/interns/ProofStatusCard";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import {JourneyTimeline,NextActionCard,ProgressRing,EmptyState,Skeleton,AchievementCard,MentorCard} from "@/shared/intern/JourneyComponents";
 
 const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 
@@ -90,7 +91,7 @@ export default function InternDashboardPage() {
   if (!data)
     return (
       <main className={s.page}>
-        <p>Loading dashboard…</p>
+        <Skeleton/>
       </main>
     );
   const p = data.profile || {},
@@ -214,6 +215,10 @@ export default function InternDashboardPage() {
           <h3 className={s.summaryValue}>{(data.tasks || []).length}</h3>
         </div>
       </div>
+      <div className="mb-5"><NextActionCard title={!a?"Awaiting internship allocation":!f||f.status!=="APPROVED"?"Complete face registration":!o?"Await your offer letter":(data.tasks||[]).length?"Review your released tasks":"Track your internship progress"} description={!a?"Your administrator will assign your approved batch and internship dates.":!f||f.status!=="APPROVED"?"Submit your face registration for approval before using attendance.":!o?"Your administrator will issue the official offer letter.":(data.tasks||[]).length?"Your assigned weekly tasks are available for review.":"Check attendance, mentor feedback and your completion status."} href={!a?null:!f||f.status!=="APPROVED"?"/intern/face-enrollment":!o?null:(data.tasks||[]).length?"/intern/tasks":"/intern/attendance"} action={!f||f.status!=="APPROVED"?"Open face registration":(data.tasks||[]).length?"View tasks":"Open attendance"}/></div>
+      <section className={s.card+" mb-5"}><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="m-0 text-lg font-bold text-[#0f172a]">Your internship journey</h2><span className="text-xs font-medium text-[#64748b]">Progress follows approved internship records</span></div><JourneyTimeline steps={[{label:"Registration",done:true},{label:"Verification",done:!!a},{label:"Allocation",done:!!a},{label:"Internship",done:!!a&&!!a.intern_start},{label:"Final review",done:!!completion?.evaluation},{label:"Certificate",done:["ISSUED","REISSUED"].includes(completion?.certificate?.status)}]}/></section>
+      <div className="mb-5 grid gap-4 md:grid-cols-2"><section className={s.card}><h2 className="mb-4 mt-0 text-lg font-bold text-[#0f172a]">Attendance overview</h2><ProgressRing value={present} total={(data.attendance||[]).length} label="Recorded attendance"/><p className="mt-3 text-xs text-[#64748b]">This shows recorded present days, not official attendance eligibility. A valid full day requires the configured 7-hour rule.</p><a className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-[#2563eb]" href="/intern/attendance">View attendance</a></section><section className={s.card}><h2 className="mb-4 mt-0 text-lg font-bold text-[#0f172a]">Internship identity</h2><div className={s.row}><span>Batch</span><b>{a?.batch_name||"Not allocated"}</b></div><div className={s.row}><span>Domain</span><b>{a?.domain_name||"Not assigned"}</b></div><div className={s.row}><span>Project</span><b>{group?.project_title||"Not assigned"}</b></div><div className="mt-4"><MentorCard names={group?.mentors?.map(x=>x.full_name).filter(Boolean).join(", ")}/></div></section></div>
+      <div className="mb-5 grid gap-4 md:grid-cols-2"><section className={s.card}><h2 className="mt-0 text-lg font-bold text-[#0f172a]">Learning and work</h2><div className={s.row}><span>Released tasks</span><b>{(data.tasks||[]).length}</b></div><div className={s.row}><span>Assessments available</span><b>{assessments.length}</b></div><div className={s.row}><span>Fortnight reviews</span><b>{reviews.length}</b></div><p className="mt-4 text-sm text-[#64748b]">Task deadlines are displayed only when provided by the application.</p><div className="flex flex-wrap gap-3"><a className={s.btnSmall} href="/intern/tasks">Open tasks</a><a className={s.btnSmall} href="/intern/assessments">Open assessments</a></div></section><AchievementCard status={displayStatus(completion?.certificate?.status||"Not issued")}/></div>
       <nav className={s.tabs} aria-label="Intern dashboard sections">{[["overview","Overview"],["onboarding","Onboarding"],["work","Daily Work"],["learning","Tasks & Assessments"],["team","Team & Project"],["reviews","Fortnight Reviews"],["completion","Completion"]].map(([key,label])=><button key={key} type="button" className={s.tab + " " + (tab === key ? s.tabActive : s.tabIdle)} onClick={()=>setTab(key)} aria-current={tab===key?"page":undefined}>{label}</button>)}</nav>
       <div className={s.sections}>
         <section className={pane("onboarding")}>
