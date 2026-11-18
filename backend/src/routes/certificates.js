@@ -48,7 +48,7 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
   pdf.image(image,0,0,{width:W,height:H});
   // The uploaded master already includes both signatures, names and roles.
   // Never redraw those elements: doing so duplicates the printed signatories.
-  center("Certificate ID: "+c.certificate_number,54,10,"#111111","Helvetica-Bold",170,170);
+  center("Certificate ID: "+c.certificate_number,69,10,"#111111","Helvetica-Bold",170,170);
   center("CERTIFICATE",83,52,"#213660","Times-Roman",100,100);
   center("Of Internship",137,25,"#213660","Times-Roman",100,100);
   center("We Present This Certificate To",171,13,"#213660","Helvetica",110,110);
@@ -57,7 +57,7 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
   let nameSize=34*scale;
   pdf.font("Times-Italic");
   while(nameSize>18*scale){pdf.fontSize(nameSize);if(pdf.widthOfString(name)<=available)break;nameSize-=1*scale;}
-  pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,202*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
+  pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,225*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
   // The horizontal divider is printed at about y=320 on the original
   // 862.5 x 605.25 pt template. All description lines belong below it.
   // Fixed, independent rows prevent a long title from shifting dates into
@@ -71,11 +71,11 @@ r.get("/:id/pdf",certificate,async(req,res)=>{
    pdf.fillColor("#233a68").fontSize(size).text(content,x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
   };
   const project=String(c.project_title||"Internship Project").trim().toUpperCase();
-  fitRow("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",341,10,8);
-  fitRow(project,357,11,7.5,true);
-  fitRow("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",375,9.5,8);
-  fitRow("DURING THE PERIOD FROM",391,9.5,8);
-  fitRow(date(c.start_date)+" TO "+date(c.end_date),407,10,8,true);
+  fitRow("THIS IS TO CERTIFY THAT THE INTERNSHIP PROJECT ENTITLED",355,10,8);
+  fitRow(project,371,11,7.5,true);
+  fitRow("WAS CARRIED OUT AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",389,9.5,8);
+  fitRow("DURING THE PERIOD FROM",405,9.5,8);
+  fitRow(date(c.start_date)+" TO "+date(c.end_date),421,10,8,true);
   res.setHeader("Content-Type","application/pdf");
   res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${c.certificate_number}.pdf"`);
   pdf.pipe(res);pdf.end();
