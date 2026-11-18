@@ -1,60 +1,26 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/shared/api/client";
 export default function InternNotificationsPage() {
-  const [n, setN] = useState([]),
-    [err, setErr] = useState("");
-  const load = () =>
-    api("/intern/notifications")
-      .then(setN)
-      .catch((e) => setErr(e.message));
-  useEffect(() => {
-    load();
-  }, []);
-  async function read(x) {
-    if (!x.read_at)
-      await api("/intern/notifications/" + x.id + "/read", {
-        method: "POST",
-        body: "{}",
-      });
-    if (x.action_url) location.href = x.action_url;
-    else load();
-  }
-  async function all() {
-    await api("/intern/notifications/read-all", { method: "POST", body: "{}" });
-    load();
-  }
-  return (
-    <main className="wrap">
-      <div className="intern-head">
-        <div>
-          <h1>Notifications</h1>
-          <p className="muted">
-            {n.filter((x) => !x.read_at).length} unread notification(s)
-          </p>
-        </div>
-        <button className="btn secondary" onClick={all}>
-          Mark All Read
-        </button>
-      </div>
-      {err && <p className="error">{err}</p>}
-      <section className="card notification-center">
-        {n.map((x) => (
-          <button
-            key={x.id}
-            className={"notification-row " + (!x.read_at ? "unread" : "")}
-            onClick={() => read(x)}
-          >
-            <span>
-              <b>{x.title}</b>
-              <p>{x.body}</p>
-              <small>{new Date(x.created_at).toLocaleString()}</small>
-            </span>
-            <span className="status-pill">{x.read_at ? "Read" : "New"}</span>
-          </button>
-        ))}
-        {!n.length && <p className="muted">No notifications yet.</p>}
-      </section>
-    </main>
-  );
+  const [n,setN]=useState([]),[err,setErr]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[filter,setFilter]=useState("all"),[search,setSearch]=useState(""),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(5);
+  const load=async()=>{setErr("");try{const data=await api("/intern/notifications");setN(Array.isArray(data)?data:[]);}catch(e){setErr(e.message||"Unable to load notifications.");}finally{setLoading(false);}};
+  useEffect(()=>{load();},[]);
+  const unread=n.filter(x=>!x.read_at).length;
+  const filtered=useMemo(()=>n.filter(x=>(filter==="all"||(filter==="unread"?!x.read_at:!!x.read_at))&&[x.title,x.body].join(" ").toLowerCase().includes(search.trim().toLowerCase())),[n,filter,search]);
+  const totalPages=Math.max(1,Math.ceil(filtered.length/pageSize)),currentPage=Math.min(page,totalPages),visible=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize);
+  const changeFilter=v=>{setFilter(v);setPage(1);};
+  async function read(x){setErr("");try{if(!x.read_at){await api("/intern/notifications/"+x.id+"/read",{method:"POST",body:"{}"});setN(old=>old.map(y=>y.id===x.id?{...y,read_at:new Date().toISOString()}:y));}if(x.action_url)location.href=x.action_url;}catch(e){setErr(e.message||"Unable to open notification.");}}
+  async function all(){setBusy(true);setErr("");try{await api("/intern/notifications/read-all",{method:"POST",body:"{}"});await load();}catch(e){setErr(e.message||"Unable to mark notifications as read.");}finally{setBusy(false);}}
+  return <main className="wrap intern-notifications">
+    <header className="in-head"><div><p className="in-eyebrow">Intern workspace</p><h1>Notifications</h1><p>Review your updates and internship reminders in one place.</p></div><div className="in-head-actions"><span className="in-count">{unread} unread</span><button type="button" className="in-primary" onClick={all} disabled={!unread||busy}>{busy?"Updating…":"Mark all as read"}</button></div></header>
+    <section className="in-panel" aria-label="Notification inbox">
+      <div className="in-toolbar"><div className="in-tabs" role="group" aria-label="Filter notifications">{[["all","All",n.length],["unread","Unread",unread],["read","Read",n.length-unread]].map(([key,label,count])=><button key={key} type="button" className={filter===key?"active":""} onClick={()=>changeFilter(key)} aria-pressed={filter===key}>{label} <span>{count}</span></button>)}</div><label className="in-search"><span>Search notifications</span><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Search title or message"/></label></div>
+      {err&&<p role="alert" className="in-error">{err} <button type="button" onClick={load}>Try again</button></p>}
+      {loading?<p className="in-empty">Loading notifications…</p>:visible.length?<div className="in-list">{visible.map(x=><button key={x.id} type="button" className={"in-item "+(!x.read_at?"unread":"")} onClick={()=>read(x)}><span className="in-dot" aria-hidden="true"/><span className="in-item-content"><strong>{x.title}</strong><span>{x.body}</span><small>{x.created_at?new Date(x.created_at).toLocaleString():""}</small></span><span className={"in-status "+(!x.read_at?"new":"")}>{x.read_at?"Read":"Unread"}</span></button>)}</div>:<div className="in-empty"><strong>{n.length?"No matching notifications":"You're all caught up"}</strong><p>{n.length?"Try another search or status filter.":"New updates will appear here when available."}</p></div>}
+      {!loading&&filtered.length>0&&<footer className="in-pagination"><span>Showing {(currentPage-1)*pageSize+1}–{Math.min(currentPage*pageSize,filtered.length)} of {filtered.length}</span><div className="in-page-controls"><label htmlFor="intern-notifications-size">Rows per page</label><select id="intern-notifications-size" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1);}}>{[5,10,20].map(v=><option key={v} value={v}>{v}</option>)}</select><button type="button" disabled={currentPage===1} onClick={()=>setPage(v=>Math.max(1,v-1))}>Previous</button><span>Page {currentPage} of {totalPages}</span><button type="button" disabled={currentPage===totalPages} onClick={()=>setPage(v=>Math.min(totalPages,v+1))}>Next</button></div></footer>}
+    </section>
+    <style jsx>{`
+      .intern-notifications{max-width:1160px;padding-top:32px;padding-bottom:56px;color:#111827}.in-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.in-eyebrow{color:#047857;font-size:12px;font-weight:700;margin:0 0 6px}.in-head h1{font-size:32px;letter-spacing:-.7px;margin:0 0 8px;color:#111827}.in-head p:not(.in-eyebrow){margin:0;color:#475467}.in-head-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.in-count{background:#e8f5ee;border-radius:999px;color:#075b38;font-size:13px;font-weight:700;padding:10px 14px}.in-primary{border:0;border-radius:999px;background:linear-gradient(110deg,#8747ff,#5b8cff);color:white;padding:13px 20px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px #7859ff30}.in-primary:disabled{opacity:.5;cursor:not-allowed}.in-panel{background:#fff;border:1px solid #dce7e2;border-radius:20px;padding:24px;box-shadow:0 8px 30px #163e2910}.in-toolbar{display:flex;justify-content:space-between;align-items:end;gap:18px;flex-wrap:wrap;margin-bottom:20px}.in-tabs{display:flex;gap:5px;padding:5px;background:#f0f4f2;border-radius:999px}.in-tabs button{border:0;background:transparent;border-radius:999px;padding:10px 15px;font-weight:700;color:#344054;cursor:pointer}.in-tabs button.active{background:white;color:#065f46;box-shadow:0 2px 8px #112a2014}.in-tabs button span{font-size:11px;margin-left:4px}.in-search{display:flex;flex-direction:column;gap:7px;min-width:270px;flex:1;max-width:420px;font-size:13px;font-weight:700;color:#111827}.in-search input,.in-page-controls select{height:44px;border:1px solid #377dff;border-radius:10px;padding:0 13px;background:#fff;color:#111827}.in-search input:focus,.in-page-controls select:focus{outline:2px solid #2563eb;outline-offset:1px}.in-list{display:grid;gap:10px}.in-item{display:flex;align-items:flex-start;text-align:left;gap:14px;width:100%;padding:18px;border:1px solid #e3e9ee;border-radius:15px;background:#fff;color:#111827;cursor:pointer}.in-item.unread{background:#f5f9ff;border-color:#d9e7ff}.in-item:hover{border-color:#83adff;box-shadow:0 4px 14px #204a8a10}.in-dot{width:9px;height:9px;border-radius:50%;background:#cbd5e1;margin-top:6px;flex:none}.in-item.unread .in-dot{background:#3478f6}.in-item-content{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}.in-item-content strong{font-size:15px;color:#111827}.in-item-content>span{font-size:14px;color:#344054;overflow-wrap:anywhere}.in-item-content small{font-size:12px;color:#667085}.in-status{border-radius:999px;background:#eef1f4;color:#475467;padding:6px 10px;font-size:12px;font-weight:700}.in-status.new{background:#e5efff;color:#174ea6}.in-empty{text-align:center;padding:48px 16px;color:#475467}.in-empty strong{color:#111827}.in-error{background:#fff0f0;color:#9f1239;border-radius:10px;padding:12px}.in-error button{margin-left:10px;text-decoration:underline;border:0;background:none;color:inherit;cursor:pointer}.in-pagination{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid #e5eaf0;font-size:13px;color:#344054}.in-page-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.in-page-controls select{height:38px}.in-page-controls button{border:1px solid #e0e7f3;border-radius:999px;background:#f2f5ff;color:#111827;padding:10px 15px;font-weight:700;cursor:pointer}.in-page-controls button:disabled{opacity:.45;cursor:not-allowed}.in-item:focus-visible,.in-tabs button:focus-visible,.in-primary:focus-visible,.in-page-controls button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}@media(max-width:640px){.intern-notifications{padding:20px 14px 40px}.in-head{align-items:flex-start;flex-direction:column}.in-head h1{font-size:26px}.in-panel{padding:15px}.in-tabs{width:100%;justify-content:space-between}.in-tabs button{padding:9px 11px}.in-search{min-width:100%;max-width:none}.in-item{padding:14px;gap:9px}.in-status{font-size:11px}.in-pagination{align-items:flex-start}.in-page-controls{width:100%}}
+    `}</style>
+  </main>;
 }
