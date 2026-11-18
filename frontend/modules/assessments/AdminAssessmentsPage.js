@@ -44,7 +44,12 @@ export default function AdminAssessmentsPage() {
     [feedbackArea,setFeedbackArea]=useState("create"),
     [sectionErrors, setSectionErrors] = useState({}),
     [busy, setBusy] = useState(false),
-    [activeView, setActiveView] = useState("create");
+    [activeView, setActiveView] = useState("create"),
+    [resultSearch, setResultSearch] = useState(""),
+    [resultAssessment, setResultAssessment] = useState(""),
+    [resultStatus, setResultStatus] = useState(""),
+    [resultPage, setResultPage] = useState(1),
+    [resultPageSize, setResultPageSize] = useState(10);
   const load = () =>
     Promise.all([
       api("/admin/batches"),
@@ -176,6 +181,15 @@ export default function AdminAssessmentsPage() {
       setErr(e.message);
     }
   }
+  const resultAssessments = [...new Set(subs.map(x => x.assessment_name).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  const filteredResults = subs.filter(x =>
+    (!resultSearch || [x.full_name, x.assessment_name].some(v => String(v || "").toLowerCase().includes(resultSearch.trim().toLowerCase()))) &&
+    (!resultAssessment || x.assessment_name === resultAssessment) &&
+    (!resultStatus || x.status === resultStatus)
+  );
+  const resultPageCount = Math.max(1, Math.ceil(filteredResults.length / resultPageSize));
+  const currentResultPage = Math.min(resultPage, resultPageCount);
+  const visibleResults = filteredResults.slice((currentResultPage - 1) * resultPageSize, currentResultPage * resultPageSize);
   return (
     <main className="wrap admin-assessments-page">
       <div className="intern-head">
@@ -424,32 +438,28 @@ export default function AdminAssessmentsPage() {
           <div className="action-row"><button type="button" className="btn" disabled={busy} onClick={()=>decideRetry(request,"APPROVED")}>Approve Retry</button><button type="button" className="btn secondary" disabled={busy} onClick={()=>decideRetry(request,"REJECTED")}>Reject</button></div>
         </div>) : <p className="muted">No pending retry requests.</p>}
       </section>}
-      {activeView==="results" && <section className="card workflow-section">
-        <h2>Intern Assessment Results & Evaluation</h2>{feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
-        {subs.length ? (
-          subs.map((x) => (
-            <div className="workflow-row" key={x.attempt_id}>
-              <div>
-                <b>{x.full_name}</b>
-                <div className="muted">
-                  {x.assessment_name} · Score {x.result_snapshot?.earned ?? x.total_score ?? 0}{x.result_snapshot?.possible != null && <>/{x.result_snapshot.possible} ({x.result_snapshot.percentage}%)</>} · {x.status}{formatTimeTaken(x.started_at, x.submitted_at) && <> · Time taken: {formatTimeTaken(x.started_at, x.submitted_at)}</>}
-                  {x.result_snapshot?.sectionResults?.length > 0 && <div className="section-results" style={{display:"flex",flexWrap:"wrap",gap:12,marginTop:8}}>{x.result_snapshot.sectionResults.map(s=><span key={s.sectionId}><b>{s.name}</b>: {s.earned}/{s.possible} ({s.percentage}%) {s.totalQuestions!=null && <>· Correct {s.correct} · Wrong {s.wrong} · Unanswered {s.unanswered}</>}</span>)}</div>}
-                  {x.result_snapshot?.domainRecommendation && <div style={{marginTop:6}}><b>Suggested domain: {x.result_snapshot.domainRecommendation==="ADMIN_REVIEW"?"Balanced performance — Admin review":x.result_snapshot.domainRecommendation+" Development"}</b><span className="muted"> · Recommendation only; Admin confirms allocation</span></div>}
-                </div>
-              </div>
-              <div className="action-row">
-                <span className="status-pill">{x.pending_manual} pending</span>
-                <button className="btn secondary" onClick={() => openReview(x)}>
-                  Review
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="muted">No submissions yet.</p>
-        )}
+      {activeView==="results" && <section className="card workflow-section assessment-results">
+        <div className="assessment-results-heading"><div><h2>Intern Assessment Results & Evaluation</h2><p className="muted">Search and review intern submissions. Select Review for section scores and domain recommendations.</p></div><span className="badge">{subs.length} submissions</span></div>
+        {feedbackArea==="score"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        <div className="assessment-results-filters">
+          <label>Search intern or assessment<input className="input" type="search" placeholder="Search by name or assessment" value={resultSearch} onChange={e=>{setResultSearch(e.target.value);setResultPage(1);}}/></label>
+          <label>Assessment<select className="input" value={resultAssessment} onChange={e=>{setResultAssessment(e.target.value);setResultPage(1);}}><option value="">All assessments</option>{resultAssessments.map(name=><option key={name} value={name}>{name}</option>)}</select></label>
+          <label>Status<select className="input" value={resultStatus} onChange={e=>{setResultStatus(e.target.value);setResultPage(1);}}><option value="">All statuses</option>{[...new Set(subs.map(x=>x.status).filter(Boolean))].sort().map(status=><option key={status} value={status}>{status.replaceAll("_"," ")}</option>)}</select></label>
+          <button type="button" className="btn secondary" onClick={()=>{setResultSearch("");setResultAssessment("");setResultStatus("");setResultPage(1);}}>Clear filters</button>
+        </div>
+        {filteredResults.length ? <>
+          <div className="assessment-results-scroll"><table className="assessment-results-table"><thead><tr><th scope="col">Intern</th><th scope="col">Assessment</th><th scope="col">Score</th><th scope="col">Time taken</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead><tbody>{visibleResults.map(x=><tr key={x.attempt_id}>
+            <td><strong>{x.full_name || "Unknown intern"}</strong></td><td>{x.assessment_name || "—"}</td>
+            <td><strong>{x.result_snapshot?.earned ?? x.total_score ?? 0}{x.result_snapshot?.possible != null ? "/"+x.result_snapshot.possible : ""}</strong>{x.result_snapshot?.percentage != null && <small>{x.result_snapshot.percentage}%</small>}</td>
+            <td>{formatTimeTaken(x.started_at,x.submitted_at)||"—"}</td><td><span className="status-pill">{String(x.status||"Unknown").replaceAll("_"," ")}</span>{Number(x.pending_manual)>0&&<small>{x.pending_manual} pending</small>}</td>
+            <td><button type="button" className="btn secondary" onClick={()=>openReview(x)}>Review</button></td>
+          </tr>)}</tbody></table></div>
+          <div className="assessment-results-footer"><span>Showing {(currentResultPage-1)*resultPageSize+1}–{Math.min(currentResultPage*resultPageSize,filteredResults.length)} of {filteredResults.length} results</span>
+            <div className="assessment-results-pagination"><label>Rows per page <select value={resultPageSize} onChange={e=>{setResultPageSize(Number(e.target.value));setResultPage(1);}}>{[5,10,20,50].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
+            <button type="button" className="btn secondary" disabled={currentResultPage===1} onClick={()=>setResultPage(p=>Math.max(1,p-1))}>Previous</button><span>Page {currentResultPage} of {resultPageCount}</span><button type="button" className="btn secondary" disabled={currentResultPage===resultPageCount} onClick={()=>setResultPage(p=>Math.min(resultPageCount,p+1))}>Next</button></div></div>
+        </> : <div className="assessment-results-empty"><strong>{subs.length?"No matching results":"No submissions yet"}</strong><p>{subs.length?"Try a different search or clear the filters.":"Intern assessment submissions will appear here."}</p></div>}
       </section>}
-      {review && (
+            {review && (
         <div className="modal-backdrop" onMouseDown={() => setReview(null)}>
           <section
             className="modal-card assessment-review"
@@ -506,6 +516,30 @@ export default function AdminAssessmentsPage() {
       .admin-assessments-page nav[aria-label="Assessment workspace"] button:hover{border-color:#065f46!important;box-shadow:0 6px 18px #065f4618}
       .admin-assessments-page nav[aria-label="Assessment workspace"] button[aria-current="page"]{background:#ecfdf5!important}
       @media(max-width:600px){.admin-assessments-page .action-row .btn{flex:1}}
+
+      .admin-assessments-page .assessment-results-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}
+      .admin-assessments-page .assessment-results-heading h2{margin:0 0 6px;font-size:21px;color:#111}
+      .admin-assessments-page .assessment-results-heading p{margin:0;font-size:13px;line-height:1.5}
+      .admin-assessments-page .assessment-results-filters{display:grid;grid-template-columns:minmax(190px,1.6fr) minmax(155px,1fr) minmax(140px,.8fr) auto;gap:12px;align-items:end;margin-bottom:18px}
+      .admin-assessments-page .assessment-results-filters label{display:grid;gap:7px;font-size:12px;font-weight:650;color:#111;min-width:0}
+      .admin-assessments-page .assessment-results-filters .input{margin:0;min-height:44px;color:#111;border:1.5px solid #93b4ed;border-radius:9px}
+      .admin-assessments-page .assessment-results-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px}
+      .admin-assessments-page .assessment-results-table{width:100%;border-collapse:collapse;text-align:left;min-width:690px;font-size:13px;color:#111}
+      .admin-assessments-page .assessment-results-table th{padding:13px 15px;background:#f8faf9;font-size:12px;font-weight:700;color:#374151;border-bottom:1px solid #e2e8f0}
+      .admin-assessments-page .assessment-results-table td{padding:13px 15px;border-bottom:1px solid #edf0f2;vertical-align:middle}
+      .admin-assessments-page .assessment-results-table tr:last-child td{border-bottom:0}
+      .admin-assessments-page .assessment-results-table tbody tr:hover{background:#f8fbf9}
+      .admin-assessments-page .assessment-results-table td small{display:block;margin-top:4px;color:#525252;font-size:11px}
+      .admin-assessments-page .assessment-results-table .btn{min-height:38px;padding:8px 13px}
+      .admin-assessments-page .assessment-results-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:17px;color:#374151;font-size:12px}
+      .admin-assessments-page .assessment-results-pagination{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .admin-assessments-page .assessment-results-pagination label{display:flex;align-items:center;gap:7px}
+      .admin-assessments-page .assessment-results-pagination select{width:auto;min-height:38px;margin:0;padding:7px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111}
+      .admin-assessments-page .assessment-results-pagination .btn{min-height:38px;padding:8px 12px}
+      .admin-assessments-page .assessment-results-empty{text-align:center;padding:48px 16px;border:1px dashed #cbd5e1;border-radius:12px;color:#111}
+      .admin-assessments-page .assessment-results-empty p{font-size:13px;color:#525252}
+      @media(max-width:900px){.admin-assessments-page .assessment-results-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-assessments-page .assessment-results-footer{align-items:flex-start;flex-direction:column}}
+      @media(max-width:540px){.admin-assessments-page .assessment-results-filters{grid-template-columns:1fr}.admin-assessments-page .assessment-results-heading{flex-direction:column}.admin-assessments-page .assessment-results-pagination{gap:7px}}
       `}</style>
     </main>
   );
