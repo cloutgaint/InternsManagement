@@ -339,3 +339,14 @@
 .page-back-bar button.page-back-button:hover,.page-back-bar a.page-back-button:hover,.page-back-button:hover{background:#064e3b!important;border-color:#064e3b!important;color:#fff!important}
 .page-back-button svg,.page-back-button svg *{color:#fff!important;stroke:currentColor}
 .page-back-button>span:first-child,.page-back-button .back-icon{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#fff!important}
+
+/* Unified pill-shaped action system inspired by the approved gradient reference. */
+:root{--gaint-action-gradient:linear-gradient(125deg,#9149f7 0%,#6e5bf7 48%,#5c9cf8 100%);--gaint-action-shadow:0 5px 15px rgba(100,84,238,.22)}
+button.btn,a.btn,.page-back-button,.page-back-bar .page-back-button{border-radius:999px!important;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .16s ease,box-shadow .16s ease,background .16s ease}
+button.btn:not(.secondary):not(.danger):not(.report-asset-remove):not(:disabled),a.btn:not(.secondary):not(.danger),.page-back-button,.page-back-bar .page-back-button{background:var(--gaint-action-gradient)!important;background-image:var(--gaint-action-gradient)!important;border:1px solid transparent!important;color:#fff!important;box-shadow:var(--gaint-action-shadow)!important}
+button.btn:not(.secondary):not(.danger):not(:disabled):hover,a.btn:not(.secondary):not(.danger):hover,.page-back-button:hover,.page-back-bar .page-back-button:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 19px rgba(100,84,238,.30)!important;color:#fff!important}
+button.btn.secondary,a.btn.secondary{border-radius:999px!important;background:#edf0fb!important;color:#242a47!important;border:1px solid #dce2f7!important}
+button.btn.secondary:hover:not(:disabled),a.btn.secondary:hover{background:#e0e5fa!important;color:#161d3a!important}
+button.btn.danger,button.btn.report-asset-remove{border-radius:999px!important;background:#b42332!important;color:#fff!important}
+button.btn:focus-visible,a.btn:focus-visible,.page-back-button:focus-visible{outline:3px solid #6e5bf7!important;outline-offset:3px}
+button.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
