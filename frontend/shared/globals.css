@@ -333,3 +333,9 @@
 .page-back-bar .page-back-button{min-height:44px;border:1px solid #065f46;background:#065f46;color:#fff;border-radius:11px;padding:10px 16px;box-shadow:0 4px 12px #065f4626;transition:background .15s,border-color .15s,box-shadow .15s}
 .page-back-bar .page-back-button:hover{background:#064e3b;border-color:#064e3b;color:#fff;box-shadow:0 6px 16px #065f4633}
 .page-back-bar .page-back-button:focus-visible{outline:3px solid #86efac;outline-offset:3px}
+
+/* Canonical back navigation: override legacy blue inline utility classes. */
+.page-back-bar button.page-back-button,.page-back-bar a.page-back-button,.page-back-button{background:#065f46!important;background-image:none!important;border:1px solid #065f46!important;border-radius:11px!important;color:#fff!important;min-height:44px;box-shadow:0 4px 12px rgba(6,95,70,.15)!important}
+.page-back-bar button.page-back-button:hover,.page-back-bar a.page-back-button:hover,.page-back-button:hover{background:#064e3b!important;border-color:#064e3b!important;color:#fff!important}
+.page-back-button svg,.page-back-button svg *{color:#fff!important;stroke:currentColor}
+.page-back-button>span:first-child,.page-back-button .back-icon{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#fff!important}
