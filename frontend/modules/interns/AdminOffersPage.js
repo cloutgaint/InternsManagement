@@ -17,6 +17,9 @@ export default function AdminOffersPage() {
     [editMessage,setEditMessage]=useState(""),
     [revisionReason,setRevisionReason]=useState(""),
     [revisionReasonOpen,setRevisionReasonOpen]=useState(false),
+    [reasonDialog,setReasonDialog]=useState(null),
+    [reasonValue,setReasonValue]=useState(""),
+    [reasonError,setReasonError]=useState(""),
     [tpl, setTpl] = useState({
       name: "GAINT Internship Offer Letter",
       signatory: "Authorized Signatory, GAINT Clout Technologies",
@@ -138,9 +141,7 @@ export default function AdminOffersPage() {
   async function action(l, type) {setFeedbackArea("action");
     let body = {};
     if (type === "reissue" || type === "revoke") {
-      const reason = prompt("Reason is required:");
-      if (!reason) return;
-      body = { reason };
+      setReasonDialog({offer:l,type});setReasonValue("");setReasonError("");return;
     }
     if (type === "issue") {
       if (!issueAt) return setErr("Declare the issue date and time before issuing.");
@@ -161,6 +162,7 @@ export default function AdminOffersPage() {
       setBusy(false);
     }
   }
+  async function submitReasonAction(){if(!reasonDialog)return;const reason=reasonValue.trim();if(!reason){setReasonError("Please enter a reason.");return;}if(reason.length>500){setReasonError("Reason must be 500 characters or fewer.");return;}const {offer,type}=reasonDialog;setBusy(true);setReasonError("");setFeedbackArea("action");try{await api("/admin/offer-letters/"+offer.id+"/"+type,{method:"POST",body:JSON.stringify({reason})});setReasonDialog(null);setReasonValue("");setMsg(type==="reissue"?"Reissue draft created. Preview the letter and edit its content before approval.":"Offer letter revoked.");setPreview(null);await load()}catch(e){setReasonError(e.message)}finally{setBusy(false)}}
   return (
     <main className="wrap admin-offers-page">
       <div className="intern-head">
@@ -338,6 +340,7 @@ export default function AdminOffersPage() {
             );
           })}
       </section>
+      {reasonDialog&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setReasonDialog(null)}}><section className="modal-card offer-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="offer-reason-title" onMouseDown={e=>e.stopPropagation()}><div className="verification-title"><div><span className="eyebrow">GAINT SkillBridge</span><h2 id="offer-reason-title">{reasonDialog.type==="revoke"?"Revoke offer letter":"Create reissue draft"}</h2></div><button type="button" className="btn secondary" disabled={busy} aria-label="Close" onClick={()=>setReasonDialog(null)}>Close</button></div><p className="muted">Reference: {reasonDialog.offer.reference_number}</p><p className="muted">{reasonDialog.type==="revoke"?"This will revoke the issued offer letter. The reason will be recorded in its audit history.":"This will create an editable draft for reissue. The reason will be recorded in its audit history."}</p><div className="offer-edit-fields"><label htmlFor="offer-action-reason">Reason <span aria-hidden="true">*</span></label><textarea id="offer-action-reason" className="input" rows={3} maxLength={500} placeholder="Enter a clear reason" value={reasonValue} onChange={e=>{setReasonValue(e.target.value);setReasonError("");}}/></div>{reasonError&&<p className="error" role="alert">{reasonError}</p>}<div className="action-row"><button type="button" className={reasonDialog.type==="revoke"?"btn danger":"btn"} disabled={busy||!reasonValue.trim()} onClick={submitReasonAction}>{busy?"Processing...":reasonDialog.type==="revoke"?"Confirm revocation":"Continue"}</button><button type="button" className="btn secondary" disabled={busy} onClick={()=>setReasonDialog(null)}>Cancel</button></div></section></div>}
       {preview && (
         <div className="modal-backdrop" onMouseDown={() => setPreview(null)}>
           <section
