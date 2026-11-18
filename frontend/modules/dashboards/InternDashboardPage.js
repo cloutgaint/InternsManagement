@@ -2,7 +2,7 @@
 import ProofStatusCard from "@/modules/interns/ProofStatusCard";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
-import {JourneyTimeline,NextActionCard,ProgressRing,EmptyState,Skeleton,AchievementCard,MentorCard} from "@/shared/intern/JourneyComponents";
+import {JourneyTimeline,NextActionCard,ProgressRing,Skeleton,AchievementCard,MentorCard} from "@/shared/intern/JourneyComponents";
 
 const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 
