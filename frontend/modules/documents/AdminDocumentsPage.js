@@ -24,7 +24,7 @@ export default function AdminDocumentsPage() {
     if (file) body.append("file", file);
     run(async () => { await api("/admin/documents", { method: "POST", body }); setF(blank); setFile(null); e.target.reset(); await load(); }, "Document published.");
   }
-  const remove = (d) => { if (window.confirm("Remove \"" + d.title + "\"? Users will lose access.")) run(async () => { await api("/admin/documents/" + d.id, { method: "DELETE" }); await load(); }, "Document removed."); };
+  const remove = (d) => run(async () => { await api("/admin/documents/" + d.id, { method: "DELETE" }); await load(); setConfirmTarget(null); }, "Document removed.");
   const download = (d) => run(async () => {
     const u = URL.createObjectURL(await apiBlob("/admin/documents/" + d.id + "/file")), a = document.createElement("a");
     a.href = u; a.download = d.original_name || d.title; a.click(); setTimeout(() => URL.revokeObjectURL(u), 10000);
