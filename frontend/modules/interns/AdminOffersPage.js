@@ -9,6 +9,12 @@ export default function AdminOffersPage() {
     [selected, setSelected] = useState(null),
     [pdfPreview,setPdfPreview]=useState(null),
     [preview, setPreview] = useState(null),
+    [editingOffer,setEditingOffer]=useState(false),
+    [editBody,setEditBody]=useState(""),
+    [editSignatory,setEditSignatory]=useState(""),
+    [editBusy,setEditBusy]=useState(false),
+    [editError,setEditError]=useState(""),
+    [editMessage,setEditMessage]=useState(""),
     [tpl, setTpl] = useState({
       name: "GAINT Internship Offer Letter",
       signatory: "Authorized Signatory, GAINT Clout Technologies",
@@ -110,7 +116,11 @@ export default function AdminOffersPage() {
   function downloadPdf(){if(!pdfPreview)return;const a=document.createElement("a");a.href=pdfPreview.url;a.download="GAINT-Offer-"+pdfPreview.reference.replace(/[^a-zA-Z0-9_-]/g,"")+".pdf";document.body.appendChild(a);a.click();a.remove()}
   async function show(l) {
     try {
-      setPreview(await api("/admin/offer-letters/" + l.id + "/preview"));
+      const detail=await api("/admin/offer-letters/" + l.id + "/preview");
+      setPreview(detail);
+      setEditBody(detail.rendered_body||"");
+      setEditSignatory(detail.signatory||"");
+      setEditingOffer(false);setEditError("");setEditMessage("");
       setSelected(l);
       if (l.status === "DRAFT") {
         await api("/admin/offer-letters/" + l.id + "/mark-previewed", { method: "POST", body: "{}" });
@@ -120,6 +130,8 @@ export default function AdminOffersPage() {
       setErr(e.message);
     }
   }
+  async function saveOfferContent(){if(!preview)return;setEditBusy(true);setEditError("");setEditMessage("");try{await api("/admin/offer-letters/"+preview.id+"/content",{method:"PUT",body:JSON.stringify({body:editBody,signatory:editSignatory})});const detail=await api("/admin/offer-letters/"+preview.id+"/preview");setPreview(detail);setSelected(detail);setEditingOffer(false);setEditMessage("Changes saved. Review the updated PDF and approve the revised letter.");await load()}catch(e){setEditError(e.message)}finally{setEditBusy(false)}}
+  async function startOfferRevision(){if(!preview)return;const reason=window.prompt("Reason for reissuing this offer letter:");if(!reason?.trim())return;setEditBusy(true);setEditError("");try{await api("/admin/offer-letters/"+preview.id+"/reissue",{method:"POST",body:JSON.stringify({reason:reason.trim()})});const detail=await api("/admin/offer-letters/"+preview.id+"/preview");setPreview(detail);setSelected(detail);setEditBody(detail.rendered_body||"");setEditSignatory(detail.signatory||"");setEditingOffer(true);setEditMessage("Revision draft created. The previous issued version remains in version history.");await load()}catch(e){setEditError(e.message)}finally{setEditBusy(false)}}
   async function action(l, type) {setFeedbackArea("action");
     let body = {};
     if (type === "reissue" || type === "revoke") {
@@ -342,14 +354,11 @@ export default function AdminOffersPage() {
               <b>{preview.reference_number}</b>
               <span>Status: {preview.status}</span>
             </div>
-            <div className="letter-body">{preview.rendered_body}</div>
-            {preview.signatory && (
-              <p className="offer-sign">
-                <b>{preview.signatory}</b>
-              </p>
-            )}
+            {editingOffer?<div className="offer-edit-fields"><label htmlFor="offer-edit-body">Offer letter content</label><textarea id="offer-edit-body" className="input" rows={12} maxLength={6000} value={editBody} onChange={e=>setEditBody(e.target.value)}/><label htmlFor="offer-edit-signatory">Authorized signatory</label><input id="offer-edit-signatory" className="input" maxLength={200} value={editSignatory} onChange={e=>setEditSignatory(e.target.value)}/><p className="muted">Saving returns this offer to Draft. Preview and approve it again before issue.</p></div>:<><div className="letter-body">{preview.rendered_body}</div>{preview.signatory&&<p className="offer-sign"><b>{preview.signatory}</b></p>}</>}
+            {editError&&<p className="error" role="alert">{editError}</p>}{editMessage&&<p className="success" role="status">{editMessage}</p>}
             <div className="action-row">
-              {preview.status === "DRAFT" && (
+              {editingOffer?<><button className="btn" disabled={editBusy||!editBody.trim()||!editSignatory.trim()} onClick={saveOfferContent}>Save changes</button><button className="btn secondary" disabled={editBusy} onClick={()=>setEditingOffer(false)}>Cancel</button></>:<>{["DRAFT","PREVIEWED","APPROVED"].includes(preview.status)&&<button className="btn secondary" onClick={()=>setEditingOffer(true)}>Edit content</button>}{["ISSUED","REISSUED","REVOKED"].includes(preview.status)&&<button className="btn secondary" disabled={editBusy} onClick={startOfferRevision}>Create revision to edit</button>}</>}
+              {!editingOffer && preview.status === "DRAFT" && (
                 <button
                   className="btn"
                   onClick={() => action(preview, "approve")}
@@ -357,7 +366,7 @@ export default function AdminOffersPage() {
                   Approve Letter
                 </button>
               )}
-              {preview.status === "APPROVED" && (
+              {!editingOffer && preview.status === "APPROVED" && (
                 <button
                   className="btn"
                   onClick={() => action(preview, "issue")}
@@ -371,7 +380,7 @@ export default function AdminOffersPage() {
       )}
       {pdfPreview&&<div className="offer-pdf-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closePdf()}}><section className="offer-pdf-dialog" role="dialog" aria-modal="true" aria-label="Offer letter PDF preview"><header><div><h2>Offer letter preview</h2><p>{pdfPreview.name} · {pdfPreview.reference}</p></div><div className="action-row"><button type="button" className="btn secondary" onClick={downloadPdf}>Download PDF</button><button type="button" className="btn secondary" onClick={closePdf} aria-label="Close preview">Close</button></div></header><iframe src={pdfPreview.url+"#toolbar=0&navpanes=0&view=FitH"} title="Official GAINT offer letter PDF"/></section></div>}
       <style jsx global>{`.offer-pdf-overlay{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.75);display:flex;align-items:center;justify-content:center;padding:20px}.offer-pdf-dialog{display:flex;flex-direction:column;width:min(980px,100%);height:min(95vh,100%);background:white;border-radius:16px;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.3)}.offer-pdf-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid #e2e8f0}.offer-pdf-dialog h2{font-size:18px;color:#111;margin:0}.offer-pdf-dialog p{font-size:12px;color:#525252;margin:4px 0 0}.offer-pdf-dialog iframe{flex:1;width:100%;border:0;background:#525252}.offer-pdf-dialog .btn{min-height:38px;border-radius:9px;padding:8px 14px;background:#eff6ff;color:#111;border:1px solid #bfdbfe}@media(max-width:600px){.offer-pdf-overlay{padding:5px}.offer-pdf-dialog header{flex-wrap:wrap}}
-.admin-offers-page .letterhead-settings{display:flex;flex-direction:column;gap:12px}
+.admin-offers-page .offer-edit-fields{display:flex;flex-direction:column;gap:10px;margin:16px 0}.admin-offers-page .offer-edit-fields label{font-weight:650;color:#111}.admin-offers-page .offer-edit-fields textarea{min-height:230px;line-height:1.6;resize:vertical}.admin-offers-page .offer-edit-fields .input{border:1.5px solid #93b4ed;color:#111;background:#fff}.admin-offers-page .letterhead-settings{display:flex;flex-direction:column;gap:12px}
 .admin-offers-page .letterhead-settings h2{margin-bottom:0}
 .admin-offers-page .letterhead-settings p{margin:0;line-height:1.5}
 .admin-offers-page .letterhead-settings .form-field{margin:4px 0}
