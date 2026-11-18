@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import "@/shared/globals.css";
 import AdminShell from "@/shared/admin/AdminShell";
+import InternShell from "@/shared/intern/InternShell";
 import { useAppSession } from "@/shared/auth/useAppSession";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function App({ Component, pageProps }) {
     };
   }, [profileOpen]);
   const loggedIn = !!session.token;
+  const internShell = loggedIn && session.role === "INTERN" && (router.pathname === "/intern" || router.pathname.startsWith("/intern/"));
   const adminShell = loggedIn && ["ADMIN","SUPER_ADMIN"].includes(session.role) && (router.pathname === "/admin" || router.pathname.startsWith("/admin/"));
   const role = session.role || "";
   const home = role.includes("ADMIN")
@@ -103,7 +105,7 @@ export default function App({ Component, pageProps }) {
           content="GAINT SkillBridge — Connecting Education with Industry. Internship registration, assessments, projects, mentoring and progress tracking."
         />
       </Head>
-      {!adminShell && <header className="top glass-top">
+      {!adminShell && !internShell && <header className="top glass-top">
         <div className="glass-nav-shell">
           <Link
             href="/"
@@ -404,7 +406,7 @@ export default function App({ Component, pageProps }) {
           outline-offset: 2px;
         }
       `}</style>
-      {!adminShell && router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
+      {!adminShell && !internShell && router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
         <div className={"page-back-bar"+(router.pathname==="/login"?" login-back-bar":"")}>
           <div className="page-back-inner">
             <button
@@ -418,7 +420,7 @@ export default function App({ Component, pageProps }) {
           </div>
         </div>
       )}
-      {adminShell ? <AdminShell profile={profile} photo={photo} role={role} onLogout={logout}><Component {...pageProps} /></AdminShell> : <Component {...pageProps} />}
+      {adminShell ? <AdminShell profile={profile} photo={photo} role={role} onLogout={logout}><Component {...pageProps} /></AdminShell> : internShell ? <InternShell profile={profile} onLogout={logout}><Component {...pageProps} /></InternShell> : <Component {...pageProps} />}
     </>
   );
 }
