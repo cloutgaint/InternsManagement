@@ -53,6 +53,33 @@ function drawLetterhead(pdf, asset) {
   return true;
 }
 
+
+function formattedDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }).format(date);
+}
+
+function watermark(pdf) {
+  const cx = 307, cy = 419, nodes = [
+    [-108,-94],[-22,-138],[82,-112],[144,-28],[126,82],[38,135],[-78,115],[-150,25],
+    [-36,-32],[58,-36],[22,54],[-63,49]
+  ];
+  pdf.save().strokeColor("#e5e9e4").fillColor("#f1f5f2").lineWidth(0.8).opacity(0.42);
+  nodes.forEach(([x,y],i) => {
+    for (const j of [(i+1)%nodes.length,(i+4)%nodes.length]) {
+      pdf.moveTo(cx+x,cy+y).lineTo(cx+nodes[j][0],cy+nodes[j][1]).stroke();
+    }
+  });
+  nodes.forEach(([x,y],i) => pdf.circle(cx+x,cy+y,i<8?12:9).fill());
+  pdf.restore();
+}
+
+function write(pdf, value, x, y, width, fontSize = 10, bold = false, opts = {}) {
+  pdf.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize).fillColor("#171717");
+  pdf.text(String(value || ""), x, y, { width, lineBreak: false, ...opts });
+}
+
 export async function sendOfferPdf(res, offer, { disposition = "attachment" } = {}) {
   const values = {
     student_name: offer.student_name_snapshot, college: offer.college_snapshot,
@@ -63,30 +90,63 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   let body = offer.issued_snapshot?.rendered_body || offer.template_body || "";
   if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
-  const asset = (await q("SELECT mime_type,image_data FROM report_brand_assets WHERE asset_key='offer_letterhead' AND owner_user_id IS NULL")).rows[0];
+  const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp')")).rows;
+  const letterhead = assets.find(x => x.asset_key === "offer_letterhead");
+  const stamp = assets.find(x => x.asset_key === "company_stamp" && ["image/png","image/jpeg"].includes(x.mime_type));
   const pdf = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
   pdf.addPage({ size: "A4", margin: 0 });
-  const hasLetterhead = drawLetterhead(pdf, asset);
-  const top = hasLetterhead ? 151 : 60;
-  const bottom = hasLetterhead ? 140 : 60;
-  const contentHeight = pdf.page.height - top - bottom;
+  const { width, height } = pdf.page;
+  const branded = drawLetterhead(pdf, letterhead);
+  if (!branded) {
+    pdf.save().strokeColor("#ffc400").lineWidth(4).moveTo(width-20,0).lineTo(width-20,height).stroke();
+    pdf.moveTo(30,122).lineTo(width-20,122).stroke();
+    pdf.moveTo(30,height-112).lineTo(width-20,height-112).stroke();
+    pdf.restore();
+    write(pdf,"GAINT",62,48,260,31,true);
+    write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
+    write(pdf,"Gaint Clout Technologies Pvt Ltd | Hyderabad | info@gaintclout.com",54,height-73,width-108,8);
+  }
+  watermark(pdf);
+  const left = 66, right = width - 66, textWidth = right - left;
+  const top = 151;
+  pdf.font("Helvetica-Bold").fontSize(16).fillColor("#141414")
+    .text("Internship Offer Letter", left, top, { width: textWidth, align: "center", lineBreak: false });
+  pdf.save().strokeColor("#171717").lineWidth(0.7).moveTo(width/2-89,top+22).lineTo(width/2+89,top+22).stroke().restore();
+  write(pdf, "Date: " + formattedDate(offer.issue_at || offer.issued_at || offer.created_at), left, top+49, textWidth, 10);
+  write(pdf, "Reference: " + (offer.reference_number || "—"), left, top+68, textWidth, 9);
+  write(pdf, "Subject: Internship Offer Letter", left, top+96, textWidth, 10, true);
+  write(pdf, "Dear " + (values.student_name || "Intern") + ",", left, top+125, textWidth, 11, true);
+
+  // Keep the issued template's wording intact. The formal layout, not the approved
+  // offer terms, is what changes here.
+  const cleanBody = body.trim().replace(/^Dear[^\n]*,\s*/i, "").replace(/\n\s*Regards,?[\s\S]*$/i, "").trim();
+  const bodyTop = top + 158;
+  const bottomLimit = height - 202;
   const signatory = offer.issued_snapshot?.signatory || offer.signatory || "Authorized Signatory";
-  const title = "Internship Offer Letter";
-  const headerHeight = 65;
+  const maxBodyHeight = bottomLimit - bodyTop;
   let fontSize = 11;
-  const textWidth = pdf.page.width - 108;
-  while (fontSize > 8 && pdf.heightOfString(body, { width: textWidth, lineGap: 3, fontSize }) + headerHeight + 42 > contentHeight) fontSize -= 0.5;
-  if (pdf.heightOfString(body, { width: textWidth, lineGap: 3, fontSize }) + headerHeight + 42 > contentHeight)
-    throw Object.assign(new Error("Offer letter exceeds one A4 page; shorten the template"), { status: 422 });
+  let bodyHeight = 0;
+  for (; fontSize >= 8.5; fontSize -= 0.5) {
+    pdf.font("Helvetica").fontSize(fontSize);
+    bodyHeight = pdf.heightOfString(cleanBody, { width: textWidth, lineGap: 5, paragraphGap: 9 });
+    if (bodyHeight <= maxBodyHeight) break;
+  }
+  if (bodyHeight > maxBodyHeight) {
+    throw Object.assign(new Error("Offer text is too long for one A4 page; shorten the approved template."), { status: 422 });
+  }
+  pdf.font("Helvetica").fontSize(fontSize).fillColor("#171717")
+    .text(cleanBody, left, bodyTop, { width: textWidth, lineGap: 5, paragraphGap: 9, height: maxBodyHeight });
+  const closingY = Math.max(bodyTop + bodyHeight + 28, height - 234);
+  write(pdf, "With best wishes,", left, closingY, textWidth, 10);
+  if (stamp) {
+    try { pdf.image(stamp.image_data, left+100, closingY+21, { fit: [94, 78] }); }
+    catch { /* Invalid historic stamp must not prevent offer download. */ }
+  }
+  write(pdf, signatory, left, closingY+93, textWidth, 10, true, { height: 24, ellipsis: true });
+  write(pdf, "For Gaint Clout Technologies Pvt. Ltd.", left, closingY+110, textWidth, 9);
+  if (pdf.bufferedPageRange().count !== 1) throw new Error("Offer PDF pagination error");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", disposition + '; filename="GAINT-Internship-Offer.pdf"');
   pdf.pipe(res);
-  pdf.fillColor("#111111").font("Helvetica-Bold").fontSize(15).text(title, 54, top, { width: textWidth, align: "center" });
-  pdf.font("Helvetica").fontSize(9).text("Reference: " + offer.reference_number, 54, top + 36, { width: textWidth });
-  const bodyY = top + headerHeight;
-  pdf.fontSize(fontSize).text(body, 54, bodyY, { width: textWidth, lineGap: 3, height: contentHeight - headerHeight - 42 });
-  const signY = bodyY + pdf.heightOfString(body, { width: textWidth, lineGap: 3, fontSize }) + 18;
-  pdf.font("Helvetica-Bold").fontSize(10).text(signatory, 54, signY, { width: textWidth, height: 28, ellipsis: true });
-  if (pdf.bufferedPageRange().count !== 1) throw new Error("Offer PDF pagination error");
   pdf.end();
 }
