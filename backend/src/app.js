@@ -27,6 +27,7 @@ export function createApp() {
   );
   app.use("/api/report-assets/offer-letterhead", express.json({ limit: "6mb" }));
   app.use("/api/certificates/template", express.json({ limit: "11mb" }));
+  app.use("/api/certificates/font", express.json({ limit: "6mb" }));
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("combined"));
   // Only credential attempts count. Reads such as /auth/me run on every page view, and a whole
