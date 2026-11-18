@@ -8,7 +8,7 @@ export default function MentorOperationsPage() {
     [exceptions, setExceptions] = useState([]),
     [notes, setNotes] = useState({}),
     [msg, setMsg] = useState(""),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(5),[statusFilter,setStatusFilter]=useState("ALL");
   const load = () =>
     Promise.all([api("/mentor/operations"), api("/mentor/attendance-exceptions")])
       .then(([o, e]) => {
@@ -42,11 +42,15 @@ export default function MentorOperationsPage() {
     (x.full_name + " " + (x.group_name || ""))
       .toLowerCase()
       .includes(q.toLowerCase());
+  const sources={attendance:d.attendance||[],exceptions,leave:d.leave||[],reports:d.dailyReports||[],milestones:d.milestones||[]};
+  const records=sources[tab].filter(x=>(tab==="milestones"?(String(x.group_name||"")+" "+String(x.title||"")).toLowerCase().includes(q.toLowerCase()):match(x))&&(statusFilter==="ALL"||String(x.status||"").toUpperCase()===statusFilter));
+  const totalPages=Math.max(1,Math.ceil(records.length/pageSize));const currentPage=Math.min(page,totalPages);const visible=records.slice((currentPage-1)*pageSize,currentPage*pageSize);
+  const changeTab=x=>{setTab(x);setPage(1);setStatusFilter("ALL");};
   return (
-    <main className="wrap">
+    <main className="wrap mentor-ops">
       <div className="intern-head">
         <div>
-          <h1>Intern Operations</h1>
+          <h1>Intern operations</h1>
           <p className="muted">
             Attendance, leave, daily reporting and assigned-project milestones
             for your groups.
@@ -55,27 +59,23 @@ export default function MentorOperationsPage() {
       </div>
       {msg && <p className="success" role="status">{msg}</p>}
       {err && <p className="error" role="alert">{err}</p>}
-      <div className="tab-row">
+      <div className="ops-summary">{[["Attendance",(d.attendance||[]).length],["Exceptions",exceptions.length],["Leave",(d.leave||[]).length],["Daily reports",(d.dailyReports||[]).length],["Milestones",(d.milestones||[]).length]].map(([name,count])=><div key={name}><span>{name}</span><strong>{count}</strong></div>)}</div>
+      <div className="tab-row" role="tablist" aria-label="Intern operations sections">
         {["attendance", "exceptions", "leave", "reports", "milestones"].map((x) => (
           <button
             className={"btn " + (tab === x ? "" : "secondary")}
-            onClick={() => setTab(x)}
+            type="button" role="tab" aria-selected={tab===x} onClick={() => changeTab(x)}
             key={x}
           >
             {x[0].toUpperCase() + x.slice(1)}
           </button>
         ))}
       </div>
-      <input
-        className="input"
-        placeholder="Search intern or group"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="ops-toolbar"><label>Search records<input className="input" type="search" placeholder="Search intern, project or group" value={q} onChange={(e)=>{setQ(e.target.value);setPage(1);}}/></label>{tab!=="milestones"&&<label>Status<select className="input" value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setPage(1);}}><option value="ALL">All statuses</option>{[...new Set(sources[tab].map(x=>String(x.status||"").toUpperCase()).filter(Boolean))].sort().map(x=><option value={x} key={x}>{x.replaceAll("_"," ")}</option>)}</select></label>}</div>
       {tab === "attendance" && (
         <section className="card ops-list">
           <h2>Attendance</h2>
-          {d.attendance.filter(match).map((x) => (
+          {visible.map((x) => (
             <div className="workflow-row" key={x.id}>
               <div>
                 <b>{x.full_name}</b>
@@ -92,7 +92,7 @@ export default function MentorOperationsPage() {
       {tab === "exceptions" && (
         <section className="card ops-list">
           <h2>Attendance Corrections</h2>
-          {exceptions.filter(match).map((x) => (
+          {visible.map((x) => (
             <div className="workflow-row" key={x.id}>
               <div>
                 <b>{x.full_name}</b>
@@ -104,13 +104,13 @@ export default function MentorOperationsPage() {
               {["DETECTED", "REQUESTED"].includes(x.status) && decisionControls("attendance-exceptions", x)}
             </div>
           ))}
-          {!exceptions.length && <p className="muted">No attendance corrections for your groups.</p>}
+          
         </section>
       )}
       {tab === "leave" && (
         <section className="card ops-list">
           <h2>Leave Requests</h2>
-          {d.leave.filter(match).map((x) => (
+          {visible.map((x) => (
             <div className="workflow-row" key={x.id}>
               <div>
                 <b>{x.full_name}</b>
@@ -129,7 +129,7 @@ export default function MentorOperationsPage() {
       {tab === "reports" && (
         <section className="card ops-list">
           <h2>Daily Reports</h2>
-          {d.dailyReports.filter(match).map((x) => (
+          {visible.map((x) => (
             <article className="daily-review-card" key={x.id}>
               <div>
                 <b>{x.full_name}</b>
@@ -158,7 +158,7 @@ export default function MentorOperationsPage() {
       {tab === "milestones" && (
         <section className="card ops-list">
           <h2>Project Milestones</h2>
-          {d.milestones.map((x) => (
+          {visible.map((x) => (
             <article className="daily-review-card" key={x.group_id}>
               <b>
                 {x.group_name} · {x.title || "Project not assigned"}
@@ -185,6 +185,9 @@ export default function MentorOperationsPage() {
           ))}
         </section>
       )}
+      {!records.length&&<div className="ops-empty">{q||statusFilter!=="ALL"?"No records match your filters.":"No records available in this section."}</div>}
+      {records.length>0&&<nav className="ops-pagination" aria-label="Operations pagination"><span>Showing {(currentPage-1)*pageSize+1}–{Math.min(currentPage*pageSize,records.length)} of {records.length}</span><div><label>Rows per page <select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1);}}><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select></label><button type="button" className="btn secondary" disabled={currentPage===1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</button><span>Page {currentPage} of {totalPages}</span><button type="button" className="btn secondary" disabled={currentPage===totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next</button></div></nav>}
+      <style jsx global>{` .mentor-ops{max-width:1160px;margin:0 auto;padding:28px 20px 60px;color:#111}.mentor-ops .intern-head h1{font-size:clamp(26px,3vw,34px);margin:0 0 8px}.mentor-ops .intern-head p{line-height:1.6;font-size:14px}.mentor-ops .ops-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:22px 0}.mentor-ops .ops-summary>div{display:flex;flex-direction:column;gap:9px;background:#fff;border:1px solid #dce7e1;border-radius:15px;padding:16px;min-width:0}.mentor-ops .ops-summary span{color:#475569;font-size:12px}.mentor-ops .ops-summary strong{font-size:24px}.mentor-ops .tab-row{display:flex;flex-wrap:wrap;gap:9px;background:#f0f5f3;border-radius:16px;padding:9px;margin:18px 0}.mentor-ops .btn{border-radius:999px!important;min-height:40px}.mentor-ops .tab-row .btn:not(.secondary),.mentor-ops .action-row .btn:not(.danger):not(.secondary){background:linear-gradient(110deg,#8b45ff,#5c8dfb);border:0;color:#fff}.mentor-ops .btn:hover:not(:disabled){color:#fff}.mentor-ops .ops-toolbar{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin:18px 0}.mentor-ops .ops-toolbar label{display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:13px}.mentor-ops .input{width:100%;min-height:44px;border:1.5px solid #79a6f9;border-radius:10px;background:#fff;color:#111;padding:10px 12px;box-sizing:border-box}.mentor-ops .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}.mentor-ops .ops-list{border:1px solid #dce7e1;border-radius:18px;padding:22px}.mentor-ops .ops-list h2{font-size:21px;margin:0 0 16px}.mentor-ops .workflow-row,.mentor-ops .daily-review-card{border:1px solid #e2e8f0;border-radius:13px;padding:17px;margin:10px 0;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;background:#fff}.mentor-ops .workflow-row>div:first-child{flex:1 1 240px;min-width:0}.mentor-ops .workflow-row small,.mentor-ops .daily-review-card small{display:block;color:#64748b;margin:6px 0;font-size:12px}.mentor-ops .workflow-row p,.mentor-ops .daily-review-card p{line-height:1.5;overflow-wrap:anywhere}.mentor-ops .status-pill{border-radius:999px;padding:7px 12px;background:#eaf3ed;color:#075e46;font-size:12px;font-weight:700;white-space:nowrap}.mentor-ops .action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}.mentor-ops .action-row .input{flex:1 1 190px}.mentor-ops .ops-pagination{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:20px 0;font-size:13px}.mentor-ops .ops-pagination>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mentor-ops .ops-pagination label{display:flex;align-items:center;gap:7px}.mentor-ops .ops-pagination select{border:1px solid #cbd5e1;border-radius:9px;padding:9px;background:#fff;color:#111}.mentor-ops .ops-empty{border:1px dashed #cbd5e1;border-radius:14px;text-align:center;padding:28px;color:#475569;margin:16px 0}@media(max-width:720px){.mentor-ops{padding:18px 14px 48px}.mentor-ops .ops-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mentor-ops .ops-summary>div{padding:12px}.mentor-ops .ops-toolbar{grid-template-columns:1fr}.mentor-ops .ops-list{padding:14px}.mentor-ops .ops-pagination{flex-direction:column;align-items:flex-start}.mentor-ops .tab-row{gap:6px}} `}</style>
     </main>
   );
 }
