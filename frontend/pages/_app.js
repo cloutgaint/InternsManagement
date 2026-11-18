@@ -3,6 +3,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import "@/shared/globals.css";
+import AdminShell from "@/shared/admin/AdminShell";
 import { useAppSession } from "@/shared/auth/useAppSession";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function App({ Component, pageProps }) {
     };
   }, [profileOpen]);
   const loggedIn = !!session.token;
+  const adminShell = loggedIn && ["ADMIN","SUPER_ADMIN"].includes(session.role) && (router.pathname === "/admin" || router.pathname.startsWith("/admin/"));
   const role = session.role || "";
   const home = role.includes("ADMIN")
     ? "/admin"
@@ -101,7 +103,7 @@ export default function App({ Component, pageProps }) {
           content="GAINT SkillBridge — Connecting Education with Industry. Internship registration, assessments, projects, mentoring and progress tracking."
         />
       </Head>
-      <header className="top glass-top">
+      {!adminShell && <header className="top glass-top">
         <div className="glass-nav-shell">
           <Link
             href="/"
@@ -253,7 +255,7 @@ export default function App({ Component, pageProps }) {
             )}
           </nav>
         </div>
-      </header>
+      </header>}
       <style jsx global>{`
         .top .glass-brand{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none}
         .top .skillbridge-wordmark{display:flex;flex-direction:column;gap:2px;white-space:nowrap;border-left:1px solid #d7e8dd;padding-left:12px}
@@ -402,7 +404,7 @@ export default function App({ Component, pageProps }) {
           outline-offset: 2px;
         }
       `}</style>
-      {router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
+      {!adminShell && router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
         <div className={"page-back-bar"+(router.pathname==="/login"?" login-back-bar":"")}>
           <div className="page-back-inner">
             <button
@@ -416,7 +418,7 @@ export default function App({ Component, pageProps }) {
           </div>
         </div>
       )}
-      <Component {...pageProps} />
+      {adminShell ? <AdminShell profile={profile} photo={photo} role={role} onLogout={logout}><Component {...pageProps} /></AdminShell> : <Component {...pageProps} />}
     </>
   );
 }
