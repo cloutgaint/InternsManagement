@@ -23,7 +23,16 @@ export default function AdminOffersPage() {
     [letterheadFile,setLetterheadFile]=useState(null),
     [letterheadBusy,setLetterheadBusy]=useState(false),
     [letterheadError,setLetterheadError]=useState(""),
-    [letterheadMessage,setLetterheadMessage]=useState("");
+    [letterheadMessage,setLetterheadMessage]=useState(""),
+    [signature,setSignature]=useState(null),
+    [signatureFile,setSignatureFile]=useState(null),
+    [signatureBusy,setSignatureBusy]=useState(false),
+    [signatureMessage,setSignatureMessage]=useState(""),
+    [signatureError,setSignatureError]=useState("");
+  const loadSignature=()=>api("/report-assets/offer-signature").then(x=>setSignature(x.asset)).catch(e=>setSignatureError(e.message));
+  async function uploadSignature(){if(!signatureFile)return;setSignatureBusy(true);setSignatureError("");setSignatureMessage("");try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(new Error("Unable to read signature image"));reader.readAsDataURL(signatureFile)});await api("/report-assets/offer-signature",{method:"PUT",body:JSON.stringify({mimeType:signatureFile.type,data})});setSignatureMessage("Offer signature saved successfully.");setSignatureFile(null);await loadSignature()}catch(e){setSignatureError(e.message)}finally{setSignatureBusy(false)}}
+  async function viewSignature(){try{const blob=await apiBlob("/report-assets/offer-signature/file");const url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setSignatureError(e.message)}}
+  async function removeSignature(){setSignatureBusy(true);setSignatureError("");try{await api("/report-assets/offer-signature",{method:"DELETE"});setSignatureMessage("Offer signature removed.");await loadSignature()}catch(e){setSignatureError(e.message)}finally{setSignatureBusy(false)}}
   const loadLetterhead=()=>api("/report-assets/offer-letterhead").then(x=>setLetterhead(x.asset)).catch(e=>setLetterheadError(e.message));
   async function uploadLetterhead(){if(!letterheadFile)return;setLetterheadError("");setLetterheadMessage("");setLetterheadBusy(true);try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(new Error("Unable to read file"));reader.readAsDataURL(letterheadFile)});await api("/report-assets/offer-letterhead",{method:"PUT",body:JSON.stringify({mimeType:letterheadFile.type,data})});setLetterheadMessage("Company letterhead uploaded.");setLetterheadFile(null);await loadLetterhead()}catch(e){setLetterheadError(e.message)}finally{setLetterheadBusy(false)}}
   async function previewLetterhead(){try{const blob=await apiBlob("/report-assets/offer-letterhead/file");const url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setLetterheadError(e.message)}}
@@ -43,6 +52,7 @@ export default function AdminOffersPage() {
   useEffect(() => {
     load();
     loadLetterhead();
+    loadSignature();
   }, []);
   async function createTemplate(e) {setFeedbackArea("createTemplate");
     e.preventDefault();
@@ -138,6 +148,21 @@ export default function AdminOffersPage() {
         </span>
       </div>
       <section className="card letterhead-settings"><h2>Company letterhead settings</h2><p className="muted">Upload your company letterhead. Supported formats: PDF, DOCX, PNG and JPG (maximum 4 MB).</p><p className="muted">The uploaded letterhead is applied to the offer PDF preview and intern download.</p>{letterhead&&<p className="muted">Uploaded letterhead: {letterhead.original_filename || ({ "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"Company letterhead.docx","application/pdf":"Company letterhead.pdf","image/png":"Company letterhead.png","image/jpeg":"Company letterhead.jpg" }[letterhead.mime_type] || "Company letterhead")} · Updated {new Date(letterhead.updated_at).toLocaleString()}</p>}<div className="form-field"><label htmlFor="offer-letterhead-file">Choose letterhead</label><input id="offer-letterhead-file" className="input letterhead-file-input" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;setLetterheadError(file&&file.size>4*1024*1024?"File must be 4 MB or smaller.":"");setLetterheadFile(file&&file.size<=4*1024*1024?file:null)}} /></div><div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!letterheadFile||letterheadBusy} onClick={uploadLetterhead}>Upload letterhead</button>{letterhead&&<><button className="btn secondary" type="button" onClick={previewLetterhead}>View file</button><button className="btn danger" type="button" disabled={letterheadBusy} onClick={removeLetterhead}>Remove</button></>}</div>{letterheadError&&<p className="error" role="alert">{letterheadError}</p>}{letterheadMessage&&<p className="success" role="status">{letterheadMessage}</p>}</section>
+      <section className="card letterhead-settings">
+        <h2>Offer letter signature</h2>
+        <p className="muted">Upload the authorized company signatory's signature. It appears above the signatory name in the official offer PDF, beside the company stamp.</p>
+        {signature&&<p className="muted">Signature uploaded · Updated {new Date(signature.updated_at).toLocaleString()}</p>}
+        <div className="form-field">
+          <label htmlFor="offer-signature-file">Signature image (PNG or JPG, maximum 1 MB)</label>
+          <input id="offer-signature-file" className="input letterhead-file-input" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;const valid=file&&["image/png","image/jpeg"].includes(file.type)&&file.size<=1024*1024;setSignatureError(file&&!valid?"Select a PNG or JPG image no larger than 1 MB.":"");setSignatureFile(valid?file:null)}}/>
+        </div>
+        <div className="action-row" style={{justifyContent:"flex-start"}}>
+          <button className="btn" type="button" disabled={!signatureFile||signatureBusy} onClick={uploadSignature}>Upload signature</button>
+          {signature&&<><button className="btn secondary" type="button" onClick={viewSignature}>View signature</button><button className="btn danger" type="button" disabled={signatureBusy} onClick={removeSignature}>Remove</button></>}
+        </div>
+        {signatureError&&<p className="error" role="alert">{signatureError}</p>}
+        {signatureMessage&&<p className="success" role="status">{signatureMessage}</p>}
+      </section>
       {!templates.length && (
         <section className="card">
           <h2>Create Offer Letter Template</h2>{feedbackArea==="createTemplate"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
