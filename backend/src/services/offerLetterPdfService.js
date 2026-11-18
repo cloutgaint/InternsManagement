@@ -132,25 +132,29 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   const branded = Boolean(background);
   if (background) {
     pdf.image(background, 0, 0, { width, height });
-    // Match the original asymmetric GAINT letterhead: top-right gold edge,
-    // bottom-left gold edge. The uploaded blank DOCX draws both on the right.
+    // Remove the artificial lower-left gold strip and the template's hard
+    // lower-right edge. The top-right brand rule remains untouched.
     const footerTop = height - 111;
     pdf.save();
-    pdf.fillColor("#ffffff").rect(width - 18, footerTop + 2, 18, height - footerTop - 2).fill();
-    pdf.fillColor("#ffbf00").rect(0, footerTop + 2, 17, height - footerTop - 2).fill();
+    pdf.fillColor("#ffffff").rect(0, footerTop + 2, 18, height - footerTop - 2).fill();
+    pdf.fillColor("#ffffff").rect(width - 19, footerTop + 2, 19, height - footerTop - 2).fill();
     pdf.restore();
   }
   if (!branded) {
-    pdf.save().fillColor("#ffbf00").rect(width-17,0,17,height).fill().strokeColor("#ffbf00").lineWidth(3);
+    pdf.save().fillColor("#ffbf00").rect(width-17,0,17,height-111).fill().strokeColor("#ffbf00").lineWidth(3);
     pdf.moveTo(0,126).lineTo(width-17,126).stroke();
-    pdf.moveTo(17,height-111).lineTo(width,height-111).stroke();
-    pdf.fillColor("#ffbf00").rect(0,height-109,17,109).fill();
-    pdf.fillColor("#ffffff").rect(width-17,height-109,17,109).fill();
+    pdf.moveTo(0,height-111).lineTo(width,height-111).stroke();
     pdf.restore();
     write(pdf,"GAINT",62,48,260,31,true);
     write(pdf,"CLOUT TECHNOLOGIES PVT. LTD.",64,90,300,10,true);
     write(pdf,"Gaint Clout Technologies Pvt Ltd | Hyderabad | info@gaintclout.com",54,height-73,width-108,8);
   }
+  // Soften the lower end of the right-side gold accent instead of a sharp cut.
+  pdf.save();
+  const fade=pdf.linearGradient(width-17,height-141,width-17,height-108);
+  fade.stop(0,"#ffbf00",1).stop(1,"#ffbf00",0);
+  pdf.rect(width-17,height-141,17,33).fill(fade);
+  pdf.restore();
   const uploadedWatermark = assets.find(x => x.asset_key === "offer_watermark" && ["image/png","image/jpeg"].includes(x.mime_type));
   if (uploadedWatermark) {
     // The watermark is placed behind the letter content; preserve image aspect ratio.
