@@ -8,11 +8,12 @@ const fmt = (d) => (d ? String(d).slice(0, 10) : "—");
 const card =
   "rounded-[14px] border border-[#dbe5df] bg-white p-[18px] shadow-[0_8px_28px_rgba(20,45,31,.055)]";
 const button =
-  "cursor-pointer rounded-[9px] border-0 font-bold transition-all duration-[180ms] ease-[ease] hover:-translate-y-px hover:bg-[#06472f]";
+  "inline-flex items-center justify-center text-center cursor-pointer rounded-[9px] border-0 font-bold transition-all duration-[180ms] ease-[ease] hover:-translate-y-px hover:bg-[#06472f]";
 const primary = "bg-[#0c5132] text-white";
 const secondary = "bg-[#e8f0eb] text-[#123]";
 const regular = "px-4 py-[11px]";
 const compact = "px-3 py-2";
+const displayStatus = (value) => String(value || "Pending").toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const s = {
   page: "mx-auto max-w-[1200px] px-7 pb-7 pt-[34px] max-[600px]:px-[18px] max-[600px]:pb-[18px]",
   error: "rounded-lg border border-current bg-[#ffe9e9] p-2.5 text-[#8b1f1f]",
@@ -32,9 +33,9 @@ const s = {
   sectionTitle: "mt-0 text-[19px]",
   sectionTitleInRow: "mb-[5px] mt-0 text-[19px]",
   titleRow: "flex items-start justify-between gap-4 max-[900px]:flex-col",
-  row: "flex justify-between gap-4 border-b border-[#e4ebe7] py-[11px] last:border-b-0",
-  actions: "flex flex-wrap gap-2",
-  pill: "whitespace-nowrap rounded-full bg-[#edf2ef] px-2 py-[5px] text-[10px] font-extrabold",
+  row: "flex items-center justify-between gap-4 border-b border-[#e4ebe7] py-[11px] last:border-b-0",
+  actions: "flex flex-wrap items-center justify-end gap-2",
+  pill: "inline-flex min-h-[28px] items-center justify-center whitespace-nowrap rounded-full bg-[#edf2ef] px-3 py-1 text-center text-[12px] font-bold leading-none text-[#123]",
   formActions: "mt-[18px] flex justify-end",
   btn: [button, primary, regular, "min-w-[170px] max-[760px]:w-full"].join(" "),
   btnPrintable: [button, primary, compact].join(" "),
@@ -217,7 +218,7 @@ export default function InternDashboardPage() {
           <div className={s.row}>
             <span>Face registration</span>
             <div className={s.actions}>
-              <b>{f ? f.status : "Not submitted"}</b>
+              <b>{f ? displayStatus(f.status) : "Not submitted"}</b>
               <a className={s.btnSmall} href="/intern/face-enrollment">
                 {f ? "View" : "Register Face"}
               </a>
@@ -241,7 +242,7 @@ export default function InternDashboardPage() {
                   </small>
                 </span>
                 <div className={s.actions}>
-                  <span className={s.pill}>{x.status}</span>
+                  <span className={s.pill}>{displayStatus(x.status)}</span>
                   <button
                     className={s.btnSmall}
                     onClick={() => viewOffer(x)}
@@ -275,7 +276,7 @@ export default function InternDashboardPage() {
               {data.attendance.slice(0, 5).map((x) => (
                 <div className={s.row} key={x.id || x.day}>
                   <span>{fmt(x.day)}</span>
-                  <b>{x.status}</b>
+                  <b>{displayStatus(x.status)}</b>
                 </div>
               ))}
             </div>
@@ -314,7 +315,7 @@ export default function InternDashboardPage() {
             assessments.map((x) => (
               <div className={s.row} key={x.id}>
                 <span>{x.name}</span>
-                <b>{x.attempt_status || "Available"}</b>
+                <b>{displayStatus(x.attempt_status || "Available")}</b>
               </div>
             ))
           ) : (
@@ -331,7 +332,7 @@ export default function InternDashboardPage() {
           {group ? (
             <>
               <p>
-                <b>{group.name}</b> · {group.status}
+                <b>{group.name}</b> · {displayStatus(group.status)}
               </p>
               <p>Project: {group.project_title || "Not assigned"}</p>
               <p>
@@ -369,11 +370,11 @@ export default function InternDashboardPage() {
           </div>
           <div className={s.row}>
             <span>Completion approval</span>
-            <b>{completion?.approval?.status || "Pending"}</b>
+            <b>{displayStatus(completion?.approval?.status)}</b>
           </div>
           <div className={s.row}>
             <span>Certificate</span>
-            <b>{completion?.certificate?.status || "Not issued"}</b>
+            <b>{displayStatus(completion?.certificate?.status || "Not issued")}</b>
           </div>
         </section>
         <section className={pane("team")}><h2 className={s.sectionTitle}>Group Workspace</h2><p className={s.muted}>Documents, shared resources and group chat with your mentor.</p><div className={s.formActions}><a className={s.btn} href="/intern/collaboration">Open Group Workspace</a></div></section>
@@ -409,7 +410,7 @@ export default function InternDashboardPage() {
             </div>
             <div className={s.offerRef}>
               <b>{offerView.reference_number}</b>
-              <span>{offerView.status}</span>
+              <span>{displayStatus(offerView.status)}</span>
             </div>
             <div className={s.letter}>{offerView.rendered_body}</div>
             {offerView.signatory && (
