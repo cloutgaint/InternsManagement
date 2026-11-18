@@ -12,7 +12,7 @@ export default function AdminOffersPage() {
     [tpl, setTpl] = useState({
       name: "GAINT Internship Offer Letter",
       signatory: "Authorized Signatory, GAINT Clout Technologies",
-      body: "Dear {{student_name}},\n\nWe are pleased to offer you an internship with GAINT Clout Technologies under {{batch}} from {{from_date}} to {{to_date}} ({{duration}}).\n\nCollege: {{college}}\nReference: {{reference_number}}\n\nWe look forward to your contribution and learning during the internship period.\n\nRegards,\nGAINT Clout Technologies",
+      body: "On behalf of GAINT CLOUT TECHNOLOGIES PVT LTD, I am delighted to extend an internship opportunity to you with our expert team. The programme is scheduled to begin on {{from_date}} and will continue until {{to_date}} ({{duration}}). Please bring the necessary documents and your complete profile on your first day.\n\nIf you have any questions about this offer, please contact our front office. We look forward to welcoming you as you begin your career with Gaint Clout Technologies Pvt Ltd.",
     }),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
