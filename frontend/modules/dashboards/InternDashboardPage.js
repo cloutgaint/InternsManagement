@@ -140,7 +140,18 @@ export default function InternDashboardPage() {
   }
   async function viewOffer(x) {
     try {
-      setOfferView(await api("/intern/offer-letters/" + x.id + "/view"));
+      const blob = await apiBlob("/intern/offer-letters/" + x.id + "/pdf");
+      const url = URL.createObjectURL(blob);
+      const tab = window.open(url, "_blank", "noopener,noreferrer");
+      if (!tab) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "GAINT-Offer-" + x.reference_number.replace(/[^a-zA-Z0-9_-]/g, "") + ".pdf";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) {
       setErr(e.message);
     }
@@ -393,39 +404,7 @@ export default function InternDashboardPage() {
           )}
         </section>
       </div>
-      {offerView && (
-        <div className={s.backdrop} onMouseDown={() => setOfferView(null)}>
-          <section
-            className={s.modal}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className={s.titleRow}>
-              <div>
-                <span className={s.eyebrow}>GAINT CLOUT TECHNOLOGIES</span>
-                <h2 className={s.modalTitle}>Internship Offer Letter</h2>
-              </div>
-              <button className={s.close} onClick={() => setOfferView(null)}>
-                ×
-              </button>
-            </div>
-            <div className={s.offerRef}>
-              <b>{offerView.reference_number}</b>
-              <span>{displayStatus(offerView.status)}</span>
-            </div>
-            <div className={s.letter}>{offerView.rendered_body}</div>
-            {offerView.signatory && (
-              <p className={s.signature}>
-                <b>{offerView.signatory}</b>
-              </p>
-            )}
-            <div className={s.modalActions}>
-              <button className={s.btnPrintable} onClick={() => window.print()}>
-                Print / Save PDF
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+
     </main>
   );
 }
