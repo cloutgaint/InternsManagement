@@ -1054,7 +1054,13 @@ r.put("/offer-letters/:id/content",async(req,res)=>{
   const before=(await q("SELECT * FROM offer_letters WHERE id=$1",[req.params.id])).rows[0];
   if(!before)return res.status(404).json({error:"Offer letter not found"});
   if(!["DRAFT","PREVIEWED","APPROVED"].includes(before.status))return res.status(409).json({error:"Issued letters cannot be edited. Create a reissue draft first."});
-  const updated=(await q("UPDATE offer_letters SET draft_body=$2,draft_signatory=$3,status='DRAFT',previewed_by=null,previewed_at=null,approved_by=null,approved_at=null WHERE id=$1 AND status IN ('DRAFT','PREVIEWED','APPROVED') RETURNING *",[req.params.id,body,signatory])).rows[0];
+  let updated;
+  try {
+    updated=(await q("UPDATE offer_letters SET draft_body=$2,draft_signatory=$3,status='DRAFT',previewed_by=null,previewed_at=null,approved_by=null,approved_at=null WHERE id=$1 AND status IN ('DRAFT','PREVIEWED','APPROVED') RETURNING *",[req.params.id,body,signatory])).rows[0];
+  } catch(error) {
+    if(error.code==="42703")return res.status(503).json({error:"Offer content editing database migration is missing. Run npm run migrate in backend and restart the API."});
+    throw error;
+  }
   if(!updated)return res.status(409).json({error:"Offer state changed; reload and retry"});
   await q("UPDATE offer_letter_versions SET snapshot=$2 WHERE offer_letter_id=$1 AND version=(SELECT max(version) FROM offer_letter_versions WHERE offer_letter_id=$1)",[updated.id,updated]);
   await audit(req,"OFFER_CONTENT_EDITED","offer_letter",updated.id,{status:before.status,draft_body:before.draft_body,draft_signatory:before.draft_signatory},{status:updated.status,draft_body:body,draft_signatory:signatory});
