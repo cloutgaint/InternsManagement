@@ -1,6 +1,7 @@
 "use client";
 import ProofStatusCard from "@/modules/interns/ProofStatusCard";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { api, apiBlob } from "@/shared/api/client";
 import {JourneyTimeline,NextActionCard,ProgressRing,Skeleton,AchievementCard,MentorCard} from "@/shared/intern/JourneyComponents";
 
@@ -53,6 +54,7 @@ const s = {
   modalActions: "flex flex-wrap justify-end gap-2 border-t border-[#dbe5df] pt-4 print:hidden",
 };
 export default function InternDashboardPage() {
+  const router=useRouter();
   const [data, setData] = useState(null),
     [err, setErr] = useState(""),
     [msg, setMsg] = useState(""),
@@ -63,6 +65,7 @@ export default function InternDashboardPage() {
     [offers, setOffers] = useState([]),
     [offerView, setOfferView] = useState(null),
     [tab,setTab]=useState("overview");
+  useEffect(()=>{if(router.isReady)setTab(router.query.section==="onboarding"?"onboarding":"overview")},[router.isReady,router.query.section]);
   useEffect(() => {
     Promise.all([
       api("/intern/dashboard"),
