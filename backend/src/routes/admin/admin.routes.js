@@ -1038,15 +1038,27 @@ r.get("/offer-letters/:id/preview", async (req, res) => {
     reference_number: x.reference_number,
   };
   let body =
-    x.template_body ||
+    x.draft_body || x.template_body ||
     "Dear {{student_name}},\n\nYou are offered an internship with GAINT from {{from_date}} to {{to_date}} under {{batch}}.\n\nRegards,\nGAINT Clout Technologies";
   for (const [k, v] of Object.entries(values))
     body = body.replaceAll("{{" + k + "}}", v || "");
   res.json({
     ...x,
     rendered_body: x.issued_snapshot?.rendered_body ?? body,
-    signatory: x.issued_snapshot?.signatory ?? x.signatory,
+    signatory: x.issued_snapshot?.signatory ?? x.draft_signatory ?? x.signatory,
   });
+});
+r.put("/offer-letters/:id/content",async(req,res)=>{
+  const body=String(req.body?.body??"").trim(),signatory=String(req.body?.signatory??"").trim();
+  if(!body||body.length>6000||!signatory||signatory.length>200)return res.status(400).json({error:"Offer body (1–6000 characters) and signatory (1–200 characters) are required"});
+  const before=(await q("SELECT * FROM offer_letters WHERE id=$1",[req.params.id])).rows[0];
+  if(!before)return res.status(404).json({error:"Offer letter not found"});
+  if(!["DRAFT","PREVIEWED","APPROVED"].includes(before.status))return res.status(409).json({error:"Issued letters cannot be edited. Create a reissue draft first."});
+  const updated=(await q("UPDATE offer_letters SET draft_body=$2,draft_signatory=$3,status='DRAFT',previewed_by=null,previewed_at=null,approved_by=null,approved_at=null WHERE id=$1 AND status IN ('DRAFT','PREVIEWED','APPROVED') RETURNING *",[req.params.id,body,signatory])).rows[0];
+  if(!updated)return res.status(409).json({error:"Offer state changed; reload and retry"});
+  await q("UPDATE offer_letter_versions SET snapshot=$2 WHERE offer_letter_id=$1 AND version=(SELECT max(version) FROM offer_letter_versions WHERE offer_letter_id=$1)",[updated.id,updated]);
+  await audit(req,"OFFER_CONTENT_EDITED","offer_letter",updated.id,{status:before.status,draft_body:before.draft_body,draft_signatory:before.draft_signatory},{status:updated.status,draft_body:body,draft_signatory:signatory});
+  res.json(updated);
 });
 r.post("/offer-letters/:id/mark-previewed", async (req, res) => {
   const before = (
@@ -1122,6 +1134,8 @@ r.post("/offer-letters/:id/issue", async (req, res) => {
   const snapshot = offerSnapshot({
     ...before,
     ...template,
+    template_body: before.draft_body || template.template_body,
+    signatory: before.draft_signatory || template.signatory,
     issue_at: issuedAt,
   });
   const x = (
@@ -1204,6 +1218,8 @@ r.post("/offer-letters/:id/reissue", async (req, res) => {
       ],
     )
   ).rows[0];
+  // Preserve the last issued content as the starting point for this revision.
+  if(old.issued_snapshot?.rendered_body)await q("UPDATE offer_letters SET draft_body=$2,draft_signatory=$3 WHERE id=$1",[old.id,old.issued_snapshot.rendered_body,old.issued_snapshot.signatory||"Authorized Signatory"]);
   await q(
     "INSERT INTO offer_letter_versions(offer_letter_id,version,snapshot,reason) VALUES($1,$2,$3,$4)",
     [x.id, version, x, reason],
