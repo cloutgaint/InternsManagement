@@ -6,6 +6,7 @@ import "@/shared/globals.css";
 import AdminShell from "@/shared/admin/AdminShell";
 import InternShell from "@/shared/intern/InternShell";
 import MentorShell from "@/shared/mentor/MentorShell";
+import CoordinatorShell from "@/shared/coordinator/CoordinatorShell";
 import { useAppSession } from "@/shared/auth/useAppSession";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function App({ Component, pageProps }) {
     };
   }, [profileOpen]);
   const loggedIn = !!session.token;
+  const coordinatorShell = loggedIn && session.role === "COLLEGE_COORDINATOR" && router.pathname === "/college-coordinator";
   const mentorShell = loggedIn && session.role === "MENTOR" && (router.pathname === "/mentor" || router.pathname.startsWith("/mentor/"));
   const internShell = loggedIn && session.role === "INTERN" && (router.pathname === "/intern" || router.pathname.startsWith("/intern/"));
   const adminShell = loggedIn && ["ADMIN","SUPER_ADMIN"].includes(session.role) && (router.pathname === "/admin" || router.pathname.startsWith("/admin/"));
@@ -107,7 +109,7 @@ export default function App({ Component, pageProps }) {
           content="GAINT SkillBridge — Connecting Education with Industry. Internship registration, assessments, projects, mentoring and progress tracking."
         />
       </Head>
-      {!adminShell && !internShell && !mentorShell && <header className="top glass-top">
+      {!adminShell && !internShell && !mentorShell && !coordinatorShell && <header className="top glass-top">
         <div className="glass-nav-shell">
           <Link
             href="/"
@@ -408,7 +410,7 @@ export default function App({ Component, pageProps }) {
           outline-offset: 2px;
         }
       `}</style>
-      {!adminShell && !internShell && !mentorShell && router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
+      {!adminShell && !internShell && !mentorShell && !coordinatorShell && router.pathname !== "/" && (!loggedIn || router.asPath !== home) && (
         <div className={"page-back-bar"+(router.pathname==="/login"?" login-back-bar":"")}>
           <div className="page-back-inner">
             <button
@@ -422,7 +424,7 @@ export default function App({ Component, pageProps }) {
           </div>
         </div>
       )}
-      {adminShell ? <AdminShell profile={profile} photo={photo} role={role} onLogout={logout}><Component {...pageProps} /></AdminShell> : internShell ? <InternShell profile={profile} onLogout={logout}><Component {...pageProps} /></InternShell> : mentorShell ? <MentorShell profile={profile} onLogout={logout}><Component {...pageProps} /></MentorShell> : <Component {...pageProps} />}
+      {adminShell ? <AdminShell profile={profile} photo={photo} role={role} onLogout={logout}><Component {...pageProps} /></AdminShell> : internShell ? <InternShell profile={profile} onLogout={logout}><Component {...pageProps} /></InternShell> : mentorShell ? <MentorShell profile={profile} onLogout={logout}><Component {...pageProps} /></MentorShell> : coordinatorShell ? <CoordinatorShell profile={profile} onLogout={logout}><Component {...pageProps} /></CoordinatorShell> : <Component {...pageProps} />}
     </>
   );
 }
