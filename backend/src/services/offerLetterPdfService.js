@@ -90,9 +90,10 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   let body = offer.issued_snapshot?.rendered_body || offer.template_body || "";
   if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
-  const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp')")).rows;
+  const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp','offer_signature')")).rows;
   const letterhead = assets.find(x => x.asset_key === "offer_letterhead");
   const stamp = assets.find(x => x.asset_key === "company_stamp" && ["image/png","image/jpeg"].includes(x.mime_type));
+  const signature = assets.find(x => x.asset_key === "offer_signature" && ["image/png","image/jpeg"].includes(x.mime_type));
   const pdf = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
   pdf.addPage({ size: "A4", margin: 0 });
   const { width, height } = pdf.page;
@@ -138,8 +139,12 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     .text(cleanBody, left, bodyTop, { width: textWidth, lineGap: 5, paragraphGap: 9, height: maxBodyHeight });
   const closingY = Math.max(bodyTop + bodyHeight + 28, height - 234);
   write(pdf, "With best wishes,", left, closingY, textWidth, 10);
+  if (signature) {
+    try { pdf.image(signature.image_data, left, closingY+23, { fit: [128, 48] }); }
+    catch { /* Invalid image must not break the issued document. */ }
+  }
   if (stamp) {
-    try { pdf.image(stamp.image_data, left+100, closingY+21, { fit: [94, 78] }); }
+    try { pdf.image(stamp.image_data, left+133, closingY+18, { fit: [83, 77] }); }
     catch { /* Invalid historic stamp must not prevent offer download. */ }
   }
   write(pdf, signatory, left, closingY+93, textWidth, 10, true, { height: 24, ellipsis: true });
