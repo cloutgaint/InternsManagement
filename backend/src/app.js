@@ -24,6 +24,7 @@ export function createApp() {
   app.use(
     cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }),
   );
+  app.use("/api/report-assets/offer-letterhead", express.json({ limit: "6mb" }));
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("combined"));
   // Only credential attempts count. Reads such as /auth/me run on every page view, and a whole
