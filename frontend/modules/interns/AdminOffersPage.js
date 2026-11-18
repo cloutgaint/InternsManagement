@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/shared/api/client";
+import { api, apiBlob } from "@/shared/api/client";
 const fmt = (x) => (x ? String(x).slice(0, 10) : "—");
 export default function AdminOffersPage() {
   const [alloc, setAlloc] = useState([]),
@@ -18,7 +18,16 @@ export default function AdminOffersPage() {
     [feedbackArea,setFeedbackArea]=useState("createTemplate"),
     [busy, setBusy] = useState(false),
     [issueAt, setIssueAt] = useState(""),
-    [dates, setDates] = useState({});
+    [dates, setDates] = useState({}),
+    [letterhead,setLetterhead]=useState(null),
+    [letterheadFile,setLetterheadFile]=useState(null),
+    [letterheadBusy,setLetterheadBusy]=useState(false),
+    [letterheadError,setLetterheadError]=useState(""),
+    [letterheadMessage,setLetterheadMessage]=useState("");
+  const loadLetterhead=()=>api("/report-assets/offer-letterhead").then(x=>setLetterhead(x.asset)).catch(e=>setLetterheadError(e.message));
+  async function uploadLetterhead(){if(!letterheadFile)return;setLetterheadError("");setLetterheadMessage("");setLetterheadBusy(true);try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(new Error("Unable to read file"));reader.readAsDataURL(letterheadFile)});await api("/report-assets/offer-letterhead",{method:"PUT",body:JSON.stringify({mimeType:letterheadFile.type,data})});setLetterheadMessage("Company letterhead uploaded.");setLetterheadFile(null);await loadLetterhead()}catch(e){setLetterheadError(e.message)}finally{setLetterheadBusy(false)}}
+  async function previewLetterhead(){try{const blob=await apiBlob("/report-assets/offer-letterhead/file");const url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setLetterheadError(e.message)}}
+  async function removeLetterhead(){setLetterheadBusy(true);setLetterheadError("");try{await api("/report-assets/offer-letterhead",{method:"DELETE"});setLetterheadMessage("Letterhead removed.");await loadLetterhead()}catch(e){setLetterheadError(e.message)}finally{setLetterheadBusy(false)}}
   const load = () =>
     Promise.all([
       api("/admin/allocations"),
@@ -33,6 +42,7 @@ export default function AdminOffersPage() {
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
+    loadLetterhead();
   }, []);
   async function createTemplate(e) {setFeedbackArea("createTemplate");
     e.preventDefault();
@@ -126,6 +136,7 @@ export default function AdminOffersPage() {
           {letters.filter((x) => ["ISSUED", "REISSUED"].includes(x.status)).length} issued
         </span>
       </div>
+      <section className="card letterhead-settings"><h2>Company letterhead settings</h2><p className="muted">Upload your company letterhead. Supported formats: PDF, DOCX, PNG and JPG (maximum 4 MB).</p><p className="muted">Document upload and storage are supported. Applying the letterhead to generated offer letters requires the separate document-rendering integration.</p>{letterhead&&<p className="muted">Current letterhead: {letterhead.mime_type.split("/").pop()} · Updated {new Date(letterhead.updated_at).toLocaleString()}</p>}<div className="form-field"><label htmlFor="offer-letterhead-file">Choose letterhead</label><input id="offer-letterhead-file" className="input" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={e=>{const file=e.target.files?.[0]||null;setLetterheadError(file&&file.size>4*1024*1024?"File must be 4 MB or smaller.":"");setLetterheadFile(file&&file.size<=4*1024*1024?file:null)}} /></div><div className="action-row" style={{justifyContent:"flex-start"}}><button className="btn" type="button" disabled={!letterheadFile||letterheadBusy} onClick={uploadLetterhead}>Upload letterhead</button>{letterhead&&<><button className="btn secondary" type="button" onClick={previewLetterhead}>View file</button><button className="btn danger" type="button" disabled={letterheadBusy} onClick={removeLetterhead}>Remove</button></>}</div>{letterheadError&&<p className="error" role="alert">{letterheadError}</p>}{letterheadMessage&&<p className="success" role="status">{letterheadMessage}</p>}</section>
       {!templates.length && (
         <section className="card">
           <h2>Create Offer Letter Template</h2>{feedbackArea==="createTemplate"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
