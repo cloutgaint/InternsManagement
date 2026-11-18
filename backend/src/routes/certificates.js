@@ -1,3 +1,4 @@
+import {renderCertificate} from "../services/certificatePdfService.js";
 import {Router} from "express";
 import PDFDocument from "pdfkit";
 import {execFile} from "node:child_process";
@@ -27,58 +28,10 @@ r.post("/:id/revoke",admin,certificate,async(req,res)=>{const reason=String(req.
 r.get("/:id/pdf",certificate,async(req,res)=>{
  const t=(await q("SELECT pdf_data FROM internship_certificate_templates WHERE id=COALESCE($1,(SELECT id FROM internship_certificate_templates ORDER BY uploaded_at DESC,id DESC LIMIT 1))",[req.certificate.template_id])).rows[0];
  if(!t)return res.status(409).json({error:"Admin must upload a certificate PDF template first"});
- const dir=await mkdtemp(join(tmpdir(),"gaint-certificate-"));
- try{
-  const file=join(dir,"template.pdf");
-  await writeFile(file,t.pdf_data,{mode:0o600});
-  const {stdout:info}=await exec("pdfinfo",[file],{timeout:15000});
-  const match=info.match(/Page size:\s*([\d.]+) x ([\d.]+) pts/i);
-  if(!match)throw Object.assign(new Error("Unable to determine certificate template dimensions"),{status:422});
-  const W=Number(match[1]),H=Number(match[2]);
-  if(W<=H||W<600||H<400||W>2000||H>1500)throw Object.assign(new Error("Upload a landscape certificate PDF with a standard page size"),{status:422});
-  await exec("pdftoppm",["-f","1","-l","1","-singlefile","-r","180","-png",file,join(dir,"template")],{timeout:30000});
-  const image=await readFile(join(dir,"template.png"));
-  const pdf=new PDFDocument({size:[W,H],margin:0});
-  const c=req.certificate, sx=W/862.5,sy=H/605.25,scale=Math.min(sx,sy);
-  const center=(value,y,size,color="#233a68",font="Helvetica",left=115,right=115)=>{
-   const x=left*sx,width=W-(left+right)*sx;
-   pdf.font(font).fontSize(size*scale).fillColor(color);
-   pdf.text(String(value||""),x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
-  };
-  pdf.image(image,0,0,{width:W,height:H});
-  // The uploaded master already includes both signatures, names and roles.
-  // Never redraw those elements: doing so duplicates the printed signatories.
-  center("Certificate ID: "+c.certificate_number,69,10,"#111111","Helvetica-Bold",170,170);
-  center("CERTIFICATE",83,52,"#213660","Times-Roman",100,100);
-  center("Of Internship",137,25,"#213660","Times-Roman",100,100);
-  center("We Present This Certificate To",171,13,"#213660","Helvetica",110,110);
-  const name=String(c.student_name||"").trim();
-  const available=W-130*sx;
-  let nameSize=34*scale;
-  pdf.font("Times-Italic");
-  while(nameSize>18*scale){pdf.fontSize(nameSize);if(pdf.widthOfString(name)<=available)break;nameSize-=1*scale;}
-  pdf.fillColor("#c99c18").font("Times-Italic").fontSize(nameSize).text(name,65*sx,225*sy,{width:available,align:"center",lineBreak:false,ellipsis:true});
-  // The horizontal divider is printed at about y=320 on the original
-  // 862.5 x 605.25 pt template. All description lines belong below it.
-  // Fixed, independent rows prevent a long title from shifting dates into
-  // the preprinted Chairman / CEO signature area.
-  const fitRow=(value,y,preferred=10,min=7.5,bold=false)=>{
-   const content=String(value||"").trim(),x=92*sx,width=W-184*sx;
-   const font=bold?"Helvetica-Bold":"Helvetica";
-   let size=preferred*scale;
-   pdf.font(font);
-   while(size>min*scale){pdf.fontSize(size);if(pdf.widthOfString(content)<=width)break;size-=0.25*scale;}
-   pdf.fillColor("#233a68").fontSize(size).text(content,x,y*sy,{width,align:"center",lineBreak:false,ellipsis:true});
-  };
-  const project=String(c.project_title||"Internship Project").trim().toUpperCase();
-  fitRow("THIS IS TO CERTIFY THAT THE PROJECT ENTITLED",355,10,8);
-  fitRow('"' + project + '" IS A BONAFIDE WORK',371,10,7.5,true);
-  fitRow("CARRIED OUT BY " + String(c.student_name||"").trim().toUpperCase(),389,9.5,7.5,true);
-  fitRow("AT GAINT CLOUT TECHNOLOGIES PVT. LTD., HYDERABAD",405,9.5,8);
-  fitRow("DURING THE PERIOD FROM " + date(c.start_date) + " TO " + date(c.end_date),421,9.5,7.5,true);
-  res.setHeader("Content-Type","application/pdf");
-  res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${c.certificate_number}.pdf"`);
-  pdf.pipe(res);pdf.end();
- }finally{await rm(dir,{recursive:true,force:true});}
+ const pdf=await renderCertificate(t.pdf_data,req.certificate);
+ res.setHeader("Content-Type","application/pdf");
+ res.setHeader("Content-Disposition",`inline; filename="GAINT-Certificate-${req.certificate.certificate_number}.pdf"`);
+ res.setHeader("Content-Length",String(pdf.length));
+ res.end(pdf);
 });
 export default r;
