@@ -118,7 +118,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
     to_date: String(offer.to_date).slice(0, 10), duration: offer.duration_text,
     reference_number: offer.reference_number,
   };
-  let body = offer.issued_snapshot?.rendered_body || offer.template_body || "";
+  let body = offer.issued_snapshot?.rendered_body || offer.draft_body || offer.template_body || "";
   if (!offer.issued_snapshot) for (const [key, value] of Object.entries(values))
     body = body.replaceAll("{{" + key + "}}", String(value || ""));
   const assets = (await q("SELECT asset_key,mime_type,image_data FROM report_brand_assets WHERE owner_user_id IS NULL AND asset_key IN ('offer_letterhead','company_stamp','offer_signature','offer_watermark')")).rows;
@@ -175,7 +175,7 @@ export async function sendOfferPdf(res, offer, { disposition = "attachment" } = 
   const cleanBody = body.trim().replace(/^Dear[^\n]*,\s*/i, "").replace(/\n\s*Regards,?[\s\S]*$/i, "").trim();
   const bodyTop = top + 158;
   const bottomLimit = height - 225;
-  const signatory = offer.issued_snapshot?.signatory || offer.signatory || "Authorized Signatory";
+  const signatory = offer.issued_snapshot?.signatory || offer.draft_signatory || offer.signatory || "Authorized Signatory";
   const maxBodyHeight = bottomLimit - bodyTop;
   let fontSize = 11;
   let bodyHeight = 0;
