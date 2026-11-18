@@ -1,7 +1,5 @@
-import {useId} from "react";
 /** Lightweight CoreSpin-inspired loading indicator. No third-party dependencies. */
 export default function CoreSpinLoader({label="Loading",size="md",inline=false}){
- const id=useId().replace(/:/g,"");
  return <div className={"gaint-core-spin"+(inline?" gaint-core-spin-inline":"")} role="status" aria-live="polite" aria-label={label}>
  <svg className={"gaint-core-spin-art gaint-core-spin-"+size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
  <circle cx="50" cy="50" r="38" stroke="#D9F3E6" strokeWidth="2"/>
