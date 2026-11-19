@@ -26,6 +26,20 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - name: Smoke test production Next.js routes
+        run: |
+          npm run start -- --port 3000 > /tmp/skillbridge-next.log 2>&1 &
+          NEXT_PID=$!
+          trap 'kill "$NEXT_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/login; then break; fi
+            sleep 1
+          done
+          for route in / /login /register /admin /intern /mentor /college-coordinator; do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$route")
+            echo "$route -> HTTP $status"
+            test "$status" = 200
+          done
   backend:
     name: Backend tests with PostgreSQL
     runs-on: ubuntu-latest
