@@ -17,8 +17,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
       NEXT_PUBLIC_API_URL: /api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -66,8 +66,8 @@ jobs:
       RUN_DB_E2E: '1'
       NODE_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -79,6 +79,6 @@ jobs:
     name: Production Docker build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: docker build --build-arg NEXT_PUBLIC_API_URL=/api -t gaint-skillbridge-frontend:ci ./frontend
       - run: docker build -t gaint-skillbridge-backend:ci ./backend
