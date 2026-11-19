@@ -111,7 +111,7 @@ services:
       context: ./frontend
       args:
         # Baked into the browser bundle at build time; the API is served from the same domain.
-        NEXT_PUBLIC_API_URL: https://${APP_DOMAIN:?APP_DOMAIN is required}/api
+        NEXT_PUBLIC_API_URL: /api
     restart: unless-stopped
     environment:
       NODE_ENV: production
