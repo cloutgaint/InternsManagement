@@ -12,6 +12,8 @@ function formatTimeTaken(startedAt, submittedAt) {
 }
 export default function InternAssessmentsPage() {
   const submittingRef=useRef(false);
+  // The timer is set up once per exam; it must call the latest submit so auto-submit sends current answers.
+  const submitRef=useRef(null);
   const [list, setList] = useState([]),
     [exam, setExam] = useState(null),
     [answers, setAnswers] = useState({}),
@@ -36,7 +38,7 @@ export default function InternAssessmentsPage() {
         Math.floor((new Date(exam.deadline) - Date.now()) / 1000),
       );
       setLeft(n);
-      if (n === 0 && !submittingRef.current) submit(true);
+      if (n === 0 && !submittingRef.current) submitRef.current?.(true);
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -132,6 +134,7 @@ export default function InternAssessmentsPage() {
       setBusy(false);
     }
   }
+  submitRef.current = submit;
   if (exam) {
     const q = exam.questions[idx],
       answered = Object.keys(answers).filter(

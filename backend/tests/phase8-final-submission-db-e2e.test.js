@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import jwt from "jsonwebtoken";
+import { signToken } from "../src/common/security/tokens.js";
 import {createApp} from "../src/app.js";
 import {q,pool} from "../src/common/database/index.js";
 test("final project submission, mentor review and evaluation are enforced end-to-end",{skip:process.env.RUN_DB_E2E!=="1"},async()=>{
@@ -10,7 +10,7 @@ test("final project submission, mentor review and evaluation are enforced end-to
  const one=async(sql,args=[]) => (await q(sql,args)).rows[0];
  const app=createApp(),server=app.listen(0),base="http://127.0.0.1:"+server.address().port;
  const request=async(role,id,method,path,body)=>{
-  const token=jwt.sign({id,role},process.env.JWT_SECRET);
+  const token=signToken({id,role});
   const res=await fetch(base+path,{method,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
   return {status:res.status,body:await res.json()};
  };

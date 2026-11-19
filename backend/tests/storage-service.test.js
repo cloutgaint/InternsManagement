@@ -13,6 +13,7 @@ import {
   writeSecureStoredBuffer,
   writeStoredBuffer,
 } from "../src/common/storage/storage.service.js";
+import { encryptionEnvelopeVersion } from "../src/common/storage/secureFiles.js";
 
 test("local storage adapter writes, reads, checks and removes objects", async () => {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "gaint-storage-"));
@@ -43,7 +44,9 @@ test("secure storage adapter encrypts bytes at rest and restores them", async ()
   try {
     const plain = Buffer.from("biometric evidence");
     const reference = await writeSecureStoredBuffer(plain, { prefix: "attendance-evidence", filename: "capture.jpg" });
-    assert.notDeepEqual(await readStoredBuffer(reference), plain);
+    const stored = await readStoredBuffer(reference);
+    assert.notDeepEqual(stored, plain);
+    assert.equal(encryptionEnvelopeVersion(stored), 3);
     assert.deepEqual(await readSecureStoredBuffer(reference), plain);
   } finally {
     if (previous.driver === undefined) delete process.env.STORAGE_DRIVER; else process.env.STORAGE_DRIVER = previous.driver;

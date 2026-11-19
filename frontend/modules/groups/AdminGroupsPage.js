@@ -11,7 +11,7 @@ export default function AdminGroupsPage() {
     [edit, setEdit] = useState(null),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState(""),
-    [feedbackArea,setFeedbackArea]=useState("generate"),
+    [feedbackArea, setFeedbackArea] = useState("generate"),
     [busy, setBusy] = useState(false),
     [activeGroups, setActiveGroups] = useState([]),
     [manage, setManage] = useState(null);
@@ -30,6 +30,7 @@ export default function AdminGroupsPage() {
       .catch((e) => setErr(e.message));
   useEffect(() => {
     loadBase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
   }, []);
   useEffect(() => {
     if (batchId)
@@ -37,7 +38,8 @@ export default function AdminGroupsPage() {
         .then(setGroups)
         .catch((e) => setErr(e.message));
   }, [batchId]);
-  async function generate() {setFeedbackArea("generate");
+  async function generate() {
+    setFeedbackArea("generate");
     if (!batchId) return;
     try {
       setBusy(true);
@@ -56,7 +58,8 @@ export default function AdminGroupsPage() {
       setBusy(false);
     }
   }
-  async function approve(g) {setFeedbackArea("approve");
+  async function approve(g) {
+    setFeedbackArea("approve");
     try {
       await api("/admin/group-proposals/" + g.id + "/approve", {
         method: "POST",
@@ -68,7 +71,8 @@ export default function AdminGroupsPage() {
       setErr(e.message);
     }
   }
-  async function saveEdit() {setFeedbackArea("saveEdit");
+  async function saveEdit() {
+    setFeedbackArea("saveEdit");
     try {
       await api("/admin/group-proposals/" + edit.id, {
         method: "PATCH",
@@ -85,15 +89,28 @@ export default function AdminGroupsPage() {
     }
   }
   async function mergeGroup(g) {
-    const others = activeGroups.filter((x) => x.id !== g.id && x.batch_id === g.batch_id);
-    if (!others.length) return setErr("There is no other active group in this batch.");
-    const name = prompt("Merge " + g.name + " into which group?\n" + others.map((x) => x.name).join("\n"));
+    const others = activeGroups.filter(
+      (x) => x.id !== g.id && x.batch_id === g.batch_id,
+    );
+    if (!others.length)
+      return setErr("There is no other active group in this batch.");
+    const name = prompt(
+      "Merge " +
+        g.name +
+        " into which group?\n" +
+        others.map((x) => x.name).join("\n"),
+    );
     if (!name) return;
-    const target = others.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    const target = others.find(
+      (x) => x.name.toLowerCase() === name.trim().toLowerCase(),
+    );
     if (!target) return setErr("No active group in this batch has that name.");
     try {
       setErr("");
-      await api("/admin/groups/" + g.id + "/merge", { method: "POST", body: JSON.stringify({ targetGroupId: target.id }) });
+      await api("/admin/groups/" + g.id + "/merge", {
+        method: "POST",
+        body: JSON.stringify({ targetGroupId: target.id }),
+      });
       setMsg(g.name + " merged into " + target.name + ".");
       await loadBase();
     } catch (e) {
@@ -104,14 +121,26 @@ export default function AdminGroupsPage() {
     try {
       setErr("");
       const data = await api("/admin/groups/" + g.id + "/manage");
-      const list = data.members.map((m, i) => i + 1 + ". " + m.full_name).join("\n");
-      const picks = prompt("Numbers of the interns to move (comma separated):\n" + list);
+      const list = data.members
+        .map((m, i) => i + 1 + ". " + m.full_name)
+        .join("\n");
+      const picks = prompt(
+        "Numbers of the interns to move (comma separated):\n" + list,
+      );
       if (!picks) return;
-      const internIds = picks.split(",").map((x) => data.members[Number(x.trim()) - 1]?.intern_id).filter(Boolean);
+      const internIds = picks
+        .split(",")
+        .map((x) => data.members[Number(x.trim()) - 1]?.intern_id)
+        .filter(Boolean);
       const name = prompt("Name for the new group:");
       if (!name?.trim()) return;
-      await api("/admin/groups/" + g.id + "/split", { method: "POST", body: JSON.stringify({ internIds, name: name.trim() }) });
-      setMsg("Group split. Assign a mentor and project to " + name.trim() + ".");
+      await api("/admin/groups/" + g.id + "/split", {
+        method: "POST",
+        body: JSON.stringify({ internIds, name: name.trim() }),
+      });
+      setMsg(
+        "Group split. Assign a mentor and project to " + name.trim() + ".",
+      );
       await loadBase();
     } catch (e) {
       setErr(e.message);
@@ -125,15 +154,28 @@ export default function AdminGroupsPage() {
     }
   }
   async function deleteGroup(g) {
-    if(!window.confirm("Delete team "+g.name+"? This cannot be undone. Assigned projects, mentors or tasks must be removed first."))return;
-    setErr("");setMsg("");setBusy(true);
-    try{
-      await api("/admin/groups/"+g.id,{method:"DELETE"});
-      setMsg(g.name+" deleted.");
-      if(manage?.id===g.id)setManage(null);
+    if (
+      !window.confirm(
+        "Delete team " +
+          g.name +
+          "? This cannot be undone. Assigned projects, mentors or tasks must be removed first.",
+      )
+    )
+      return;
+    setErr("");
+    setMsg("");
+    setBusy(true);
+    try {
+      await api("/admin/groups/" + g.id, { method: "DELETE" });
+      setMsg(g.name + " deleted.");
+      if (manage?.id === g.id) setManage(null);
       await loadBase();
-      if(batchId)setGroups(await api("/admin/group-proposals/"+batchId));
-    }catch(e){setErr(e.message);}finally{setBusy(false);}
+      if (batchId) setGroups(await api("/admin/group-proposals/" + batchId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveMembers() {
     try {
@@ -161,7 +203,9 @@ export default function AdminGroupsPage() {
               intern_id: i.id,
               full_name: i.full_name,
               final_domain_id: i.final_domain_id,
+              final_subdomain_id: i.final_subdomain_id,
               domain_name: i.final_domain,
+              subdomain_name: i.final_subdomain,
             },
           ],
     }));
@@ -206,7 +250,11 @@ export default function AdminGroupsPage() {
           </div>
           <div className="form-field">
             <label>Composition</label>
-            <select className="input" value={composition} onChange={(e) => setComposition(e.target.value)}>
+            <select
+              className="input"
+              value={composition}
+              onChange={(e) => setComposition(e.target.value)}
+            >
               <option value="SINGLE_DOMAIN">Single domain teams</option>
               <option value="CROSS_FUNCTIONAL">Cross-functional teams</option>
             </select>
@@ -228,7 +276,17 @@ export default function AdminGroupsPage() {
         </button>
       </section>
       <section className="card workflow-section">
-        <h2>Active Groups — Member Rebalancing</h2>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
+        <h2>Active Groups — Member Rebalancing</h2>
+        {err && (
+          <p className="error" role="alert">
+            {err}
+          </p>
+        )}
+        {msg && (
+          <p className="success" role="status">
+            {msg}
+          </p>
+        )}
         {activeGroups
           .filter((g) => !batchId || g.batch_id === batchId)
           .map((g) => (
@@ -243,19 +301,47 @@ export default function AdminGroupsPage() {
                 <button className="btn secondary" onClick={() => openManage(g)}>
                   Manage Members
                 </button>
-                <button className="btn secondary" disabled={busy} onClick={() => mergeGroup(g)}>
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => mergeGroup(g)}
+                >
                   Merge Into…
                 </button>
-                <button className="btn secondary" disabled={busy} onClick={() => splitGroup(g)}>
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => splitGroup(g)}
+                >
                   Split…
                 </button>
-                <button className="btn secondary" disabled={busy} onClick={() => deleteGroup(g)}>Delete Team</button>
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => deleteGroup(g)}
+                >
+                  Delete Team
+                </button>
               </div>
             </div>
           ))}
       </section>
       <section className="card workflow-section">
-        <h2>Admin Review</h2>{feedbackArea==="approve"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+        <h2>Admin Review</h2>
+        {feedbackArea === "approve" && (
+          <>
+            {err && (
+              <p className="error" role="alert">
+                {err}
+              </p>
+            )}
+            {msg && (
+              <p className="success" role="status">
+                {msg}
+              </p>
+            )}
+          </>
+        )}
         {!groups.length ? (
           <p className="muted">No draft proposals for this batch.</p>
         ) : (
@@ -298,7 +384,21 @@ export default function AdminGroupsPage() {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="verification-title">
-              <h2>Edit System Proposal</h2>{feedbackArea==="saveEdit"&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
+              <h2>Edit System Proposal</h2>
+              {feedbackArea === "saveEdit" && (
+                <>
+                  {err && (
+                    <p className="error" role="alert">
+                      {err}
+                    </p>
+                  )}
+                  {msg && (
+                    <p className="success" role="status">
+                      {msg}
+                    </p>
+                  )}
+                </>
+              )}
               <button className="icon-close" onClick={() => setEdit(null)}>
                 ×
               </button>
@@ -324,7 +424,9 @@ export default function AdminGroupsPage() {
                       onChange={() => toggle(i.id)}
                     />
                     <span>
-                      {i.full_name} · {i.domain_name || "Confirmed domain"}
+                      {i.full_name} ·{" "}
+                      {i.final_domain || i.domain_name || "Confirmed domain"}
+                      {i.final_subdomain ? " · " + i.final_subdomain : ""}
                     </span>
                   </label>
                 ))}
@@ -347,7 +449,8 @@ export default function AdminGroupsPage() {
               <div>
                 <h2>Rebalance {manage.name}</h2>
                 <p className="muted">
-                  Add/remove eligible interns. Batch and active-group conflicts are validated by the server.
+                  Add/remove eligible interns. Batch and active-group conflicts
+                  are validated by the server.
                 </p>
               </div>
               <button className="icon-close" onClick={() => setManage(null)}>
@@ -372,6 +475,7 @@ export default function AdminGroupsPage() {
                     />
                     <span>
                       {i.full_name} · {i.final_domain || "Confirmed domain"}
+                      {i.final_subdomain ? " · " + i.final_subdomain : ""}
                     </span>
                   </label>
                 ))}

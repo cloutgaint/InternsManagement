@@ -1,62 +1,1062 @@
 "use client";
-import {useEffect,useState} from "react";
-import {useRouter} from "next/router";
-import {api,apiBlob} from "@/shared/api/client";
-const base="/klu-fortnight";
-const empty=()=>({achievements:"",next_plan:"",exceptions:"",company_comments:"",company_marks:"",university_marks:"",student_feedback:""});
-const headings=[["achievements","14. Achievements / Progress till date"],["next_plan","15. Plan for the coming fortnight"],["exceptions","16. Exceptions, if any"],["company_comments","18. Company Guide Evaluation (comments)"],["student_feedback","19. Feedback to the student"]];
-export default function KluFortnightPage(){
- const router=useRouter();
- const generalReportsHref=router.pathname.startsWith("/mentor/")?"/mentor/reports":"/admin/reports";
- const [reportSearch,setReportSearch]=useState(""),[reportStatus,setReportStatus]=useState("ALL"),[reportPage,setReportPage]=useState(1),[reportPageSize,setReportPageSize]=useState(10),[interns,setInterns]=useState([]),[rows,setRows]=useState([]),[internId,setInternId]=useState(""),[fortnight,setFortnight]=useState(1),[preview,setPreview]=useState(null),[current,setCurrent]=useState(null),[form,setForm]=useState(empty()),[err,setErr]=useState(""),[msg,setMsg]=useState(""),[busy,setBusy]=useState(false),[brand,setBrand]=useState({stamp:null,signature:null}),[viewUrl,setViewUrl]=useState(""),[viewError,setViewError]=useState("");
- const load=async()=>{try{const [i,r]=await Promise.all([api(base+"/interns"),api(base+"/reports")]);setInterns(i);setRows(r);}catch(e){setErr(e.message);}};
- useEffect(()=>{load();},[]);
- async function select(id,no){setErr("");setMsg("");setCurrent(null);setPreview(null);setForm(empty());setInternId(id);setFortnight(no);if(!id)return;try{setPreview(await api(base+"/interns/"+id+"/preview?fortnight="+no));setBrand(await api(base+"/branding"));}catch(e){setErr(e.message);}}
- async function open(row){setErr("");setMsg("");try{const d=await api(base+"/reports/"+row.id);setCurrent(d.report);setInternId(row.intern_id);setFortnight(row.fortnight_no);setForm(Object.fromEntries(Object.keys(empty()).map(k=>[k,d.report[k]??""])));setPreview({profile:d.profile,from:d.report.from_date,to:d.report.to_date,attendance:d.attendance});setBrand(d.brand||{});}catch(e){setErr(e.message);}}
- async function save(finalize=false){setBusy(true);setErr("");setMsg("");try{if(!preview)throw Error("Select an intern and fortnight.");const body={...form};let row=current;if(!row){row=await api(base+"/reports",{method:"POST",body:JSON.stringify({...body,internId,fortnightNo:Number(fortnight)})});}else{row=await api(base+"/reports/"+row.id,{method:"PATCH",body:JSON.stringify({...body,finalize})});}
- if(finalize&&!current){row=await api(base+"/reports/"+row.id,{method:"PATCH",body:JSON.stringify({...body,finalize:true})});}
- setCurrent(row);setMsg(finalize?"Report finalized and locked.":"Draft saved successfully.");await load();if(finalize)await open(row);
- }catch(e){setErr(e.message);}finally{setBusy(false);}}
- async function download(format){setErr("");if(!current){setErr("Save the report before downloading.");return;}try{const blob=await apiBlob(base+"/reports/"+current.id+"/export/"+format);const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="KLU_Fortnight_"+fortnight+"_"+(profile?.roll_number||"intern")+"."+format;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setErr(e.message);}}
- async function viewReport(row){setErr("");setViewError("");try{const blob=await apiBlob(base+"/reports/"+row.id+"/export/pdf");const url=URL.createObjectURL(blob);setViewUrl(old=>{if(old)URL.revokeObjectURL(old);return url;});}catch(e){setErr(e.message);setViewError(e.message);}}
- function closeView(){setViewUrl(old=>{if(old)URL.revokeObjectURL(old);return "";});}
- async function remove(){if(!current||!window.confirm("Delete this draft KLU report? This cannot be undone."))return;setBusy(true);setErr("");try{await api(base+"/reports/"+current.id,{method:"DELETE"});setMsg("Draft deleted.");setCurrent(null);setPreview(null);setInternId("");setForm(empty());await load();}catch(e){setErr(e.message);}finally{setBusy(false);}}
- const locked=current?.status==="FINALIZED",att=preview?.attendance,profile=preview?.profile,total=form.company_marks!==""&&form.university_marks!==""?Number(form.company_marks)+Number(form.university_marks):null;
- const filteredReports=rows.filter(x=>(reportStatus==="ALL"||x.status===reportStatus)&&(!reportSearch.trim()||[x.full_name,x.fortnight_no,x.from_date,x.to_date].some(v=>String(v??"").toLowerCase().includes(reportSearch.trim().toLowerCase()))));
- const reportPages=Math.max(1,Math.ceil(filteredReports.length/reportPageSize)),activeReportPage=Math.min(reportPage,reportPages),pagedReports=filteredReports.slice((activeReportPage-1)*reportPageSize,activeReportPage*reportPageSize);
- return <main className="wrap klu-report klu-report-redesign">
- <div className="intern-head"><div><h1>KLU Fortnightly Progress Report</h1><p className="muted">Industrial Practice School · K. L. Deemed to be University · KLU interns only</p></div><div className="action-row"><a className="btn secondary" href={generalReportsHref}>General Reports</a><button className="btn secondary" type="button" onClick={()=>{setCurrent(null);setPreview(null);setInternId("");setFortnight(1);setForm(empty());setBrand({stamp:null,signature:null});setErr("");setMsg("Ready to create a new report. Select a KLU intern and fortnight.");setViewError("");closeView();requestAnimationFrame(()=>{document.getElementById("klu-report-student")?.scrollIntoView({behavior:"smooth",block:"center"});document.getElementById("klu-report-student")?.focus({preventScroll:true});});}}>New Report</button></div></div>
- <section className="card" id="klu-report-selection"><h2>Report Selection</h2>{msg&&<p className="success" role="status">{msg}</p>}<div className="form-grid"><label>Student<select id="klu-report-student" className="input" disabled={!!current} value={internId} onChange={e=>select(e.target.value,fortnight)}><option value="">Select KLU intern</option>{interns.map(x=><option key={x.id} value={x.id}>{x.full_name} · {x.roll_number||"No university ID"}</option>)}</select></label><label>Fortnight No.<input className="input" type="number" min="1" max="52" disabled={!!current} value={fortnight} onChange={e=>select(internId,Number(e.target.value))}/></label></div>{!preview&&err&&<p className="error" role="alert">{err}</p>}</section>
- {preview&&<section className="card" style={{marginTop:16}}><div className="workflow-row" style={{justifyContent:"space-between",alignItems:"center"}}><div><h2>Fortnightly Progress Report</h2><p className="muted">PS__, A.Y. 20____-___ · Draft template</p></div><span className="muted">{locked?"Finalized":"Draft"}</span></div>
- <div className="form-grid">
- {[[ "1. Name of Student",profile?.full_name],["2. University ID No.",profile?.roll_number],["3. Branch",profile?.branch],["4. Regional Office","Not configured"],["5. Practice School Company","GAINT Clout Technologies Pvt. Ltd."],["6. Company Guide",profile?.company_guide||"Not assigned"],["7. University Guide","To be completed by university"],["8. Project Title",profile?.project_title||"Not assigned"],["9. Fortnight No.",fortnight],["10. Commencing Date",preview.from],["From",preview.from],["To",preview.to]].map(([label,value])=><label key={label}>{label}<input className="input" readOnly value={value??""}/></label>)}
- </div>
- <h3>Attendance Summary — Automatically calculated</h3><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th>11–13. Attendance</th><th>This fortnight</th><th>Till date</th></tr></thead><tbody>{[["Working days","working"],["Days present","present"],["Leaves availed","leave"],["Missing attendance records","unrecorded"]].map(([label,key])=><tr key={key}><td>{label}</td><td>{att?.fortnight?.[key]??"—"}</td><td>{att?.tillDate?.[key]??"—"}</td></tr>)}</tbody></table></div><p className="muted">Weekends and recorded batch holidays excluded. Unrecorded days are not treated as present or leave.</p>
- <h3>Report on On-the-Job Engineer Training (OJET)</h3>
- {headings.slice(0,3).map(([key,label])=><label key={key} style={{display:"block",marginBottom:12}}>{label}<textarea className="input" rows={4} style={{width:"100%"}} disabled={locked} value={form[key]} onChange={e=>setForm(x=>({...x,[key]:e.target.value}))}/></label>)}
- <p className="muted">Plan for coming fortnight — From: {preview.to ? new Date(new Date(preview.to+"T12:00:00Z").getTime()+86400000).toISOString().slice(0,10) : "—"} · To: {preview.to ? new Date(new Date(preview.to+"T12:00:00Z").getTime()+14*86400000).toISOString().slice(0,10) : "—"}</p><p className="muted">Date: {preview.to} · Signature of Student: To be obtained offline</p>
- <h3>Evaluation by University Guide & Company Guide</h3>
- <section className="card" style={{marginBottom:12}}><h3>17. University Guide — 10 Marks</h3><p className="muted">Discipline, regularity, punctuality, commitment, willingness to work hard, attitude and behavior.</p><label>University Guide Marks (out of 10)<input className="input" type="number" min="0" max="10" disabled={locked} value={form.university_marks} onChange={e=>setForm(x=>({...x,university_marks:e.target.value}))}/></label><p className="muted">University Guide signature: External approval required</p></section>
- <section className="card" style={{marginBottom:12}}><h3>18. Company Guide — 30 Marks</h3><p className="muted">OJET progress, work engagement, problem-solving, knowledge application, professional behavior, teamwork, ideas and appreciation.</p><label>Company Guide Comments<textarea className="input" rows={5} style={{width:"100%"}} disabled={locked} value={form.company_comments} onChange={e=>setForm(x=>({...x,company_comments:e.target.value}))}/></label><label>Company Guide Marks (out of 30)<input className="input" type="number" min="0" max="30" disabled={locked} value={form.company_marks} onChange={e=>setForm(x=>({...x,company_marks:e.target.value}))}/></label><div className="form-grid"><div><strong>Mentor Signature</strong>{brand.signature?<img src={brand.signature} alt="Authorized mentor signature" style={{display:"block",maxWidth:180,maxHeight:100,objectFit:"contain"}}/>:<p className="muted">Not uploaded. Mentor: My Profile / Signature</p>}</div><div><strong>Official Company Stamp</strong>{brand.stamp?<img src={brand.stamp} alt="Official GAINT company stamp" style={{display:"block",maxWidth:180,maxHeight:100,objectFit:"contain"}}/>:<p className="muted">Not uploaded. Admin: Company Settings</p>}</div></div></section>
- <label>19. Feedback, if any, to the student<textarea className="input" rows={3} style={{width:"100%"}} disabled={locked} value={form.student_feedback} onChange={e=>setForm(x=>({...x,student_feedback:e.target.value}))}/></label><p><strong>Total marks for the fortnight (10 + 30 = 40): {total===null?"Pending university/company marks":total+" / 40"}</strong></p>
- <div className="action-row" style={{marginTop:16}}>{!locked&&<><button className="btn" type="button" disabled={busy} onClick={()=>save(false)}>Save Draft</button><button className="btn secondary" type="button" disabled={busy} onClick={()=>save(true)}>Finalize Report</button>{current&&<button className="btn secondary" type="button" disabled={busy} onClick={remove}>Delete Draft</button>}</>}<button className="btn secondary" type="button" disabled={!current} onClick={()=>download("pdf")}>Download PDF (A4)</button><button className="btn secondary" type="button" disabled={!current} onClick={()=>download("docx")}>Download Word (.docx)</button></div>{msg&&<p className="success" role="status" style={{marginTop:10}}>{msg}</p>}{err&&<p className="error" role="alert" style={{marginTop:10}}>{err}</p>}</section>}
- <section className="card klu-saved-reports">
-  <div className="klu-section-heading"><div><h2>Saved KLU Reports</h2><p className="muted">Find and manage existing fortnightly progress reports.</p></div><span className="klu-count">{rows.length} reports</span></div>
-  <div className="klu-report-filters"><label>Search reports<input className="input" type="search" placeholder="Search intern, fortnight or date" value={reportSearch} onChange={e=>{setReportSearch(e.target.value);setReportPage(1);}}/></label><label>Status<select className="input" value={reportStatus} onChange={e=>{setReportStatus(e.target.value);setReportPage(1);}}><option value="ALL">All statuses</option>{[...new Set(rows.map(x=>x.status).filter(Boolean))].sort().map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</select></label></div>
-  {filteredReports.length?<><div className="klu-table-scroll"><table className="klu-report-table"><thead><tr><th scope="col">Intern</th><th scope="col">Fortnight</th><th scope="col">Reporting period</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{pagedReports.map(x=><tr key={x.id}><td><strong>{x.full_name}</strong></td><td>{x.fortnight_no}</td><td>{x.from_date} – {x.to_date}</td><td><span className={"klu-status "+(x.status==="FINALIZED"?"is-final":"")}>{x.status}</span></td><td><div className="klu-row-actions"><button className="btn secondary" type="button" onClick={()=>viewReport(x)}>View report</button><button className="btn secondary" type="button" onClick={()=>open(x)}>{x.status==="DRAFT"?"Edit":"Open"}</button></div></td></tr>)}</tbody></table></div>
-  <div className="klu-pagination"><span>Showing {(activeReportPage-1)*reportPageSize+1}–{Math.min(activeReportPage*reportPageSize,filteredReports.length)} of {filteredReports.length}</span><div><label>Rows per page <select value={reportPageSize} onChange={e=>{setReportPageSize(Number(e.target.value));setReportPage(1);}}>{[5,10,20,50].map(n=><option key={n} value={n}>{n}</option>)}</select></label><button className="btn secondary" type="button" disabled={activeReportPage===1} onClick={()=>setReportPage(p=>Math.max(1,p-1))}>Previous</button><span>Page {activeReportPage} of {reportPages}</span><button className="btn secondary" type="button" disabled={activeReportPage===reportPages} onClick={()=>setReportPage(p=>Math.min(reportPages,p+1))}>Next</button></div></div></>:<div className="klu-empty"><strong>{rows.length?"No matching reports":"No saved reports yet"}</strong><p>{rows.length?"Try changing the search or status filter.":"Create a report to see it here."}</p></div>}
- </section>
- {viewUrl&&<div role="dialog" aria-modal="true" aria-label="KLU Fortnight Report Preview" style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.7)",padding:16,display:"flex",flexDirection:"column",gap:8}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#fff",padding:10,borderRadius:8}}><strong>KLU Report — A4 Preview</strong><div className="action-row"><a className="btn secondary" href={viewUrl} download={"KLU_Fortnight_"+fortnight+".pdf"}>Download PDF</a><button className="btn" type="button" onClick={closeView}>Close</button></div></div><iframe title="KLU report PDF preview" src={viewUrl} style={{flex:1,width:"100%",border:0,background:"#fff",borderRadius:8}}/></div>}
- <style jsx global>{`
- .klu-report-redesign{max-width:1200px;color:#111}.klu-report-redesign .intern-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.klu-report-redesign .intern-head h1{font-size:clamp(25px,3vw,32px);letter-spacing:-.025em;color:#111}.klu-report-redesign .intern-head .action-row{display:flex;gap:9px;flex-wrap:wrap}
- .klu-report-redesign>.card{padding:24px;border:1px solid #dce7e1;border-radius:16px;box-shadow:0 5px 20px rgba(15,23,42,.035);margin-bottom:16px}.klu-report-redesign>.card h2{font-size:21px;color:#111;margin:0 0 16px}.klu-report-redesign>.card .form-grid{gap:16px;align-items:end}
- .klu-report-redesign .input{min-height:44px;border:1.5px solid #7ea7ef;border-radius:9px;color:#111;background:#fff}.klu-report-redesign .input:hover{border-color:#2563eb}.klu-report-redesign .input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
- .klu-report-redesign .btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #065f46;border-radius:9px;padding:9px 15px;background:#065f46;color:#fff;font-weight:650}.klu-report-redesign .btn:hover:not(:disabled){background:#064e3b;color:#fff;border-color:#064e3b}.klu-report-redesign .btn.secondary{background:#e8f5ee;color:#075b3b;border-color:#d6e7dc}.klu-report-redesign .btn.secondary:hover:not(:disabled){background:#065f46;color:#fff;border-color:#065f46}.klu-report-redesign .btn:focus-visible{outline:3px solid #86efac;outline-offset:2px}
- .klu-report-redesign .klu-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}.klu-report-redesign .klu-section-heading h2{margin:0 0 5px}.klu-report-redesign .klu-section-heading p{font-size:13px;margin:0}.klu-report-redesign .klu-count{background:#e8f5ee;color:#075b3b;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;white-space:nowrap}
- .klu-report-redesign .klu-report-filters{display:grid;grid-template-columns:minmax(200px,2fr) minmax(150px,1fr);gap:14px;margin-bottom:18px}.klu-report-redesign .klu-report-filters label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:650}.klu-report-redesign .klu-report-filters .input{margin:0}
- .klu-report-redesign .klu-table-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px}.klu-report-redesign .klu-report-table{width:100%;min-width:710px;border-collapse:collapse;text-align:left;font-size:13px}.klu-report-redesign .klu-report-table th{background:#f7faf8;color:#374151;font-size:12px;padding:13px 14px;border-bottom:1px solid #e2e8f0}.klu-report-redesign .klu-report-table td{padding:13px 14px;border-bottom:1px solid #edf1ee;vertical-align:middle;color:#111}.klu-report-redesign .klu-report-table tr:last-child td{border-bottom:0}.klu-report-redesign .klu-report-table tbody tr:hover{background:#f8fbf9}.klu-report-redesign .klu-status{display:inline-block;background:#fff7e6;color:#7c4a00;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700}.klu-report-redesign .klu-status.is-final{background:#e8f5ee;color:#075b3b}.klu-report-redesign .klu-row-actions{display:flex;justify-content:flex-end;gap:7px}.klu-report-redesign .klu-row-actions .btn{min-height:38px;white-space:nowrap}
- .klu-report-redesign .klu-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:#374151}.klu-report-redesign .klu-pagination>div{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.klu-report-redesign .klu-pagination label{display:inline-flex;flex-direction:row;align-items:center;gap:7px;white-space:nowrap;flex:0 0 auto;min-width:max-content}.klu-report-redesign .klu-pagination select{min-height:38px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111}.klu-report-redesign .klu-pagination .btn{min-height:38px}.klu-report-redesign .klu-empty{text-align:center;padding:40px 16px;border:1px dashed #cbd5e1;border-radius:12px}.klu-report-redesign .klu-empty p{font-size:13px;color:#525252}
- @media(max-width:700px){.klu-report-redesign .intern-head{align-items:flex-start;flex-direction:column}.klu-report-redesign>.card{padding:17px}.klu-report-redesign .klu-report-filters{grid-template-columns:1fr}.klu-report-redesign .klu-section-heading{flex-direction:column}}
- `}</style>
- </main>;
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { api, apiBlob } from "@/shared/api/client";
+const base = "/klu-fortnight";
+const empty = () => ({
+  achievements: "",
+  next_plan: "",
+  exceptions: "",
+  company_comments: "",
+  company_marks: "",
+  university_marks: "",
+  student_feedback: "",
+});
+const headings = [
+  ["achievements", "14. Achievements / Progress till date"],
+  ["next_plan", "15. Plan for the coming fortnight"],
+  ["exceptions", "16. Exceptions, if any"],
+  ["company_comments", "18. Company Guide Evaluation (comments)"],
+  ["student_feedback", "19. Feedback to the student"],
+];
+export default function KluFortnightPage() {
+  const router = useRouter();
+  const generalReportsHref = router.pathname.startsWith("/mentor/")
+    ? "/mentor/reports"
+    : "/admin/reports";
+  const [reportSearch, setReportSearch] = useState(""),
+    [reportStatus, setReportStatus] = useState("ALL"),
+    [reportPage, setReportPage] = useState(1),
+    [reportPageSize, setReportPageSize] = useState(10),
+    [interns, setInterns] = useState([]),
+    [rows, setRows] = useState([]),
+    [internId, setInternId] = useState(""),
+    [fortnight, setFortnight] = useState(1),
+    [preview, setPreview] = useState(null),
+    [current, setCurrent] = useState(null),
+    [form, setForm] = useState(empty()),
+    [err, setErr] = useState(""),
+    [msg, setMsg] = useState(""),
+    [busy, setBusy] = useState(false),
+    [brand, setBrand] = useState({ stamp: null, signature: null }),
+    [viewUrl, setViewUrl] = useState("");
+  const load = async () => {
+    try {
+      const [i, r] = await Promise.all([
+        api(base + "/interns"),
+        api(base + "/reports"),
+      ]);
+      setInterns(i);
+      setRows(r);
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  async function select(id, no) {
+    setErr("");
+    setMsg("");
+    setCurrent(null);
+    setPreview(null);
+    setForm(empty());
+    setInternId(id);
+    setFortnight(no);
+    if (!id) return;
+    try {
+      setPreview(
+        await api(base + "/interns/" + id + "/preview?fortnight=" + no),
+      );
+      setBrand(await api(base + "/branding"));
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function open(row) {
+    setErr("");
+    setMsg("");
+    try {
+      const d = await api(base + "/reports/" + row.id);
+      setCurrent(d.report);
+      setInternId(row.intern_id);
+      setFortnight(row.fortnight_no);
+      setForm(
+        Object.fromEntries(
+          Object.keys(empty()).map((k) => [k, d.report[k] ?? ""]),
+        ),
+      );
+      setPreview({
+        profile: d.profile,
+        from: d.report.from_date,
+        to: d.report.to_date,
+        attendance: d.attendance,
+      });
+      setBrand(d.brand || {});
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function save(finalize = false) {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      if (!preview) throw Error("Select an intern and fortnight.");
+      const body = { ...form };
+      let row = current;
+      if (!row) {
+        row = await api(base + "/reports", {
+          method: "POST",
+          body: JSON.stringify({
+            ...body,
+            internId,
+            fortnightNo: Number(fortnight),
+          }),
+        });
+      } else {
+        row = await api(base + "/reports/" + row.id, {
+          method: "PATCH",
+          body: JSON.stringify({ ...body, finalize }),
+        });
+      }
+      if (finalize && !current) {
+        row = await api(base + "/reports/" + row.id, {
+          method: "PATCH",
+          body: JSON.stringify({ ...body, finalize: true }),
+        });
+      }
+      setCurrent(row);
+      setMsg(
+        finalize ? "Report finalized and locked." : "Draft saved successfully.",
+      );
+      await load();
+      if (finalize) await open(row);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function download(format) {
+    setErr("");
+    if (!current) {
+      setErr("Save the report before downloading.");
+      return;
+    }
+    try {
+      const blob = await apiBlob(
+        base + "/reports/" + current.id + "/export/" + format,
+      );
+      const url = URL.createObjectURL(blob),
+        a = document.createElement("a");
+      a.href = url;
+      a.download =
+        "KLU_Fortnight_" +
+        fortnight +
+        "_" +
+        (profile?.roll_number || "intern") +
+        "." +
+        format;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function viewReport(row) {
+    setErr("");
+    try {
+      const blob = await apiBlob(base + "/reports/" + row.id + "/export/pdf");
+      const url = URL.createObjectURL(blob);
+      setViewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  function closeView() {
+    setViewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return "";
+    });
+  }
+  async function remove() {
+    if (
+      !current ||
+      !window.confirm("Delete this draft KLU report? This cannot be undone.")
+    )
+      return;
+    setBusy(true);
+    setErr("");
+    try {
+      await api(base + "/reports/" + current.id, { method: "DELETE" });
+      setMsg("Draft deleted.");
+      setCurrent(null);
+      setPreview(null);
+      setInternId("");
+      setForm(empty());
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const locked = current?.status === "FINALIZED",
+    att = preview?.attendance,
+    profile = preview?.profile,
+    total =
+      form.company_marks !== "" && form.university_marks !== ""
+        ? Number(form.company_marks) + Number(form.university_marks)
+        : null;
+  const filteredReports = rows.filter(
+    (x) =>
+      (reportStatus === "ALL" || x.status === reportStatus) &&
+      (!reportSearch.trim() ||
+        [x.full_name, x.fortnight_no, x.from_date, x.to_date].some((v) =>
+          String(v ?? "")
+            .toLowerCase()
+            .includes(reportSearch.trim().toLowerCase()),
+        )),
+  );
+  const reportPages = Math.max(
+      1,
+      Math.ceil(filteredReports.length / reportPageSize),
+    ),
+    activeReportPage = Math.min(reportPage, reportPages),
+    pagedReports = filteredReports.slice(
+      (activeReportPage - 1) * reportPageSize,
+      activeReportPage * reportPageSize,
+    );
+  return (
+    <main className="wrap klu-report klu-report-redesign">
+      <div className="intern-head">
+        <div>
+          <h1>KLU Fortnightly Progress Report</h1>
+          <p className="muted">
+            Industrial Practice School · K. L. Deemed to be University · KLU
+            interns only
+          </p>
+        </div>
+        <div className="action-row">
+          <a className="btn secondary" href={generalReportsHref}>
+            General Reports
+          </a>
+          <button
+            className="btn secondary"
+            type="button"
+            onClick={() => {
+              setCurrent(null);
+              setPreview(null);
+              setInternId("");
+              setFortnight(1);
+              setForm(empty());
+              setBrand({ stamp: null, signature: null });
+              setErr("");
+              setMsg(
+                "Ready to create a new report. Select a KLU intern and fortnight.",
+              );
+              closeView();
+              requestAnimationFrame(() => {
+                document
+                  .getElementById("klu-report-student")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                document
+                  .getElementById("klu-report-student")
+                  ?.focus({ preventScroll: true });
+              });
+            }}
+          >
+            New Report
+          </button>
+        </div>
+      </div>
+      <section className="card" id="klu-report-selection">
+        <h2>Report Selection</h2>
+        {msg && (
+          <p className="success" role="status">
+            {msg}
+          </p>
+        )}
+        <div className="form-grid">
+          <label>
+            Student
+            <select
+              id="klu-report-student"
+              className="input"
+              disabled={!!current}
+              value={internId}
+              onChange={(e) => select(e.target.value, fortnight)}
+            >
+              <option value="">Select KLU intern</option>
+              {interns.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.full_name} · {x.roll_number || "No university ID"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Fortnight No.
+            <input
+              className="input"
+              type="number"
+              min="1"
+              max="52"
+              disabled={!!current}
+              value={fortnight}
+              onChange={(e) => select(internId, Number(e.target.value))}
+            />
+          </label>
+        </div>
+        {!preview && err && (
+          <p className="error" role="alert">
+            {err}
+          </p>
+        )}
+      </section>
+      {preview && (
+        <section className="card" style={{ marginTop: 16 }}>
+          <div
+            className="workflow-row"
+            style={{ justifyContent: "space-between", alignItems: "center" }}
+          >
+            <div>
+              <h2>Fortnightly Progress Report</h2>
+              <p className="muted">PS__, A.Y. 20____-___ · Draft template</p>
+            </div>
+            <span className="muted">{locked ? "Finalized" : "Draft"}</span>
+          </div>
+          <div className="form-grid">
+            {[
+              ["1. Name of Student", profile?.full_name],
+              ["2. University ID No.", profile?.roll_number],
+              ["3. Branch", profile?.branch],
+              ["4. Regional Office", "Not configured"],
+              [
+                "5. Practice School Company",
+                "GAINT Clout Technologies Pvt. Ltd.",
+              ],
+              ["6. Company Guide", profile?.company_guide || "Not assigned"],
+              ["7. University Guide", "To be completed by university"],
+              ["8. Project Title", profile?.project_title || "Not assigned"],
+              ["9. Fortnight No.", fortnight],
+              ["10. Commencing Date", preview.from],
+              ["From", preview.from],
+              ["To", preview.to],
+            ].map(([label, value]) => (
+              <label key={label}>
+                {label}
+                <input className="input" readOnly value={value ?? ""} />
+              </label>
+            ))}
+          </div>
+          <h3>Attendance Summary — Automatically calculated</h3>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th>11–13. Attendance</th>
+                  <th>This fortnight</th>
+                  <th>Till date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Working days", "working"],
+                  ["Days present", "present"],
+                  ["Leaves availed", "leave"],
+                  ["Missing attendance records", "unrecorded"],
+                ].map(([label, key]) => (
+                  <tr key={key}>
+                    <td>{label}</td>
+                    <td>{att?.fortnight?.[key] ?? "—"}</td>
+                    <td>{att?.tillDate?.[key] ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted">
+            Weekends and recorded batch holidays excluded. Unrecorded days are
+            not treated as present or leave.
+          </p>
+          <h3>Report on On-the-Job Engineer Training (OJET)</h3>
+          {headings.slice(0, 3).map(([key, label]) => (
+            <label key={key} style={{ display: "block", marginBottom: 12 }}>
+              {label}
+              <textarea
+                className="input"
+                rows={4}
+                style={{ width: "100%" }}
+                disabled={locked}
+                value={form[key]}
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, [key]: e.target.value }))
+                }
+              />
+            </label>
+          ))}
+          <p className="muted">
+            Plan for coming fortnight — From:{" "}
+            {preview.to
+              ? new Date(
+                  new Date(preview.to + "T12:00:00Z").getTime() + 86400000,
+                )
+                  .toISOString()
+                  .slice(0, 10)
+              : "—"}{" "}
+            · To:{" "}
+            {preview.to
+              ? new Date(
+                  new Date(preview.to + "T12:00:00Z").getTime() + 14 * 86400000,
+                )
+                  .toISOString()
+                  .slice(0, 10)
+              : "—"}
+          </p>
+          <p className="muted">
+            Date: {preview.to} · Signature of Student: To be obtained offline
+          </p>
+          <h3>Evaluation by University Guide & Company Guide</h3>
+          <section className="card" style={{ marginBottom: 12 }}>
+            <h3>17. University Guide — 10 Marks</h3>
+            <p className="muted">
+              Discipline, regularity, punctuality, commitment, willingness to
+              work hard, attitude and behavior.
+            </p>
+            <label>
+              University Guide Marks (out of 10)
+              <input
+                className="input"
+                type="number"
+                min="0"
+                max="10"
+                disabled={locked}
+                value={form.university_marks}
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, university_marks: e.target.value }))
+                }
+              />
+            </label>
+            <p className="muted">
+              University Guide signature: External approval required
+            </p>
+          </section>
+          <section className="card" style={{ marginBottom: 12 }}>
+            <h3>18. Company Guide — 30 Marks</h3>
+            <p className="muted">
+              OJET progress, work engagement, problem-solving, knowledge
+              application, professional behavior, teamwork, ideas and
+              appreciation.
+            </p>
+            <label>
+              Company Guide Comments
+              <textarea
+                className="input"
+                rows={5}
+                style={{ width: "100%" }}
+                disabled={locked}
+                value={form.company_comments}
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, company_comments: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Company Guide Marks (out of 30)
+              <input
+                className="input"
+                type="number"
+                min="0"
+                max="30"
+                disabled={locked}
+                value={form.company_marks}
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, company_marks: e.target.value }))
+                }
+              />
+            </label>
+            <div className="form-grid">
+              <div>
+                <strong>Mentor Signature</strong>
+                {brand.signature ? (
+                  <img
+                    src={brand.signature}
+                    alt="Authorized mentor signature"
+                    style={{
+                      display: "block",
+                      maxWidth: 180,
+                      maxHeight: 100,
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  <p className="muted">
+                    Not uploaded. Mentor: My Profile / Signature
+                  </p>
+                )}
+              </div>
+              <div>
+                <strong>Official Company Stamp</strong>
+                {brand.stamp ? (
+                  <img
+                    src={brand.stamp}
+                    alt="Official GAINT company stamp"
+                    style={{
+                      display: "block",
+                      maxWidth: 180,
+                      maxHeight: 100,
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  <p className="muted">Not uploaded. Admin: Company Settings</p>
+                )}
+              </div>
+            </div>
+          </section>
+          <label>
+            19. Feedback, if any, to the student
+            <textarea
+              className="input"
+              rows={3}
+              style={{ width: "100%" }}
+              disabled={locked}
+              value={form.student_feedback}
+              onChange={(e) =>
+                setForm((x) => ({ ...x, student_feedback: e.target.value }))
+              }
+            />
+          </label>
+          <p>
+            <strong>
+              Total marks for the fortnight (10 + 30 = 40):{" "}
+              {total === null
+                ? "Pending university/company marks"
+                : total + " / 40"}
+            </strong>
+          </p>
+          <div className="action-row" style={{ marginTop: 16 }}>
+            {!locked && (
+              <>
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => save(false)}
+                >
+                  Save Draft
+                </button>
+                <button
+                  className="btn secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => save(true)}
+                >
+                  Finalize Report
+                </button>
+                {current && (
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={remove}
+                  >
+                    Delete Draft
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={!current}
+              onClick={() => download("pdf")}
+            >
+              Download PDF (A4)
+            </button>
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={!current}
+              onClick={() => download("docx")}
+            >
+              Download Word (.docx)
+            </button>
+          </div>
+          {msg && (
+            <p className="success" role="status" style={{ marginTop: 10 }}>
+              {msg}
+            </p>
+          )}
+          {err && (
+            <p className="error" role="alert" style={{ marginTop: 10 }}>
+              {err}
+            </p>
+          )}
+        </section>
+      )}
+      <section className="card klu-saved-reports">
+        <div className="klu-section-heading">
+          <div>
+            <h2>Saved KLU Reports</h2>
+            <p className="muted">
+              Find and manage existing fortnightly progress reports.
+            </p>
+          </div>
+          <span className="klu-count">{rows.length} reports</span>
+        </div>
+        <div className="klu-report-filters">
+          <label>
+            Search reports
+            <input
+              className="input"
+              type="search"
+              placeholder="Search intern, fortnight or date"
+              value={reportSearch}
+              onChange={(e) => {
+                setReportSearch(e.target.value);
+                setReportPage(1);
+              }}
+            />
+          </label>
+          <label>
+            Status
+            <select
+              className="input"
+              value={reportStatus}
+              onChange={(e) => {
+                setReportStatus(e.target.value);
+                setReportPage(1);
+              }}
+            >
+              <option value="ALL">All statuses</option>
+              {[...new Set(rows.map((x) => x.status).filter(Boolean))]
+                .sort()
+                .map((v) => (
+                  <option key={v} value={v}>
+                    {v.replaceAll("_", " ")}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+        {filteredReports.length ? (
+          <>
+            <div className="klu-table-scroll">
+              <table className="klu-report-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Intern</th>
+                    <th scope="col">Fortnight</th>
+                    <th scope="col">Reporting period</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedReports.map((x) => (
+                    <tr key={x.id}>
+                      <td>
+                        <strong>{x.full_name}</strong>
+                      </td>
+                      <td>{x.fortnight_no}</td>
+                      <td>
+                        {x.from_date} – {x.to_date}
+                      </td>
+                      <td>
+                        <span
+                          className={
+                            "klu-status " +
+                            (x.status === "FINALIZED" ? "is-final" : "")
+                          }
+                        >
+                          {x.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="klu-row-actions">
+                          <button
+                            className="btn secondary"
+                            type="button"
+                            onClick={() => viewReport(x)}
+                          >
+                            View report
+                          </button>
+                          <button
+                            className="btn secondary"
+                            type="button"
+                            onClick={() => open(x)}
+                          >
+                            {x.status === "DRAFT" ? "Edit" : "Open"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="klu-pagination">
+              <span>
+                Showing {(activeReportPage - 1) * reportPageSize + 1}–
+                {Math.min(
+                  activeReportPage * reportPageSize,
+                  filteredReports.length,
+                )}{" "}
+                of {filteredReports.length}
+              </span>
+              <div>
+                <label>
+                  Rows per page{" "}
+                  <select
+                    value={reportPageSize}
+                    onChange={(e) => {
+                      setReportPageSize(Number(e.target.value));
+                      setReportPage(1);
+                    }}
+                  >
+                    {[5, 10, 20, 50].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="btn secondary"
+                  type="button"
+                  disabled={activeReportPage === 1}
+                  onClick={() => setReportPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {activeReportPage} of {reportPages}
+                </span>
+                <button
+                  className="btn secondary"
+                  type="button"
+                  disabled={activeReportPage === reportPages}
+                  onClick={() =>
+                    setReportPage((p) => Math.min(reportPages, p + 1))
+                  }
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="klu-empty">
+            <strong>
+              {rows.length ? "No matching reports" : "No saved reports yet"}
+            </strong>
+            <p>
+              {rows.length
+                ? "Try changing the search or status filter."
+                : "Create a report to see it here."}
+            </p>
+          </div>
+        )}
+      </section>
+      {viewUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="KLU Fortnight Report Preview"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,.7)",
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "#fff",
+              padding: 10,
+              borderRadius: 8,
+            }}
+          >
+            <strong>KLU Report — A4 Preview</strong>
+            <div className="action-row">
+              <a
+                className="btn secondary"
+                href={viewUrl}
+                download={"KLU_Fortnight_" + fortnight + ".pdf"}
+              >
+                Download PDF
+              </a>
+              <button className="btn" type="button" onClick={closeView}>
+                Close
+              </button>
+            </div>
+          </div>
+          <iframe
+            title="KLU report PDF preview"
+            src={viewUrl}
+            style={{
+              flex: 1,
+              width: "100%",
+              border: 0,
+              background: "#fff",
+              borderRadius: 8,
+            }}
+          />
+        </div>
+      )}
+      <style jsx global>{`
+        .klu-report-redesign {
+          max-width: 1200px;
+          color: #111;
+        }
+        .klu-report-redesign .intern-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 22px;
+        }
+        .klu-report-redesign .intern-head h1 {
+          font-size: clamp(25px, 3vw, 32px);
+          letter-spacing: -0.025em;
+          color: #111;
+        }
+        .klu-report-redesign .intern-head .action-row {
+          display: flex;
+          gap: 9px;
+          flex-wrap: wrap;
+        }
+        .klu-report-redesign > .card {
+          padding: 24px;
+          border: 1px solid #dce7e1;
+          border-radius: 16px;
+          box-shadow: 0 5px 20px rgba(15, 23, 42, 0.035);
+          margin-bottom: 16px;
+        }
+        .klu-report-redesign > .card h2 {
+          font-size: 21px;
+          color: #111;
+          margin: 0 0 16px;
+        }
+        .klu-report-redesign > .card .form-grid {
+          gap: 16px;
+          align-items: end;
+        }
+        .klu-report-redesign .input {
+          min-height: 44px;
+          border: 1.5px solid #7ea7ef;
+          border-radius: 9px;
+          color: #111;
+          background: #fff;
+        }
+        .klu-report-redesign .input:hover {
+          border-color: #2563eb;
+        }
+        .klu-report-redesign .input:focus {
+          outline: 0;
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px #dbeafe;
+        }
+        .klu-report-redesign .btn {
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #065f46;
+          border-radius: 9px;
+          padding: 9px 15px;
+          background: #065f46;
+          color: #fff;
+          font-weight: 650;
+        }
+        .klu-report-redesign .btn:hover:not(:disabled) {
+          background: #064e3b;
+          color: #fff;
+          border-color: #064e3b;
+        }
+        .klu-report-redesign .btn.secondary {
+          background: #e8f5ee;
+          color: #075b3b;
+          border-color: #d6e7dc;
+        }
+        .klu-report-redesign .btn.secondary:hover:not(:disabled) {
+          background: #065f46;
+          color: #fff;
+          border-color: #065f46;
+        }
+        .klu-report-redesign .btn:focus-visible {
+          outline: 3px solid #86efac;
+          outline-offset: 2px;
+        }
+        .klu-report-redesign .klu-section-heading {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+        .klu-report-redesign .klu-section-heading h2 {
+          margin: 0 0 5px;
+        }
+        .klu-report-redesign .klu-section-heading p {
+          font-size: 13px;
+          margin: 0;
+        }
+        .klu-report-redesign .klu-count {
+          background: #e8f5ee;
+          color: #075b3b;
+          border-radius: 999px;
+          padding: 7px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+        .klu-report-redesign .klu-report-filters {
+          display: grid;
+          grid-template-columns: minmax(200px, 2fr) minmax(150px, 1fr);
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+        .klu-report-redesign .klu-report-filters label {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          font-size: 12px;
+          font-weight: 650;
+        }
+        .klu-report-redesign .klu-report-filters .input {
+          margin: 0;
+        }
+        .klu-report-redesign .klu-table-scroll {
+          overflow-x: auto;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+        }
+        .klu-report-redesign .klu-report-table {
+          width: 100%;
+          min-width: 710px;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 13px;
+        }
+        .klu-report-redesign .klu-report-table th {
+          background: #f7faf8;
+          color: #374151;
+          font-size: 12px;
+          padding: 13px 14px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .klu-report-redesign .klu-report-table td {
+          padding: 13px 14px;
+          border-bottom: 1px solid #edf1ee;
+          vertical-align: middle;
+          color: #111;
+        }
+        .klu-report-redesign .klu-report-table tr:last-child td {
+          border-bottom: 0;
+        }
+        .klu-report-redesign .klu-report-table tbody tr:hover {
+          background: #f8fbf9;
+        }
+        .klu-report-redesign .klu-status {
+          display: inline-block;
+          background: #fff7e6;
+          color: #7c4a00;
+          border-radius: 999px;
+          padding: 6px 10px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .klu-report-redesign .klu-status.is-final {
+          background: #e8f5ee;
+          color: #075b3b;
+        }
+        .klu-report-redesign .klu-row-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 7px;
+        }
+        .klu-report-redesign .klu-row-actions .btn {
+          min-height: 38px;
+          white-space: nowrap;
+        }
+        .klu-report-redesign .klu-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 16px;
+          font-size: 12px;
+          color: #374151;
+        }
+        .klu-report-redesign .klu-pagination > div {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          flex-wrap: wrap;
+        }
+        .klu-report-redesign .klu-pagination label {
+          display: inline-flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 7px;
+          white-space: nowrap;
+          flex: 0 0 auto;
+          min-width: max-content;
+        }
+        .klu-report-redesign .klu-pagination select {
+          min-height: 38px;
+          padding: 7px;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          background: #fff;
+          color: #111;
+        }
+        .klu-report-redesign .klu-pagination .btn {
+          min-height: 38px;
+        }
+        .klu-report-redesign .klu-empty {
+          text-align: center;
+          padding: 40px 16px;
+          border: 1px dashed #cbd5e1;
+          border-radius: 12px;
+        }
+        .klu-report-redesign .klu-empty p {
+          font-size: 13px;
+          color: #525252;
+        }
+        @media (max-width: 700px) {
+          .klu-report-redesign .intern-head {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+          .klu-report-redesign > .card {
+            padding: 17px;
+          }
+          .klu-report-redesign .klu-report-filters {
+            grid-template-columns: 1fr;
+          }
+          .klu-report-redesign .klu-section-heading {
+            flex-direction: column;
+          }
+        }
+      `}</style>
+    </main>
+  );
 }

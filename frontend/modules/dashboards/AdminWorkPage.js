@@ -1,62 +1,710 @@
 "use client";
-import {useEffect,useState} from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import {api} from "@/shared/api/client";
-const roles=["Frontend Developer","Backend Developer","Full Stack Developer","UI/UX Designer","QA Tester","DevOps Engineer","Database Developer","Team Lead"];
-export default function AdminWorkPage(){
-  const [pendingMentors,setPendingMentors]=useState({}),[groups,setGroups]=useState([]),[mentors,setMentors]=useState([]),[projects,setProjects]=useState([]),[batches,setBatches]=useState([]),[interns,setInterns]=useState([]),[assignments,setAssignments]=useState([]),[internMentors,setInternMentors]=useState([]),[details,setDetails]=useState({}),[batchId,setBatchId]=useState(""),[name,setName]=useState(""),[members,setMembers]=useState([]),[selected,setSelected]=useState(""),[err,setErr]=useState(""),[msg,setMsg]=useState(""),[busy,setBusy]=useState(false),[recommendations,setRecommendations]=useState([]),[transferIntern,setTransferIntern]=useState(""),[customRoles,setCustomRoles]=useState({}),[roleChoices,setRoleChoices]=useState({});
-  const load=async()=>{try{const [g,m,p,b,i,a,im]=await Promise.all(["groups","mentors","projects","batches","interns","project-assignments","intern-mentor-assignments"].map(x=>api("/admin/"+x)));setGroups(g);setMentors(m);setProjects(p);setBatches(b);setInterns(i);setAssignments(a);setInternMentors(im);setBatchId(v=>v||b[0]?.id||"");}catch(e){setErr(e.message);}};
-  useEffect(()=>{load();},[]);
-  async function run(action,success){setErr("");setMsg("");setBusy(true);try{await action();setMsg(success);await load();}catch(e){setErr(e.message);}finally{setBusy(false);}}
-  async function openGroup(id){setSelected(id);setErr("");try{setDetails(d=>({...d,[id]:null}));const result=await api("/admin/groups/"+id+"/manage");setDetails(d=>({...d,[id]:result}));}catch(e){setErr(e.message);}}
-  useEffect(()=>{if(!batchId){setRecommendations([]);return;}api("/admin/project-team-recommendations/"+batchId).then(setRecommendations).catch(e=>setErr(e.message));},[batchId]);
-  const recommendation=id=>recommendations.find(x=>x.intern_id===id)?.recommendation;
-  const batchInterns=interns.filter(x=>x.batch_id===batchId);
-  const activeGroups=groups.filter(x=>x.batch_id===batchId);
-  const hasProject=id=>assignments.some(a=>a.group_id===id&&a.status==="ASSIGNED");
-  async function createGroup(){if(!name.trim()||!members.length)return setErr("Enter a team name and select at least one intern.");await run(async()=>{const g=await api("/admin/groups",{method:"POST",body:JSON.stringify({batchId,name:name.trim(),type:"MULTI_DOMAIN"})});await api("/admin/groups/"+g.id+"/members",{method:"PATCH",body:JSON.stringify({internIds:members})});setName("");setMembers([]);},"Team created. Approve the group to activate project and mentor allocation.");}
-  async function transfer(g){if(!transferIntern)return setErr("Select an intern to transfer.");await run(()=>api("/admin/groups/"+g.id+"/transfer",{method:"POST",body:JSON.stringify({internId:transferIntern})}),"Intern transferred. Assign their new project role.");setTransferIntern("");await openGroup(g.id);}
-  async function setRole(g,p,role){if(p.project_role && !window.confirm("Change "+p.full_name+"'s project role from "+p.project_role+" to "+role+"?"))return;await run(()=>api("/admin/groups/"+g.id+"/members/"+p.intern_id+"/role",{method:"PATCH",body:JSON.stringify({role})}),"Project role saved.");await openGroup(g.id);}
-  async function approve(g){const count=details[g.id]?.members?.length||0;if(!count)return setErr("Add at least one intern to this team before approval.");await run(()=>api("/admin/group-proposals/"+g.id+"/approve",{method:"POST",body:"{}"}),"Team activated.");await openGroup(g.id);}
-  async function assignProject(g,id){if(!id)return;await run(()=>api("/admin/project-assignments",{method:"POST",body:JSON.stringify({projectId:id,groupId:g.id})}),"Project assigned.");}
-  async function saveInternAssignment(g,p){
-    const currentRole=p.project_role||"";
-    const chosen=roleChoices[p.intern_id]??currentRole;
-    const role=chosen==="__custom__"?(customRoles[p.intern_id]||"").trim():chosen;
-    const currentMentor=internMentors.find(x=>x.intern_id===p.intern_id)?.mentor_id||"";
-    const mentor=pendingMentors[p.intern_id]??currentMentor;
-    if(!role)return setErr("Select a project role before saving.");
-    if(role===currentRole&&mentor===currentMentor)return setMsg("No changes to save.");
-    if(role!==currentRole&&currentRole&&!window.confirm("Change "+p.full_name+"'s project role from "+currentRole+" to "+role+"?"))return;
-    setErr("");setMsg("");setBusy(true);
-    try{
-      if(role!==currentRole)await api("/admin/groups/"+g.id+"/members/"+p.intern_id+"/role",{method:"PATCH",body:JSON.stringify({role})});
-      if(mentor!==currentMentor)await api("/admin/interns/"+p.intern_id+"/mentor",{method:"PUT",body:JSON.stringify({mentorId:mentor||null})});
-      setRoleChoices(s=>{const next={...s};delete next[p.intern_id];return next;});
-      setPendingMentors(s=>{const next={...s};delete next[p.intern_id];return next;});
-      setCustomRoles(s=>{const next={...s};delete next[p.intern_id];return next;});
-      await load();await openGroup(g.id);
-      setMsg("Project role and mentor saved for "+p.full_name+".");
-    }catch(e){setErr(e.message);}finally{setBusy(false);}
+import { api } from "@/shared/api/client";
+const roles = [
+  "Frontend Developer",
+  "Backend Developer",
+  "Full Stack Developer",
+  "UI/UX Designer",
+  "QA Tester",
+  "DevOps Engineer",
+  "Database Developer",
+  "Team Lead",
+];
+export default function AdminWorkPage() {
+  const [pendingMentors, setPendingMentors] = useState({}),
+    [groups, setGroups] = useState([]),
+    [mentors, setMentors] = useState([]),
+    [batches, setBatches] = useState([]),
+    [interns, setInterns] = useState([]),
+    [assignments, setAssignments] = useState([]),
+    [internMentors, setInternMentors] = useState([]),
+    [details, setDetails] = useState({}),
+    [batchId, setBatchId] = useState(""),
+    [selected, setSelected] = useState(""),
+    [err, setErr] = useState(""),
+    [msg, setMsg] = useState(""),
+    [busy, setBusy] = useState(false),
+    [recommendations, setRecommendations] = useState([]),
+    [transferIntern, setTransferIntern] = useState(""),
+    [customRoles, setCustomRoles] = useState({}),
+    [roleChoices, setRoleChoices] = useState({});
+  const load = async () => {
+    try {
+      const [g, m, b, i, a, im] = await Promise.all(
+        [
+          "groups",
+          "mentors",
+          "batches",
+          "interns",
+          "project-assignments",
+          "intern-mentor-assignments",
+        ].map((x) => api("/admin/" + x)),
+      );
+      setGroups(g);
+      setMentors(m);
+      setBatches(b);
+      setInterns(i);
+      setAssignments(a);
+      setInternMentors(im);
+      setBatchId((v) => v || b[0]?.id || "");
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  async function run(action, success) {
+    setErr("");
+    setMsg("");
+    setBusy(true);
+    try {
+      await action();
+      setMsg(success);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
-  return <main className="wrap skillbridge-admin-work">
-    <div className="intern-head"><div><h1>Project Teams & Role Allocation</h1><p className="muted">Manage each project's interns, their roles and mentors before scheduling weekly tasks.</p></div></div>
-    <section className="card workflow-section"><h2>Project Groups</h2><p className="muted">Create a project group by selecting project, college, batch and interns in Project Master. Manage individual roles and mentors here.</p><Link href="/admin/projects" className="btn secondary">Open Project Master</Link><label>Batch<select className="input" value={batchId} onChange={e=>{setBatchId(e.target.value);setSelected("");}}><option value="">All batches</option>{batches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label></section>
-    <section className="card workflow-section"><h2>Manage Project Roles & Individual Mentors</h2>{activeGroups.map(g=><div key={g.id} className="workflow-row" style={{display:"block"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}><div><b>{g.name}</b><div className="muted">{g.status}</div></div><button className="btn secondary" onClick={()=>openGroup(g.id)}>Manage Project Members</button></div>{selected===g.id&&<div style={{marginTop:16,display:"grid",gap:12}}>{!details[g.id]?<p className="muted">Loading team…</p>:<>{g.status==="ACTIVE"&&<div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"end"}}><label>Transfer intern to this team<select className="input" value={transferIntern} onChange={e=>setTransferIntern(e.target.value)}><option value="">Select intern</option>{batchInterns.filter(p=>!details[g.id].members?.some(m=>m.intern_id===p.id)).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></label><button className="btn secondary" disabled={busy||!transferIntern} onClick={()=>transfer(g)}>Transfer</button></div>}{!hasProject(g.id)&&<p className="muted">This group has no assigned project. Create a project group in Project Master.</p>}{details[g.id].members?.map(p=><div key={p.intern_id} style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",justifyContent:"space-between"}}><div><b>{p.full_name}</b><small className="muted" style={{display:"block"}}>{p.domain_name||"Domain not confirmed"} · Suggested: {recommendation(p.intern_id)||"Not available"}</small></div><div style={{display:"grid",gap:6,minWidth:220}}><select aria-label={"Project role for "+p.full_name} className="input" value={roleChoices[p.intern_id]??p.project_role??""} disabled={busy||g.status!=="ACTIVE"||!hasProject(g.id)} onChange={e=>setRoleChoices(s=>({...s,[p.intern_id]:e.target.value}))}><option value="">Select project role</option>{[...new Set([...roles,...(p.project_role?[p.project_role]:[])])].map(role=><option key={role} value={role}>{role}</option>)}<option value="__custom__">+ Enter custom role</option></select>{roleChoices[p.intern_id]==="__custom__"&&<div style={{display:"flex",gap:6}}><input className="input" maxLength={100} aria-label={"Custom project role for "+p.full_name} placeholder="Enter role name" value={customRoles[p.intern_id]||""} onChange={e=>setCustomRoles(s=>({...s,[p.intern_id]:e.target.value}))}/></div>}</div>{hasProject(g.id)&&<label>Intern mentor<select className="input" style={{maxWidth:230}} value={pendingMentors[p.intern_id]??internMentors.find(x=>x.intern_id===p.intern_id)?.mentor_id??""} disabled={busy} onChange={e=>setPendingMentors(s=>({...s,[p.intern_id]:e.target.value}))}><option value="">No mentor assigned</option>{mentors.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}</select></label>}<button className="btn" type="button" disabled={busy||g.status!=="ACTIVE"||!hasProject(g.id)} onClick={()=>saveInternAssignment(g,p)}>Save Assignment</button></div>)}</>}</div>}</div>)}{!activeGroups.length&&<p className="muted">No project groups found. Create one in Project Master.</p>}</section>
-    <section className="card workflow-section"><h2>Weekly Project Tasks</h2><p className="muted">Once the team, project, roles and mentor are confirmed, prepare tasks for every internship week. Release each week manually after confirming its tasks.</p><Link href="/admin/tasks" className="btn secondary">Open Weekly Task Scheduler</Link></section>
-    {err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}
-    <style jsx global>{`/* SkillBridge blue action theme: black labels, consistent pills. */
-.skillbridge-admin-work .workflow-section .btn.secondary{background:#60a5fa!important;border:1px solid #60a5fa!important;color:#111827!important;border-radius:999px!important;min-height:44px;padding:11px 20px;font-size:13px;font-weight:600;line-height:1.3;box-shadow:0 2px 6px rgba(37,99,235,.08);transition:background-color .18s,border-color .18s,box-shadow .18s}
-.skillbridge-admin-work .workflow-section .btn.secondary:hover:not(:disabled){background:#3b82f6!important;border-color:#3b82f6!important;color:#111827!important;box-shadow:0 5px 14px rgba(59,130,246,.18)}
-.skillbridge-admin-work .workflow-section .btn.secondary:focus-visible{outline:3px solid #bfdbfe;outline-offset:3px}
-.skillbridge-admin-work .workflow-section .btn.secondary:disabled{opacity:.55;cursor:not-allowed}
-.skillbridge-admin-work>.workflow-section:nth-of-type(2)>.workflow-row>.btn.secondary{min-width:200px}
-.skillbridge-admin-work>.workflow-section:nth-of-type(2)>.workflow-row>div>.btn.secondary{min-width:200px}
-@media(max-width:600px){.skillbridge-admin-work>.workflow-section:nth-of-type(2)>.workflow-row>div>.btn.secondary{min-width:0}}
-/* Final contrast override: white text on accessible blue, including hover. */
-.skillbridge-admin-work .workflow-section .btn.secondary{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important;text-shadow:none!important}
-.skillbridge-admin-work .workflow-section .btn.secondary:hover:not(:disabled){background:#1d4ed8!important;border-color:#1d4ed8!important;color:#fff!important}
+  async function openGroup(id) {
+    setSelected(id);
+    setErr("");
+    try {
+      setDetails((d) => ({ ...d, [id]: null }));
+      const result = await api("/admin/groups/" + id + "/manage");
+      setDetails((d) => ({ ...d, [id]: result }));
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  useEffect(() => {
+    if (!batchId) {
+      setRecommendations([]);
+      return;
+    }
+    api("/admin/project-team-recommendations/" + batchId)
+      .then(setRecommendations)
+      .catch((e) => setErr(e.message));
+  }, [batchId]);
+  const recommendation = (id) =>
+    recommendations.find((x) => x.intern_id === id)?.recommendation;
+  const batchInterns = interns.filter((x) => x.batch_id === batchId);
+  const activeGroups = groups.filter((x) => x.batch_id === batchId);
+  const hasProject = (id) =>
+    assignments.some((a) => a.group_id === id && a.status === "ASSIGNED");
+  async function transfer(g) {
+    if (!transferIntern) return setErr("Select an intern to transfer.");
+    await run(
+      () =>
+        api("/admin/groups/" + g.id + "/transfer", {
+          method: "POST",
+          body: JSON.stringify({ internId: transferIntern }),
+        }),
+      "Intern transferred. Assign their new project role.",
+    );
+    setTransferIntern("");
+    await openGroup(g.id);
+  }
+  async function saveInternAssignment(g, p) {
+    const currentRole = p.project_role || "";
+    const chosen = roleChoices[p.intern_id] ?? currentRole;
+    const role =
+      chosen === "__custom__"
+        ? (customRoles[p.intern_id] || "").trim()
+        : chosen;
+    const currentMentor =
+      internMentors.find((x) => x.intern_id === p.intern_id)?.mentor_id || "";
+    const mentor = pendingMentors[p.intern_id] ?? currentMentor;
+    if (!role) return setErr("Select a project role before saving.");
+    if (role === currentRole && mentor === currentMentor)
+      return setMsg("No changes to save.");
+    if (
+      role !== currentRole &&
+      currentRole &&
+      !window.confirm(
+        "Change " +
+          p.full_name +
+          "'s project role from " +
+          currentRole +
+          " to " +
+          role +
+          "?",
+      )
+    )
+      return;
+    setErr("");
+    setMsg("");
+    setBusy(true);
+    try {
+      if (role !== currentRole)
+        await api(
+          "/admin/groups/" + g.id + "/members/" + p.intern_id + "/role",
+          { method: "PATCH", body: JSON.stringify({ role }) },
+        );
+      if (mentor !== currentMentor)
+        await api("/admin/interns/" + p.intern_id + "/mentor", {
+          method: "PUT",
+          body: JSON.stringify({ mentorId: mentor || null }),
+        });
+      setRoleChoices((s) => {
+        const next = { ...s };
+        delete next[p.intern_id];
+        return next;
+      });
+      setPendingMentors((s) => {
+        const next = { ...s };
+        delete next[p.intern_id];
+        return next;
+      });
+      setCustomRoles((s) => {
+        const next = { ...s };
+        delete next[p.intern_id];
+        return next;
+      });
+      await load();
+      await openGroup(g.id);
+      setMsg("Project role and mentor saved for " + p.full_name + ".");
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <main className="wrap skillbridge-admin-work">
+      <div className="intern-head">
+        <div>
+          <h1>Project Teams & Role Allocation</h1>
+          <p className="muted">
+            Manage each project's interns, their roles and mentors before
+            scheduling weekly tasks.
+          </p>
+        </div>
+      </div>
+      <section className="card workflow-section">
+        <h2>Project Groups</h2>
+        <p className="muted">
+          Create a project group by selecting project, college, batch and
+          interns in Project Master. Manage individual roles and mentors here.
+        </p>
+        <Link href="/admin/projects" className="btn secondary">
+          Open Project Master
+        </Link>
+        <label>
+          Batch
+          <select
+            className="input"
+            value={batchId}
+            onChange={(e) => {
+              setBatchId(e.target.value);
+              setSelected("");
+            }}
+          >
+            <option value="">All batches</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+      <section className="card workflow-section">
+        <h2>Manage Project Roles & Individual Mentors</h2>
+        {activeGroups.map((g) => (
+          <div key={g.id} className="workflow-row" style={{ display: "block" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div>
+                <b>{g.name}</b>
+                <div className="muted">{g.status}</div>
+              </div>
+              <button className="btn secondary" onClick={() => openGroup(g.id)}>
+                Manage Project Members
+              </button>
+            </div>
+            {selected === g.id && (
+              <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+                {!details[g.id] ? (
+                  <p className="muted">Loading team…</p>
+                ) : (
+                  <>
+                    {g.status === "ACTIVE" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          alignItems: "end",
+                        }}
+                      >
+                        <label>
+                          Transfer intern to this team
+                          <select
+                            className="input"
+                            value={transferIntern}
+                            onChange={(e) => setTransferIntern(e.target.value)}
+                          >
+                            <option value="">Select intern</option>
+                            {batchInterns
+                              .filter(
+                                (p) =>
+                                  !details[g.id].members?.some(
+                                    (m) => m.intern_id === p.id,
+                                  ),
+                              )
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.full_name}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        <button
+                          className="btn secondary"
+                          disabled={busy || !transferIntern}
+                          onClick={() => transfer(g)}
+                        >
+                          Transfer
+                        </button>
+                      </div>
+                    )}
+                    {!hasProject(g.id) && (
+                      <p className="muted">
+                        This group has no assigned project. Create a project
+                        group in Project Master.
+                      </p>
+                    )}
+                    {details[g.id].members?.map((p) => (
+                      <div
+                        key={p.intern_id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          flexWrap: "wrap",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <div>
+                          <b>{p.full_name}</b>
+                          <small className="muted" style={{ display: "block" }}>
+                            {p.domain_name || "Domain not confirmed"} ·
+                            Suggested:{" "}
+                            {recommendation(p.intern_id) || "Not available"}
+                          </small>
+                        </div>
+                        <div style={{ display: "grid", gap: 6, minWidth: 220 }}>
+                          <select
+                            aria-label={"Project role for " + p.full_name}
+                            className="input"
+                            value={
+                              roleChoices[p.intern_id] ?? p.project_role ?? ""
+                            }
+                            disabled={
+                              busy || g.status !== "ACTIVE" || !hasProject(g.id)
+                            }
+                            onChange={(e) =>
+                              setRoleChoices((s) => ({
+                                ...s,
+                                [p.intern_id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select project role</option>
+                            {[
+                              ...new Set([
+                                ...roles,
+                                ...(p.project_role ? [p.project_role] : []),
+                              ]),
+                            ].map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                            <option value="__custom__">
+                              + Enter custom role
+                            </option>
+                          </select>
+                          {roleChoices[p.intern_id] === "__custom__" && (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <input
+                                className="input"
+                                maxLength={100}
+                                aria-label={
+                                  "Custom project role for " + p.full_name
+                                }
+                                placeholder="Enter role name"
+                                value={customRoles[p.intern_id] || ""}
+                                onChange={(e) =>
+                                  setCustomRoles((s) => ({
+                                    ...s,
+                                    [p.intern_id]: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {hasProject(g.id) && (
+                          <label>
+                            Intern mentor
+                            <select
+                              className="input"
+                              style={{ maxWidth: 230 }}
+                              value={
+                                pendingMentors[p.intern_id] ??
+                                internMentors.find(
+                                  (x) => x.intern_id === p.intern_id,
+                                )?.mentor_id ??
+                                ""
+                              }
+                              disabled={busy}
+                              onChange={(e) =>
+                                setPendingMentors((s) => ({
+                                  ...s,
+                                  [p.intern_id]: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">No mentor assigned</option>
+                              {mentors.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.full_name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <button
+                          className="btn"
+                          type="button"
+                          disabled={
+                            busy || g.status !== "ACTIVE" || !hasProject(g.id)
+                          }
+                          onClick={() => saveInternAssignment(g, p)}
+                        >
+                          Save Assignment
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {!activeGroups.length && (
+          <p className="muted">
+            No project groups found. Create one in Project Master.
+          </p>
+        )}
+      </section>
+      <section className="card workflow-section">
+        <h2>Weekly Project Tasks</h2>
+        <p className="muted">
+          Once the team, project, roles and mentor are confirmed, prepare tasks
+          for every internship week. Release each week manually after confirming
+          its tasks.
+        </p>
+        <Link href="/admin/tasks" className="btn secondary">
+          Open Weekly Task Scheduler
+        </Link>
+      </section>
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+      {msg && (
+        <p className="success" role="status">
+          {msg}
+        </p>
+      )}
+      <style jsx global>{`
+        /* SkillBridge blue action theme: black labels, consistent pills. */
+        .skillbridge-admin-work .workflow-section .btn.secondary {
+          background: #60a5fa !important;
+          border: 1px solid #60a5fa !important;
+          color: #111827 !important;
+          border-radius: 999px !important;
+          min-height: 44px;
+          padding: 11px 20px;
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.3;
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+          transition:
+            background-color 0.18s,
+            border-color 0.18s,
+            box-shadow 0.18s;
+        }
+        .skillbridge-admin-work
+          .workflow-section
+          .btn.secondary:hover:not(:disabled) {
+          background: #3b82f6 !important;
+          border-color: #3b82f6 !important;
+          color: #111827 !important;
+          box-shadow: 0 5px 14px rgba(59, 130, 246, 0.18);
+        }
+        .skillbridge-admin-work .workflow-section .btn.secondary:focus-visible {
+          outline: 3px solid #bfdbfe;
+          outline-offset: 3px;
+        }
+        .skillbridge-admin-work .workflow-section .btn.secondary:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+        .skillbridge-admin-work
+          > .workflow-section:nth-of-type(2)
+          > .workflow-row
+          > .btn.secondary {
+          min-width: 200px;
+        }
+        .skillbridge-admin-work
+          > .workflow-section:nth-of-type(2)
+          > .workflow-row
+          > div
+          > .btn.secondary {
+          min-width: 200px;
+        }
+        @media (max-width: 600px) {
+          .skillbridge-admin-work
+            > .workflow-section:nth-of-type(2)
+            > .workflow-row
+            > div
+            > .btn.secondary {
+            min-width: 0;
+          }
+        }
+        /* Final contrast override: white text on accessible blue, including hover. */
+        .skillbridge-admin-work .workflow-section .btn.secondary {
+          background: #2563eb !important;
+          border-color: #2563eb !important;
+          color: #fff !important;
+          text-shadow: none !important;
+        }
+        .skillbridge-admin-work
+          .workflow-section
+          .btn.secondary:hover:not(:disabled) {
+          background: #1d4ed8 !important;
+          border-color: #1d4ed8 !important;
+          color: #fff !important;
+        }
 
-.skillbridge-admin-work{max-width:1380px;padding:28px 28px 64px;color:#172e23}.skillbridge-admin-work>.intern-head{margin-bottom:24px}.skillbridge-admin-work>.intern-head h1{font-size:clamp(26px,2.5vw,34px);letter-spacing:-.9px;line-height:1.2}.skillbridge-admin-work>.intern-head p{font-size:13px;line-height:1.6}.skillbridge-admin-work>.workflow-section{padding:24px;border:1px solid #dae8df;border-radius:18px;background:#fff;box-shadow:0 6px 24px #1c493010;margin:0 0 18px}.skillbridge-admin-work>.workflow-section>h2{font-size:19px;letter-spacing:-.4px;margin:0 0 8px}.skillbridge-admin-work>.workflow-section>p{font-size:13px;line-height:1.6;margin:0 0 18px}.skillbridge-admin-work>.workflow-section:first-of-type{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;align-items:end}.skillbridge-admin-work>.workflow-section:first-of-type>h2,.skillbridge-admin-work>.workflow-section:first-of-type>p{grid-column:1/-1;margin:0}.skillbridge-admin-work>.workflow-section:first-of-type>label{grid-column:1;grid-row:3;display:flex;flex-direction:column;gap:8px;min-width:0;font-size:12px}.skillbridge-admin-work>.workflow-section:first-of-type>label select{margin:0;min-height:44px}.skillbridge-admin-work>.workflow-section:first-of-type>a{grid-column:2;grid-row:3;align-self:end}.skillbridge-admin-work .btn{display:inline-flex;align-items:center;justify-content:center;min-height:41px;padding:10px 19px;border-radius:999px!important;font-size:12px;font-weight:750;text-align:center}.skillbridge-admin-work .btn.secondary{background:#e9f4ed;color:#075e3e;border:1px solid #d0e5d8}.skillbridge-admin-work .workflow-row{padding:17px 0;min-width:0}.skillbridge-admin-work .workflow-row b{font-size:14px;color:#183e2a}.skillbridge-admin-work .workflow-row .muted{font-size:12px;margin-top:5px}.skillbridge-admin-work .workflow-row .input{margin:5px 0 0;min-height:42px;border-radius:11px}.skillbridge-admin-work .workflow-row label{font-size:12px;color:#355545}@media(max-width:720px){.skillbridge-admin-work{padding:18px 12px 40px}.skillbridge-admin-work>.workflow-section{padding:18px}.skillbridge-admin-work>.workflow-section:first-of-type{grid-template-columns:1fr}.skillbridge-admin-work>.workflow-section:first-of-type>label,.skillbridge-admin-work>.workflow-section:first-of-type>a{grid-column:1;grid-row:auto}.skillbridge-admin-work .workflow-row>div:first-child{flex-wrap:wrap}}@media(max-width:430px){.skillbridge-admin-work .workflow-row>div:first-child>button{width:100%}}`}</style>
-  <style jsx global>{`.skillbridge-admin-work{max-width:1320px!important;padding:30px 28px 64px}.skillbridge-admin-work>.intern-head{margin-bottom:26px}.skillbridge-admin-work>.intern-head h1{font-size:clamp(28px,2.6vw,36px);font-weight:700;letter-spacing:-.7px}.skillbridge-admin-work>.intern-head p{font-size:14px;line-height:1.6}.skillbridge-admin-work>.workflow-section{padding:26px!important;border-radius:20px!important;margin-bottom:20px!important}.skillbridge-admin-work>.workflow-section h2{font-size:21px;font-weight:650}.skillbridge-admin-work>.workflow-section p{font-size:13px;line-height:1.6}.skillbridge-admin-work .workflow-row{padding:18px 0}.skillbridge-admin-work .workflow-row b{font-size:15px;font-weight:600}.skillbridge-admin-work .workflow-row .muted{font-size:13px}.skillbridge-admin-work .input{min-height:45px;border-radius:12px;border:1px solid #d7e4dd;font-size:14px}.skillbridge-admin-work .workflow-section .btn.secondary{background:#2563eb!important;color:#fff!important;border-color:#2563eb!important;font-size:13px}.skillbridge-admin-work .workflow-section .btn.secondary:hover:not(:disabled){background:#1d4ed8!important;color:#fff!important}.skillbridge-admin-work .workflow-section .btn:not(.secondary){font-size:13px;min-height:44px}.skillbridge-admin-work .workflow-row>div[style*="space-between"]{gap:16px!important}@media(max-width:700px){.skillbridge-admin-work{padding:18px 14px 40px}.skillbridge-admin-work>.workflow-section{padding:18px!important}}`}</style></main>;
+        .skillbridge-admin-work {
+          max-width: 1380px;
+          padding: 28px 28px 64px;
+          color: #172e23;
+        }
+        .skillbridge-admin-work > .intern-head {
+          margin-bottom: 24px;
+        }
+        .skillbridge-admin-work > .intern-head h1 {
+          font-size: clamp(26px, 2.5vw, 34px);
+          letter-spacing: -0.9px;
+          line-height: 1.2;
+        }
+        .skillbridge-admin-work > .intern-head p {
+          font-size: 13px;
+          line-height: 1.6;
+        }
+        .skillbridge-admin-work > .workflow-section {
+          padding: 24px;
+          border: 1px solid #dae8df;
+          border-radius: 18px;
+          background: #fff;
+          box-shadow: 0 6px 24px #1c493010;
+          margin: 0 0 18px;
+        }
+        .skillbridge-admin-work > .workflow-section > h2 {
+          font-size: 19px;
+          letter-spacing: -0.4px;
+          margin: 0 0 8px;
+        }
+        .skillbridge-admin-work > .workflow-section > p {
+          font-size: 13px;
+          line-height: 1.6;
+          margin: 0 0 18px;
+        }
+        .skillbridge-admin-work > .workflow-section:first-of-type {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 12px 20px;
+          align-items: end;
+        }
+        .skillbridge-admin-work > .workflow-section:first-of-type > h2,
+        .skillbridge-admin-work > .workflow-section:first-of-type > p {
+          grid-column: 1/-1;
+          margin: 0;
+        }
+        .skillbridge-admin-work > .workflow-section:first-of-type > label {
+          grid-column: 1;
+          grid-row: 3;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-width: 0;
+          font-size: 12px;
+        }
+        .skillbridge-admin-work
+          > .workflow-section:first-of-type
+          > label
+          select {
+          margin: 0;
+          min-height: 44px;
+        }
+        .skillbridge-admin-work > .workflow-section:first-of-type > a {
+          grid-column: 2;
+          grid-row: 3;
+          align-self: end;
+        }
+        .skillbridge-admin-work .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 41px;
+          padding: 10px 19px;
+          border-radius: 999px !important;
+          font-size: 12px;
+          font-weight: 750;
+          text-align: center;
+        }
+        .skillbridge-admin-work .btn.secondary {
+          background: #e9f4ed;
+          color: #075e3e;
+          border: 1px solid #d0e5d8;
+        }
+        .skillbridge-admin-work .workflow-row {
+          padding: 17px 0;
+          min-width: 0;
+        }
+        .skillbridge-admin-work .workflow-row b {
+          font-size: 14px;
+          color: #183e2a;
+        }
+        .skillbridge-admin-work .workflow-row .muted {
+          font-size: 12px;
+          margin-top: 5px;
+        }
+        .skillbridge-admin-work .workflow-row .input {
+          margin: 5px 0 0;
+          min-height: 42px;
+          border-radius: 11px;
+        }
+        .skillbridge-admin-work .workflow-row label {
+          font-size: 12px;
+          color: #355545;
+        }
+        @media (max-width: 720px) {
+          .skillbridge-admin-work {
+            padding: 18px 12px 40px;
+          }
+          .skillbridge-admin-work > .workflow-section {
+            padding: 18px;
+          }
+          .skillbridge-admin-work > .workflow-section:first-of-type {
+            grid-template-columns: 1fr;
+          }
+          .skillbridge-admin-work > .workflow-section:first-of-type > label,
+          .skillbridge-admin-work > .workflow-section:first-of-type > a {
+            grid-column: 1;
+            grid-row: auto;
+          }
+          .skillbridge-admin-work .workflow-row > div:first-child {
+            flex-wrap: wrap;
+          }
+        }
+        @media (max-width: 430px) {
+          .skillbridge-admin-work .workflow-row > div:first-child > button {
+            width: 100%;
+          }
+        }
+      `}</style>
+      <style jsx global>{`
+        .skillbridge-admin-work {
+          max-width: 1320px !important;
+          padding: 30px 28px 64px;
+        }
+        .skillbridge-admin-work > .intern-head {
+          margin-bottom: 26px;
+        }
+        .skillbridge-admin-work > .intern-head h1 {
+          font-size: clamp(28px, 2.6vw, 36px);
+          font-weight: 700;
+          letter-spacing: -0.7px;
+        }
+        .skillbridge-admin-work > .intern-head p {
+          font-size: 14px;
+          line-height: 1.6;
+        }
+        .skillbridge-admin-work > .workflow-section {
+          padding: 26px !important;
+          border-radius: 20px !important;
+          margin-bottom: 20px !important;
+        }
+        .skillbridge-admin-work > .workflow-section h2 {
+          font-size: 21px;
+          font-weight: 650;
+        }
+        .skillbridge-admin-work > .workflow-section p {
+          font-size: 13px;
+          line-height: 1.6;
+        }
+        .skillbridge-admin-work .workflow-row {
+          padding: 18px 0;
+        }
+        .skillbridge-admin-work .workflow-row b {
+          font-size: 15px;
+          font-weight: 600;
+        }
+        .skillbridge-admin-work .workflow-row .muted {
+          font-size: 13px;
+        }
+        .skillbridge-admin-work .input {
+          min-height: 45px;
+          border-radius: 12px;
+          border: 1px solid #d7e4dd;
+          font-size: 14px;
+        }
+        .skillbridge-admin-work .workflow-section .btn.secondary {
+          background: #2563eb !important;
+          color: #fff !important;
+          border-color: #2563eb !important;
+          font-size: 13px;
+        }
+        .skillbridge-admin-work
+          .workflow-section
+          .btn.secondary:hover:not(:disabled) {
+          background: #1d4ed8 !important;
+          color: #fff !important;
+        }
+        .skillbridge-admin-work .workflow-section .btn:not(.secondary) {
+          font-size: 13px;
+          min-height: 44px;
+        }
+        .skillbridge-admin-work .workflow-row > div[style*="space-between"] {
+          gap: 16px !important;
+        }
+        @media (max-width: 700px) {
+          .skillbridge-admin-work {
+            padding: 18px 14px 40px;
+          }
+          .skillbridge-admin-work > .workflow-section {
+            padding: 18px !important;
+          }
+        }
+      `}</style>
+    </main>
+  );
 }

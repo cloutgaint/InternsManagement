@@ -9,7 +9,7 @@ Production-oriented monorepo generated from the **GAINT Intern Management App Ma
   `frontend/modules/`; see [frontend structure](frontend/README.md).
 - **Backend:** Node.js + Express REST API, modular route/middleware structure.
 - **Database:** PostgreSQL 16; plain SQL migration so it is fully visible/manageable in pgAdmin.
-- **Auth:** JWT, bcrypt password hashing, approved-account login gate, RBAC for Super Admin/Admin/Mentor/Intern.
+- **Auth:** hybrid HS256 + ML-DSA-65 tokens, Argon2id password hashing with legacy bcrypt migration, approved-account login gate, and RBAC for Super Admin/Admin/Mentor/Intern.
 - **Audit/security:** Helmet, CORS, rate limiting, validation, audit records, restricted proof/biometric data model.
 
 ## Development order used
@@ -70,9 +70,58 @@ The source document itself leaves several items to decide before final developme
 
 See `REQUIREMENTS_CHECKLIST.md` for traceability.
 
-## Production settings
+## Production deployment
 
-Before going live, set `NODE_ENV=production`, `NEXT_PUBLIC_API_URL` to the public HTTPS API URL, and configure every production requirement documented in `.env.example`: unique initial-admin credentials, a 64-byte `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, private S3 object storage, `SMTP_*`, `CLAMAV_HOST`, an approved HTTPS biometric verifier, and proof/face retention periods. Set `BACKEND_DATABASE_URL` when Docker should use a managed database instead of its bundled PostgreSQL service. Use a workload role/identity for S3 rather than long-lived access keys, keep the bucket public-access blocked, and apply lifecycle/backup policies appropriate to the retention requirements. The API refuses to start in production when any of these controls are absent or insecure. Because `NEXT_PUBLIC_API_URL` is compiled into the browser bundle, set it before building the frontend image.
+The production stack is `docker-compose.prod.yml`. It runs PostgreSQL, the API, the frontend, the face
+verifier and a ClamAV virus scanner on a private network, behind Caddy, which serves one HTTPS domain
+(`https://APP_DOMAIN`, with the API at `/api`) and renews its certificate automatically. Only ports 80
+and 443 are published. The development `docker-compose.yml` is unchanged.
+
+You provide:
+
+- a server with Docker, and a domain whose DNS points at it (ports 80 and 443 open);
+- a private S3-compatible bucket and access key (AWS S3, Cloudflare R2, …);
+- an SMTP account for outgoing email.
+
+```bash
+cp deploy/production.env.example .env.production   # git ignores it
+# fill in every empty value; the file explains how to generate each secret
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+Compose refuses to start while a required value is empty, and the API refuses to start in production
+when any security control is missing or insecure. The first start takes a few minutes while ClamAV
+downloads its virus signatures. The API runs migrations and creates the first Super Admin from
+`INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` on start.
+
+**Test-server sign-in:** `ALLOW_TEST_MFA_CODE=true` (the template default) lets staff accounts use the
+code `000000` instead of an authenticator app, and the API logs a warning on every start while it is
+on. Anyone with a staff password can then sign in, so set it to `false` and restart before real users
+are onboarded. Authenticator-app codes work either way.
+
+**Face attendance:** the verifier compares faces and records an anti-spoof score for every attempt,
+but does not reject on that score until `BIOMETRIC_ANTISPOOF_THRESHOLD` is set; see
+`biometric-verifier/README.md`.
+
+Keep the bucket's public access blocked, back up the `pgdata` volume and the bucket, and never change
+or lose `FILE_ENCRYPTION_KEY`: files encrypted with it cannot be read without it.
+
+### Cryptographic rotation
+
+- New and changed passwords use Argon2id. Existing bcrypt passwords remain valid and are transparently upgraded after a successful credential check.
+- The classical half of authentication tokens is explicitly restricted to HS256. During a signing-secret rotation, place old secrets in `JWT_PREVIOUS_SECRETS` until their maximum token lifetime has elapsed.
+- New authentication tokens are hybrid-signed with HS256 and NIST ML-DSA-65. Set `PQ_REQUIRE_HYBRID_TOKENS=true` in production after any pre-upgrade sessions have expired.
+- New protected files use the versioned `GAINTENC3` ML-KEM-768 + AES-256-GCM envelope. ML-KEM establishes a fresh content key per file; AES-GCM encrypts and authenticates the file bytes. `GAINTENC1/2` files remain readable. Set `FILE_ENCRYPTION_KEY_ID` whenever the current key changes and retain old id/key pairs in `FILE_ENCRYPTION_PREVIOUS_KEYS` until older files have been re-encrypted or expired.
+- PQC or hybrid TLS must be configured at the ingress/load-balancer and for upstream services; it is not enabled by application code or by changing these environment variables.
+
+After backing up storage, upgrade files already referenced by the database from
+the legacy envelopes to `GAINTENC3`:
+
+```bash
+cd backend
+npm run migrate:post-quantum-files:dry-run
+npm run migrate:post-quantum-files
+```
 
 Run the full test suite against a disposable database whose name contains `intern_test`:
 

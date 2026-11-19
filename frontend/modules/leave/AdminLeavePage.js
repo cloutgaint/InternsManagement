@@ -32,6 +32,7 @@ export default function AdminLeavePage() {
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
   }, []);
   async function decide(x, status) {setFeedbackArea("decide");
     try {

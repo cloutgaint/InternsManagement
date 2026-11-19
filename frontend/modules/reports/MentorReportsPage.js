@@ -46,6 +46,7 @@ export default function MentorReportsPage({ admin = false }) {
     }
     setLoadingAccess(false);
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
   useEffect(() => { loadAccess(); }, []);
   async function chooseGroup(groupId) {
     setErr("");

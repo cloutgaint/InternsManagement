@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import jwt from "jsonwebtoken";
+import { signToken } from "../src/common/security/tokens.js";
 import { createApp } from "../src/app.js";
 import { q, pool } from "../src/common/database/index.js";
 
@@ -14,7 +14,7 @@ test("weekly plans and task grading follow the intern's mentor", { skip: process
   t.after(async () => { server.close(); await pool.end(); });
 
   const user = async (name, role) => one("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,'x',$2,'ACTIVE',true) RETURNING id", [name + suffix + "@example.test", role]);
-  const tokenFor = (u, role) => jwt.sign({ id: u.id, role, mfa: true }, process.env.JWT_SECRET);
+  const tokenFor = (u, role) => signToken({ id: u.id, role, mfa: true });
   const call = async (token, method, path, body) => {
     const response = await fetch(base + path, { method, headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: response.status, data: await response.json() };

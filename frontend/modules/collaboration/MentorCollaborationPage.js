@@ -26,6 +26,7 @@ export default function MentorCollaborationPage() {
     if (!gid) return;
     const x = setInterval(load, 15000);
     return () => clearInterval(x);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
   }, [gid]);
   async function send(e) {
     e.preventDefault();

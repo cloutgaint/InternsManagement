@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import jwt from "jsonwebtoken";
+import { signToken } from "../src/common/security/tokens.js";
 import { createApp } from "../src/app.js";
 import { q, pool } from "../src/common/database/index.js";
 
@@ -27,7 +27,7 @@ test("Phase 4 PostgreSQL attendance concurrency, holidays, leave and trusted ver
   const app=createApp(),server=app.listen(0);
   const base="http://127.0.0.1:"+server.address().port;
   const req=async(role,method,path,body)=>{
-    const token=jwt.sign({id:role==="ADMIN"?admin.id:user.id,role},process.env.JWT_SECRET);
+    const token=signToken({id:role==="ADMIN"?admin.id:user.id,role});
     const response=await fetch(base+path,{method,headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
     return {status:response.status,data:await response.json()};
   };

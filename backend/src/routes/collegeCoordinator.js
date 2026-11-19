@@ -1,7 +1,7 @@
 import {Router} from "express";
-import bcrypt from "bcryptjs";
 import {q,tx} from "../common/database/index.js";
 import {auth,permit} from "../common/security/auth.middleware.js";
+import {hashPassword} from "../common/security/password.js";
 import {audit} from "../common/audit/audit.service.js";
 const r=Router();
 r.use(auth);
@@ -22,7 +22,7 @@ r.post("/accounts",permit("ADMIN","SUPER_ADMIN"),async(req,res)=>{
   if(!college)return res.status(404).json({error:"Active college not found"});
   const normalized=email.trim().toLowerCase();
   if((await q("SELECT 1 FROM users WHERE lower(email)=$1",[normalized])).rowCount)return res.status(409).json({error:"Email is already registered"});
-  const hash=await bcrypt.hash(password,12);
+  const hash=await hashPassword(password);
   const created=await tx(async(client)=>{
     const user=(await client.query("INSERT INTO users(email,password_hash,role,status,is_active) VALUES($1,$2,'COLLEGE_COORDINATOR','ACTIVE',true) RETURNING id,email",[normalized,hash])).rows[0];
     await client.query("INSERT INTO college_coordinator_accounts(user_id,college_id,full_name) VALUES($1,$2,$3)",[user.id,collegeId,fullName.trim()]);

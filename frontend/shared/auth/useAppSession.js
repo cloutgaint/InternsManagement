@@ -32,11 +32,13 @@ export function useAppSession(routeKey) {
     if (session.role === "INTERN") {
       api("/intern/dashboard").then((dashboard) => {
         if (active) setProfile((current) => ({ ...current, ...dashboard.profile }));
-      }).catch(() => {});
-      apiBlob("/intern/profile-photo").then((blob) => {
-        photoUrl = URL.createObjectURL(blob);
-        if (active) setPhoto(photoUrl);
-        else URL.revokeObjectURL(photoUrl);
+        // The photo is optional at registration; only request it when one was uploaded.
+        if (!active || !dashboard.profile?.photo_url) return;
+        return apiBlob("/intern/profile-photo").then((blob) => {
+          photoUrl = URL.createObjectURL(blob);
+          if (active) setPhoto(photoUrl);
+          else URL.revokeObjectURL(photoUrl);
+        });
       }).catch(() => {});
     }
     return () => {

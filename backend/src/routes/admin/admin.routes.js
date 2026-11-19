@@ -9,7 +9,6 @@ import {
 } from "../../services/performanceScoreService.js";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import bcrypt from "bcryptjs";
 import batchAllotmentOrders from "./batch-allotment-orders.routes.js";
 import adminWorkflow from "./workflow.routes.js";
 import { offerSnapshot } from "../../services/offerLetterSnapshot.js";
@@ -18,6 +17,7 @@ import fs from "fs";
 import path from "path";
 import { q, tx } from "../../common/database/index.js";
 import { auth, permit } from "../../common/security/auth.middleware.js";
+import { hashPassword } from "../../common/security/password.js";
 import { audit } from "../../common/audit/audit.service.js";
 import { sendProofFile, latestProof } from "../../services/proofService.js";
 import {
@@ -141,12 +141,12 @@ r.put("/performance/weights", async (req, res) => {
 });
 r.get("/performance", async (req, res) => {
   const rows = (
-    await q(`SELECT ip.id,ip.full_name,ip.roll_number,c.name college_name,b.name batch_name,ba.batch_id,ip.final_domain_id domain_id,d.name domain_name,g.name group_name,p.title project_title,
+    await q(`SELECT ip.id,ip.full_name,ip.roll_number,c.name college_name,b.name batch_name,ba.batch_id,ip.final_domain_id domain_id,d.name domain_name,ip.final_subdomain_id subdomain_id,sd.name subdomain_name,g.name group_name,p.title project_title,
 COALESCE(att.present_days,0)::int present_days,COALESCE(att.total_days,0)::int attendance_days,COALESCE(att.late_days,0)::int late_days,COALESCE(att.absent_days,0)::int absent_days,COALESCE(att.leave_days,0)::int leave_days,CASE WHEN COALESCE(att.total_days,0)=0 THEN 0 ELSE round(att.present_days*100.0/att.total_days,1) END attendance_pct,
 COALESCE(ts.task_count,0)::int task_count,COALESCE(ts.approved_tasks,0)::int approved_tasks,COALESCE(ts.avg_task_marks,0)::numeric(10,1) avg_task_marks,
 COALESCE(rv.review_count,0)::int review_count,COALESCE(rv.avg_individual_marks,0)::numeric(10,1) avg_individual_marks,
 COALESCE(fe.individual_marks,0)::numeric(10,1) final_individual_marks,fe.recommendation
-FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.role='INTERN' AND u.status<>'DELETED' LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT ba.* FROM batch_allocations ba WHERE ba.intern_id=ip.id ORDER BY ba.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id
+FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.role='INTERN' AND u.status<>'DELETED' LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT ba.* FROM batch_allocations ba WHERE ba.intern_id=ip.id ORDER BY ba.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id LEFT JOIN group_members gm ON gm.intern_id=ip.id AND gm.active LEFT JOIN groups g ON g.id=gm.group_id LEFT JOIN project_assignments pa ON pa.group_id=g.id AND pa.status='ASSIGNED' LEFT JOIN projects p ON p.id=pa.project_id
 LEFT JOIN LATERAL(SELECT z.working_days total_days,z.present_days,z.late_days,z.absent_days,z.leave_days FROM attendance_summary z WHERE z.allocation_id=ba.id)att ON true
 LEFT JOIN LATERAL(SELECT count(*) task_count,count(*) FILTER(WHERE x.status='APPROVED') approved_tasks,avg(te.marks) avg_task_marks FROM task_submissions x LEFT JOIN LATERAL(SELECT marks FROM task_evaluations e WHERE e.submission_id=x.id ORDER BY e.created_at DESC LIMIT 1)te ON true WHERE x.intern_id=ip.id)ts ON true
 LEFT JOIN LATERAL(SELECT count(*) review_count,avg(rim.marks) avg_individual_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true
@@ -486,7 +486,6 @@ r.post("/users/:userId/reset-password", async (req, res) => {
 });
 for (const [path, table] of Object.entries({
   colleges: "colleges",
-  domains: "domains",
   batches: "batches",
   projects: "projects",
   questions: "question_bank",
@@ -498,6 +497,13 @@ for (const [path, table] of Object.entries({
     res.json((await q(`SELECT * FROM ${table} ORDER BY 1 DESC`)).rows),
   );
 }
+r.get("/domains", async (_req, res) =>
+  res.json((await q(
+    `SELECT d.*,COALESCE(json_agg(s ORDER BY s.name) FILTER(WHERE s.id IS NOT NULL),'[]') subdomains
+     FROM domains d LEFT JOIN subdomains s ON s.domain_id=d.id AND s.active
+     GROUP BY d.id ORDER BY d.name`,
+  )).rows),
+);
 r.post("/domains", async (req, res) => {
   const {
     name,
@@ -570,11 +576,16 @@ r.patch("/domains/:id", async (req, res) => {
   res.json(x);
 });
 r.post("/domains/:id/subdomains", async (req, res) => {
-  const { name, code } = req.body;
+  const name = String(req.body?.name || "").trim();
+  const code = String(req.body?.code || "").trim().toUpperCase();
   if (!name || !code)
     return res
       .status(400)
       .json({ error: "Sub-domain name and code are required" });
+  const domain = (await q("SELECT id FROM domains WHERE id=$1", [req.params.id])).rows[0];
+  if (!domain) return res.status(404).json({ error: "Domain not found" });
+  if ((await q("SELECT 1 FROM subdomains WHERE domain_id=$1 AND (lower(name)=lower($2) OR upper(code)=upper($3))", [domain.id,name,code])).rowCount)
+    return res.status(409).json({ error: "This sub-domain name or code already exists under the domain" });
   const x = (
     await q(
       "INSERT INTO subdomains(domain_id,name,code,active) VALUES($1,$2,$3,true) RETURNING *",
@@ -1319,7 +1330,14 @@ async function domainRecommendation(internId, batchId) {
 r.get("/domain-recommendations", async (req, res) => {
   const rows = (
     await q(
-      `SELECT ip.id intern_id,ip.full_name,ip.preferred_domains,ba.batch_id,b.name batch_name,ip.final_domain_id,fd.name final_domain_name FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED' JOIN batch_allocations ba ON ba.intern_id=ip.id JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains fd ON fd.id=ip.final_domain_id ORDER BY ip.full_name`,
+      `SELECT ip.id intern_id,ip.full_name,ip.preferred_domains,ba.batch_id,b.name batch_name,
+       ip.final_domain_id,fd.name final_domain_name,ip.final_subdomain_id,fs.name final_subdomain_name,
+       aa.result_snapshot->>'domainRecommendation' recommended_subdomain_name
+       FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
+       JOIN batch_allocations ba ON ba.intern_id=ip.id JOIN batches b ON b.id=ba.batch_id
+       LEFT JOIN domains fd ON fd.id=ip.final_domain_id LEFT JOIN subdomains fs ON fs.id=ip.final_subdomain_id
+       LEFT JOIN LATERAL(SELECT result_snapshot FROM assessment_attempts x WHERE x.intern_id=ip.id AND x.status='EVALUATED' AND x.result_snapshot IS NOT NULL ORDER BY x.submitted_at DESC NULLS LAST,x.started_at DESC LIMIT 1) aa ON true
+       ORDER BY ip.full_name`,
     )
   ).rows;
   const out = [];
@@ -1360,7 +1378,7 @@ r.post("/domain-recommendations/:internId/calculate", async (req, res) => {
   }
 });
 r.post("/domain-confirm", async (req, res) => {
-  const { internId, batchId, domainId, reason } = req.body;
+  const { internId, batchId, domainId, subdomainId, reason } = req.body;
   const latest = (
     await q(
       "SELECT * FROM domain_decisions WHERE intern_id=$1 AND batch_id=$2 ORDER BY created_at DESC LIMIT 1",
@@ -1371,7 +1389,7 @@ r.post("/domain-confirm", async (req, res) => {
     return res.status(409).json({
       error: "Calculate the domain recommendation before Admin confirmation",
     });
-  if (latest.confirmed_domain_id === domainId)
+  if (latest.confirmed_domain_id === domainId && (latest.confirmed_subdomain_id || null) === (subdomainId || null))
     return res
       .status(409)
       .json({ error: "Domain decision already confirmed; reload" });
@@ -1384,6 +1402,15 @@ r.post("/domain-confirm", async (req, res) => {
   ).rows[0];
   if (!domain)
     return res.status(400).json({ error: "Select an active domain" });
+  const subdomains = (await q("SELECT id,name,code FROM subdomains WHERE domain_id=$1 AND active ORDER BY name", [domainId])).rows;
+  let subdomain = null;
+  if (subdomains.length) {
+    subdomain = subdomains.find((item) => item.id === subdomainId);
+    if (!subdomain)
+      return res.status(400).json({ error: "Select an active sub-domain for " + domain.name });
+  } else if (subdomainId) {
+    return res.status(400).json({ error: "The selected sub-domain does not belong to " + domain.name });
+  }
   const offered = (
     await q("SELECT domain_id,capacity FROM batch_domains WHERE batch_id=$1", [
       batchId,
@@ -1394,12 +1421,17 @@ r.post("/domain-confirm", async (req, res) => {
       .status(409)
       .json({ error: "This domain is not offered in the intern's batch" });
   const top = latest.recommendations[0]?.domainId;
-  if (domainId !== top && !String(reason || "").trim())
+  const recommendedSubdomain = (await q(
+    "SELECT result_snapshot->>'domainRecommendation' value FROM assessment_attempts WHERE intern_id=$1 AND status='EVALUATED' AND result_snapshot IS NOT NULL ORDER BY submitted_at DESC NULLS LAST,started_at DESC LIMIT 1",
+    [internId],
+  )).rows[0]?.value;
+  const departsFromSubdomain = subdomain && ["FRONTEND","BACKEND"].includes(String(recommendedSubdomain || "").toUpperCase()) && subdomain.code.toUpperCase() !== recommendedSubdomain.toUpperCase();
+  if ((domainId !== top || departsFromSubdomain) && !String(reason || "").trim())
     return res
       .status(400)
       .json({
         error:
-          "A reason is required when the confirmed domain differs from the top recommendation",
+          "A reason is required when the confirmed domain or sub-domain differs from the top recommendation",
       });
   const capacity = Number(
     offered.find((x) => x.domain_id === domainId)?.capacity ??
@@ -1445,13 +1477,14 @@ r.post("/domain-confirm", async (req, res) => {
     const decision = latest.confirmed_domain_id
       ? (
           await client.query(
-            "INSERT INTO domain_decisions(intern_id,batch_id,preferences,recommendations,confirmed_domain_id,confirmed_by,reason) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+            "INSERT INTO domain_decisions(intern_id,batch_id,preferences,recommendations,confirmed_domain_id,confirmed_subdomain_id,confirmed_by,reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
             [
               internId,
               batchId,
               JSON.stringify(latest.preferences),
               JSON.stringify(latest.recommendations),
               domainId,
+              subdomain?.id || null,
               req.user.id,
               reason || null,
             ],
@@ -1459,15 +1492,16 @@ r.post("/domain-confirm", async (req, res) => {
         ).rows[0]
       : (
           await client.query(
-            "UPDATE domain_decisions SET confirmed_domain_id=$1,confirmed_by=$2,reason=$4 WHERE id=$3 RETURNING *",
-            [domainId, req.user.id, latest.id, reason || null],
+            "UPDATE domain_decisions SET confirmed_domain_id=$1,confirmed_subdomain_id=$2,confirmed_by=$3,reason=$5 WHERE id=$4 RETURNING *",
+            [domainId, subdomain?.id || null, req.user.id, latest.id, reason || null],
           )
         ).rows[0];
     const profile = await client.query(
-      "UPDATE intern_profiles SET final_domain_id=$1 WHERE id=$2 RETURNING user_id",
-      [domainId, internId],
+      "UPDATE intern_profiles SET final_domain_id=$1,final_subdomain_id=$2 WHERE id=$3 RETURNING user_id",
+      [domainId, subdomain?.id || null, internId],
     );
     if (!profile.rowCount) throw new Error("Intern profile not found");
+    await client.query("UPDATE group_members SET domain_id=$1,subdomain_id=$2 WHERE intern_id=$3 AND active", [domainId, subdomain?.id || null, internId]);
     return { decision, userId: profile.rows[0].user_id };
   });
   await audit(
@@ -1482,7 +1516,7 @@ r.post("/domain-confirm", async (req, res) => {
     x.userId,
     "DOMAIN_CONFIRMED",
     "Final domain confirmed",
-    "GAINT confirmed your internship domain: " + domain.name + ".",
+    "GAINT confirmed your internship domain: " + domain.name + (subdomain ? " · " + subdomain.name : "") + ".",
     "/intern",
   );
   res.json(x.decision);
@@ -1799,7 +1833,7 @@ r.get("/interns", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT ip.*,u.email,u.status account_status,u.is_active,cp.status proof_status,cp.reason proof_reason,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT status,reason FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE u.status<>'DELETED' ORDER BY ip.created_at DESC`,
+        `SELECT ip.*,u.email,u.status account_status,u.is_active,cp.status proof_status,cp.reason proof_reason,c.name college_name,b.id batch_id,b.name batch_name,ba.id allocation_id,d.name final_domain,sd.name final_subdomain FROM intern_profiles ip JOIN users u ON u.id=ip.user_id LEFT JOIN LATERAL (SELECT status,reason FROM college_proofs p WHERE p.intern_id=ip.id ORDER BY p.created_at DESC,p.id DESC LIMIT 1) cp ON true LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id WHERE u.status<>'DELETED' ORDER BY ip.created_at DESC`,
       )
     ).rows,
   ),
@@ -1836,7 +1870,7 @@ r.post("/mentors", async (req, res) => {
       });
   if ((await q("SELECT 1 FROM users WHERE lower(email)=$1", [email])).rowCount)
     return res.status(409).json({ error: "Email is already registered" });
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashPassword(password);
   let created;
   try {
     created = await tx(async (c) => {
@@ -1928,7 +1962,7 @@ r.get("/groups/:id/manage", async (req, res) => {
   if (!g) return res.status(404).json({ error: "Group not found" });
   g.members = (
     await q(
-      `SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,gm.project_role,d.name domain_name FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id WHERE gm.group_id=$1 AND gm.active ORDER BY ip.full_name`,
+      `SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,ip.final_subdomain_id,gm.project_role,d.name domain_name,sd.name subdomain_name FROM group_members gm JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id LEFT JOIN subdomains sd ON sd.id=gm.subdomain_id WHERE gm.group_id=$1 AND gm.active ORDER BY ip.full_name`,
       [g.id],
     )
   ).rows;
@@ -1951,7 +1985,7 @@ r.patch("/groups/:id/members", async (req, res) => {
       .json({ error: "A group must contain at least one intern" });
   const people = (
     await q(
-      `SELECT ip.id,ip.final_domain_id,d.name domain_name FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN domains d ON d.id=ip.final_domain_id WHERE ip.id=ANY($1::uuid[]) AND ba.batch_id=$2`,
+      `SELECT ip.id,ip.final_domain_id,ip.final_subdomain_id,d.name domain_name,sd.name subdomain_name FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id WHERE ip.id=ANY($1::uuid[]) AND ba.batch_id=$2`,
       [ids, g.batch_id],
     )
   ).rows;
@@ -1988,8 +2022,8 @@ r.patch("/groups/:id/members", async (req, res) => {
     await claimInternsForGroup(c, ids, g.id);
     for (const p of people)
       await c.query(
-        `INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,active=true`,
-        [g.id, p.id, p.final_domain_id],
+        `INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id,active) VALUES($1,$2,$3,$4,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,subdomain_id=EXCLUDED.subdomain_id,active=true`,
+        [g.id, p.id, p.final_domain_id, p.final_subdomain_id],
       );
   });
   await audit(req, "GROUP_MEMBERS_REBALANCED", "group", g.id, null, {
@@ -1998,27 +2032,28 @@ r.patch("/groups/:id/members", async (req, res) => {
   res.json({ ok: true, count: ids.length });
 });
 r.get("/project-team-recommendations/:batchId", async (req,res) => {
-  const rows=(await q(`SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,d.name confirmed_domain,aa.result_snapshot,aa.submitted_at
+  const rows=(await q(`SELECT ip.id intern_id,ip.full_name,ip.final_domain_id,ip.final_subdomain_id,d.name confirmed_domain,sd.name confirmed_subdomain,aa.result_snapshot,aa.submitted_at
     FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$1
     JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
     LEFT JOIN domains d ON d.id=ip.final_domain_id
+    LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id
     LEFT JOIN LATERAL(SELECT result_snapshot,submitted_at FROM assessment_attempts aa WHERE aa.intern_id=ip.id AND aa.status='EVALUATED' AND aa.result_snapshot IS NOT NULL ORDER BY aa.submitted_at DESC LIMIT 1) aa ON true
     ORDER BY ip.full_name`,[req.params.batchId])).rows;
-  res.json(rows.map(x=>({intern_id:x.intern_id,full_name:x.full_name,confirmed_domain:x.confirmed_domain,recommendation:x.result_snapshot?.domainRecommendation||null,section_results:x.result_snapshot?.sectionResults||[]})));
+  res.json(rows.map(x=>({intern_id:x.intern_id,full_name:x.full_name,confirmed_domain:x.confirmed_domain,confirmed_subdomain:x.confirmed_subdomain,recommendation:x.result_snapshot?.domainRecommendation||null,section_results:x.result_snapshot?.sectionResults||[]})));
 });
 r.post("/groups/:id/transfer", async(req,res)=>{
   const internId=req.body?.internId;
   if(!internId)return res.status(400).json({error:"Select an intern to transfer"});
   const g=(await q("SELECT * FROM groups WHERE id=$1 AND status='ACTIVE'",[req.params.id])).rows[0];
   if(!g)return res.status(404).json({error:"Destination group must be active"});
-  const person=(await q("SELECT ip.id,ip.final_domain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",[internId,g.batch_id])).rows[0];
+  const person=(await q("SELECT ip.id,ip.final_domain_id,ip.final_subdomain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",[internId,g.batch_id])).rows[0];
   if(!person)return res.status(409).json({error:"Intern must be allocated to the destination batch"});
 
   const result=await tx(async client=>{
     const old=(await client.query("SELECT gm.group_id,g.name,gm.project_role FROM group_members gm JOIN groups g ON g.id=gm.group_id WHERE gm.intern_id=$1 AND gm.active AND g.status='ACTIVE' FOR UPDATE OF gm",[internId])).rows;
     if(old.some(x=>x.group_id===g.id))throw conflict("Intern is already assigned to this team");
     await client.query("UPDATE group_members SET active=false WHERE intern_id=$1 AND active",[internId]);
-    await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,project_role,active) VALUES($1,$2,$3,NULL,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,project_role=NULL,active=true",[g.id,internId,person.final_domain_id]);
+    await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id,project_role,active) VALUES($1,$2,$3,$4,NULL,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET domain_id=EXCLUDED.domain_id,subdomain_id=EXCLUDED.subdomain_id,project_role=NULL,active=true",[g.id,internId,person.final_domain_id,person.final_subdomain_id]);
     await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action,details) VALUES($1,$2,$3,'MEMBER_TRANSFER',$4)",[g.id,g.batch_id,req.user.id,JSON.stringify({internId,from:old.map(x=>x.group_id)})]);
     return old;
   });
@@ -2802,7 +2837,7 @@ r.get("/group-proposals/:batchId", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT g.*,d.name domain_name,COUNT(gm.intern_id)::int member_count,COALESCE(json_agg(json_build_object('internId',ip.id,'name',ip.full_name,'domainId',gm.domain_id) ORDER BY ip.full_name) FILTER(WHERE ip.id IS NOT NULL),'[]') members FROM groups g LEFT JOIN group_members gm ON gm.group_id=g.id AND gm.active LEFT JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id WHERE g.batch_id=$1 AND g.status='SYSTEM_DRAFT' GROUP BY g.id,d.name ORDER BY g.created_at DESC`,
+        `SELECT g.*,d.name domain_name,COUNT(gm.intern_id)::int member_count,COALESCE(json_agg(json_build_object('internId',ip.id,'name',ip.full_name,'domainId',gm.domain_id,'subdomainId',gm.subdomain_id,'subdomainName',sd.name) ORDER BY ip.full_name) FILTER(WHERE ip.id IS NOT NULL),'[]') members FROM groups g LEFT JOIN group_members gm ON gm.group_id=g.id AND gm.active LEFT JOIN intern_profiles ip ON ip.id=gm.intern_id LEFT JOIN domains d ON d.id=gm.domain_id LEFT JOIN subdomains sd ON sd.id=gm.subdomain_id WHERE g.batch_id=$1 AND g.status='SYSTEM_DRAFT' GROUP BY g.id,d.name ORDER BY g.created_at DESC`,
         [req.params.batchId],
       )
     ).rows,
@@ -2823,7 +2858,7 @@ r.post("/group-proposals/:batchId/generate", async (req, res) => {
     return res.status(400).json({ error: "Invalid group composition" });
   const students = (
     await q(
-      `SELECT ip.id,ip.full_name,ip.final_domain_id,d.name domain_name,COALESCE(bd.capacity,d.default_capacity,25) domain_capacity,COALESCE(sc.score,0) score FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN batch_domains bd ON bd.batch_id=ba.batch_id AND bd.domain_id=ip.final_domain_id JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT max(aa.total_score) score FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.intern_id=ip.id AND a.batch_id=$1) sc ON true WHERE ba.batch_id=$1 AND ip.final_domain_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM group_members gm JOIN groups gx ON gx.id=gm.group_id WHERE gm.intern_id=ip.id AND gm.active AND gx.status='ACTIVE') AND NOT EXISTS(SELECT 1 FROM exit_records ex WHERE ex.intern_id=ip.id) ORDER BY d.name,sc.score DESC NULLS LAST,ip.full_name`,
+      `SELECT ip.id,ip.full_name,ip.final_domain_id,ip.final_subdomain_id,d.name domain_name,sd.name subdomain_name,COALESCE(bd.capacity,d.default_capacity,25) domain_capacity,COALESCE(sc.score,0) score FROM batch_allocations ba JOIN intern_profiles ip ON ip.id=ba.intern_id JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id LEFT JOIN batch_domains bd ON bd.batch_id=ba.batch_id AND bd.domain_id=ip.final_domain_id JOIN users u ON u.id=ip.user_id AND u.is_active AND u.status<>'DELETED' LEFT JOIN LATERAL(SELECT max(aa.total_score) score FROM assessment_attempts aa JOIN assessments a ON a.id=aa.assessment_id WHERE aa.intern_id=ip.id AND a.batch_id=$1) sc ON true WHERE ba.batch_id=$1 AND ip.final_domain_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM group_members gm JOIN groups gx ON gx.id=gm.group_id WHERE gm.intern_id=ip.id AND gm.active AND gx.status='ACTIVE') AND NOT EXISTS(SELECT 1 FROM exit_records ex WHERE ex.intern_id=ip.id) ORDER BY d.name,sd.name NULLS LAST,sc.score DESC NULLS LAST,ip.full_name`,
       [batch.id],
     )
   ).rows;
@@ -2890,8 +2925,8 @@ r.post("/group-proposals/:batchId/generate", async (req, res) => {
       ).rows[0];
       for (const st of plan.members)
         await c.query(
-          "INSERT INTO group_members(group_id,intern_id,domain_id) VALUES($1,$2,$3)",
-          [g.id, st.id, st.final_domain_id],
+          "INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id) VALUES($1,$2,$3,$4)",
+          [g.id, st.id, st.final_domain_id, st.final_subdomain_id],
         );
       out.push({ ...g, domainName: plan.domainName, members: plan.members });
     }
@@ -2931,7 +2966,7 @@ r.patch("/group-proposals/:groupId", async (req, res) => {
     for (const id of ids) {
       const st = (
         await c.query(
-          "SELECT ip.final_domain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",
+          "SELECT ip.final_domain_id,ip.final_subdomain_id FROM intern_profiles ip JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$2 WHERE ip.id=$1",
           [id, g.batch_id],
         )
       ).rows[0];
@@ -2952,8 +2987,8 @@ r.patch("/group-proposals/:groupId", async (req, res) => {
           { status: 409 },
         );
       await c.query(
-        "INSERT INTO group_members(group_id,intern_id,domain_id) VALUES($1,$2,$3)",
-        [g.id, id, st.final_domain_id],
+        "INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id) VALUES($1,$2,$3,$4)",
+        [g.id, id, st.final_domain_id, st.final_subdomain_id],
       );
     }
   });
@@ -3008,11 +3043,13 @@ r.post("/groups", async (req, res) => {
       )
     ).rows[0];
     await claimInternsForGroup(c, internIds, created.id);
-    for (const internId of internIds)
+    for (const internId of internIds) {
+      const profile=(await c.query("SELECT final_domain_id,final_subdomain_id FROM intern_profiles WHERE id=$1",[internId])).rows[0];
       await c.query(
-        "INSERT INTO group_members(group_id,intern_id,domain_id) VALUES($1,$2,$3)",
-        [created.id, internId, b.domainId || null],
+        "INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id) VALUES($1,$2,$3,$4)",
+        [created.id, internId, profile?.final_domain_id || b.domainId || null, profile?.final_subdomain_id || null],
       );
+    }
     return created;
   });
   await audit(req, "GROUP_CREATED", "group", g.id, null, g);
@@ -3044,7 +3081,7 @@ r.post("/project-groups", async(req,res)=>{
    const batch=(await client.query("SELECT id,college_id FROM batches WHERE id=$1",[batchId])).rows[0];
    if((projectId&&!project)||!batch)throw conflict("Active project and valid batch required");
    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[String(batchId)]);
-   const members=(await client.query(`SELECT ip.id,ip.college_id,ip.final_domain_id FROM intern_profiles ip
+   const members=(await client.query(`SELECT ip.id,ip.college_id,ip.final_domain_id,ip.final_subdomain_id FROM intern_profiles ip
     JOIN users u ON u.id=ip.user_id AND u.status<>'DELETED'
     JOIN batch_allocations ba ON ba.intern_id=ip.id AND ba.batch_id=$1
     WHERE ip.id=ANY($2::uuid[])`,[batchId,ids])).rows;
@@ -3055,7 +3092,7 @@ r.post("/project-groups", async(req,res)=>{
    const savedProject=project||(await client.query("INSERT INTO projects(title,description,domain_ids,milestones,deliverable_types,status) VALUES($1,$2,$3,$4,$5,'ACTIVE') RETURNING id,title",[String(title).trim(),description||null,JSON.stringify([]),JSON.stringify([]),JSON.stringify([])])).rows[0];
    const g=(await client.query("INSERT INTO groups(batch_id,name,type,status) VALUES($1,$2,'MULTI_DOMAIN','ACTIVE') RETURNING *",[batchId,savedProject.title])).rows[0];
    await claimInternsForGroup(client,ids,g.id);
-   for(const m of members)await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true)",[g.id,m.id,m.final_domain_id]);
+   for(const m of members)await client.query("INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id,active) VALUES($1,$2,$3,$4,true)",[g.id,m.id,m.final_domain_id,m.final_subdomain_id]);
    await client.query("INSERT INTO project_assignments(project_id,group_id,assigned_by,status) VALUES($1,$2,$3,'ASSIGNED')",[savedProject.id,g.id,req.user.id]);
    await client.query("INSERT INTO group_history(group_id,batch_id,actor_id,action) VALUES($1,$2,$3,'APPROVED')",[g.id,batchId,req.user.id]);
    return {group:g,project:savedProject,internCount:members.length};
@@ -3218,6 +3255,9 @@ r.post("/tasks", async (req, res) => {
       .status(400)
       .json({ error: "Task marks must be between 1 and 1000" });
   if (b.projectRole && !b.groupId) return res.status(400).json({error:"Select a project team for role-specific tasks"});
+  if (b.subdomainId && !b.domainId) return res.status(400).json({error:"Select a domain before selecting a sub-domain"});
+  if (b.subdomainId && !(await q("SELECT 1 FROM subdomains WHERE id=$1 AND domain_id=$2 AND active",[b.subdomainId,b.domainId])).rowCount)
+    return res.status(400).json({error:"Selected sub-domain does not belong to the task domain"});
   if (b.groupId) {
     const group = (
       await q("SELECT 1 FROM groups WHERE id=$1 AND batch_id=$2", [
@@ -3238,10 +3278,11 @@ r.post("/tasks", async (req, res) => {
   }
   const x = (
     await q(
-      `INSERT INTO weekly_tasks(batch_id,domain_id,group_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,rubric_id,status,release_weekday,release_time,release_timezone,project_role) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'SCHEDULED',$13,$14,'Asia/Kolkata',$15) RETURNING *`,
+      `INSERT INTO weekly_tasks(batch_id,domain_id,subdomain_id,group_id,title,description,expected_output,submission_types,resources,release_at,due_at,marks,rubric_id,status,release_weekday,release_time,release_timezone,project_role) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'SCHEDULED',$14,$15,'Asia/Kolkata',$16) RETURNING *`,
       [
         b.batchId,
         b.domainId || null,
+        b.subdomainId || null,
         b.groupId || null,
         b.title.trim(),
         b.description || null,
@@ -3274,7 +3315,7 @@ r.get("/completions", async (req, res) =>
   res.json(
     (
       await q(
-        `SELECT ip.id intern_id,ip.user_id,ip.full_name,d.name domain_name,fe.group_marks,fe.individual_marks,fe.mentor_feedback,ca.status completion_status,ca.reason,ex.type exit_type,ex.exit_date,c.id certificate_db_id,c.certificate_id,c.status certificate_status,c.mode certificate_mode FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.role='INTERN' AND u.status<>'DELETED' LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL (SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) fe ON true LEFT JOIN LATERAL (SELECT * FROM completion_approvals x WHERE x.intern_id=ip.id ORDER BY x.approved_at DESC LIMIT 1) ca ON true LEFT JOIN LATERAL (SELECT type,exit_date FROM exit_records x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) ex ON true LEFT JOIN certificates c ON c.intern_id=ip.id ORDER BY ip.full_name`,
+        `SELECT ip.id intern_id,ip.user_id,ip.full_name,concat_ws(' · ',d.name,sd.name) domain_name,sd.name subdomain_name,fe.group_marks,fe.individual_marks,fe.mentor_feedback,ca.status completion_status,ca.reason,ex.type exit_type,ex.exit_date,c.id certificate_db_id,c.certificate_id,c.status certificate_status,c.mode certificate_mode FROM intern_profiles ip JOIN users u ON u.id=ip.user_id AND u.role='INTERN' AND u.status<>'DELETED' LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id LEFT JOIN LATERAL (SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) fe ON true LEFT JOIN LATERAL (SELECT * FROM completion_approvals x WHERE x.intern_id=ip.id ORDER BY x.approved_at DESC LIMIT 1) ca ON true LEFT JOIN LATERAL (SELECT type,exit_date FROM exit_records x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1) ex ON true LEFT JOIN certificates c ON c.intern_id=ip.id ORDER BY ip.full_name`,
       )
     ).rows,
   ),
@@ -3355,6 +3396,9 @@ r.get("/reports", async (req, res) => {
       `SELECT ip.id intern_id,ip.full_name,ip.roll_number,ip.program,ip.branch,c.name college_name,b.name batch_name,d.name domain_name,ba.intern_start,ba.intern_end,cp.reference_number allotment_reference,COALESCE(att.pct,0) attendance_percent,COALESCE(ts.avg_marks,0) task_avg,COALESCE(rv.avg_marks,0) review_avg,fe.group_marks,fe.individual_marks,fe.mentor_feedback,fe.recommendation,ca.status completion_status,ccr.id completion_report_id,ccr.status completion_report_status,cert.certificate_id FROM intern_profiles ip JOIN users visible_user ON visible_user.id=ip.user_id AND visible_user.status<>'DELETED' LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT * FROM batch_allocations x WHERE x.intern_id=ip.id ORDER BY x.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL(SELECT reference_number FROM college_proofs x WHERE x.intern_id=ip.id AND x.status='VERIFIED' ORDER BY x.created_at DESC LIMIT 1)cp ON true LEFT JOIN LATERAL(SELECT z.attendance_percent pct FROM attendance_summary z JOIN batch_allocations za ON za.id=z.allocation_id WHERE z.intern_id=ip.id ORDER BY za.intern_start DESC NULLS LAST LIMIT 1)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)fe ON true LEFT JOIN LATERAL(SELECT * FROM completion_approvals x WHERE x.intern_id=ip.id ORDER BY x.approved_at DESC LIMIT 1)ca ON true LEFT JOIN LATERAL(SELECT * FROM college_completion_reports x WHERE x.intern_id=ip.id ORDER BY x.created_at DESC LIMIT 1)ccr ON true LEFT JOIN LATERAL(SELECT * FROM certificates x WHERE x.intern_id=ip.id AND x.status='ISSUED' ORDER BY x.created_at DESC LIMIT 1)cert ON true ORDER BY ip.full_name`,
     )
   ).rows;
+  const assignedSubdomains=(await q("SELECT ip.id,sd.name FROM intern_profiles ip LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id")).rows;
+  const subdomainByIntern=new Map(assignedSubdomains.map(item=>[item.id,item.name]));
+  for(const row of rows){row.subdomain_name=subdomainByIntern.get(row.intern_id)||null;if(row.subdomain_name)row.domain_name=row.domain_name+" · "+row.subdomain_name;}
   res.json(rows);
 });
 r.post("/reports/:internId/completion", async (req, res) => {
@@ -3365,6 +3409,8 @@ r.post("/reports/:internId/completion", async (req, res) => {
     )
   ).rows[0];
   if (!x) return res.status(404).json({ error: "Intern not found" });
+  const assignedSubdomain=(await q("SELECT sd.name FROM intern_profiles ip LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id WHERE ip.id=$1",[x.id])).rows[0]?.name;
+  if(assignedSubdomain)x.domain_name=x.domain_name+" · "+assignedSubdomain;
   if (x.completion_status !== "APPROVED")
     return res
       .status(409)
@@ -3440,7 +3486,7 @@ r.get("/reports/completion/:id/file", async (req, res) => {
 r.get("/reports/export.csv", async (req, res) => {
   const rows = (
     await q(
-      `SELECT ip.full_name,ip.roll_number,c.name college,b.name batch,d.name domain,COALESCE(att.pct,0) attendance_percent,COALESCE(ts.avg_marks,0) task_average,COALESCE(rv.avg_marks,0) review_average,fe.individual_marks final_individual_marks,fe.recommendation,ca.status completion_status,cert.certificate_id FROM intern_profiles ip JOIN users visible_user ON visible_user.id=ip.user_id AND visible_user.status<>'DELETED' LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT * FROM batch_allocations z WHERE z.intern_id=ip.id ORDER BY z.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN LATERAL(SELECT z.attendance_percent pct FROM attendance_summary z JOIN batch_allocations za ON za.id=z.allocation_id WHERE z.intern_id=ip.id ORDER BY za.intern_start DESC NULLS LAST LIMIT 1)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations z WHERE z.intern_id=ip.id ORDER BY z.created_at DESC LIMIT 1)fe ON true LEFT JOIN LATERAL(SELECT * FROM completion_approvals z WHERE z.intern_id=ip.id ORDER BY z.approved_at DESC LIMIT 1)ca ON true LEFT JOIN LATERAL(SELECT * FROM certificates z WHERE z.intern_id=ip.id AND z.status='ISSUED' ORDER BY z.created_at DESC LIMIT 1)cert ON true ORDER BY ip.full_name`,
+      `SELECT ip.full_name,ip.roll_number,c.name college,b.name batch,concat_ws(' · ',d.name,sd.name) domain,COALESCE(att.pct,0) attendance_percent,COALESCE(ts.avg_marks,0) task_average,COALESCE(rv.avg_marks,0) review_average,fe.individual_marks final_individual_marks,fe.recommendation,ca.status completion_status,cert.certificate_id FROM intern_profiles ip JOIN users visible_user ON visible_user.id=ip.user_id AND visible_user.status<>'DELETED' LEFT JOIN colleges c ON c.id=ip.college_id LEFT JOIN LATERAL(SELECT * FROM batch_allocations z WHERE z.intern_id=ip.id ORDER BY z.intern_start DESC LIMIT 1)ba ON true LEFT JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id LEFT JOIN LATERAL(SELECT z.attendance_percent pct FROM attendance_summary z JOIN batch_allocations za ON za.id=z.allocation_id WHERE z.intern_id=ip.id ORDER BY za.intern_start DESC NULLS LAST LIMIT 1)att ON true LEFT JOIN LATERAL(SELECT round(avg(te.marks),1) avg_marks FROM task_submissions ts JOIN task_evaluations te ON te.submission_id=ts.id WHERE ts.intern_id=ip.id AND te.decision='APPROVED')ts ON true LEFT JOIN LATERAL(SELECT round(avg(rim.marks),1) avg_marks FROM review_individual_marks rim JOIN fortnight_reviews fr ON fr.id=rim.review_id WHERE rim.intern_id=ip.id AND fr.status='PUBLISHED')rv ON true LEFT JOIN LATERAL(SELECT * FROM final_evaluations z WHERE z.intern_id=ip.id ORDER BY z.created_at DESC LIMIT 1)fe ON true LEFT JOIN LATERAL(SELECT * FROM completion_approvals z WHERE z.intern_id=ip.id ORDER BY z.approved_at DESC LIMIT 1)ca ON true LEFT JOIN LATERAL(SELECT * FROM certificates z WHERE z.intern_id=ip.id AND z.status='ISSUED' ORDER BY z.created_at DESC LIMIT 1)cert ON true ORDER BY ip.full_name`,
     )
   ).rows;
   const esc = (v) => '"' + String(v ?? "").replaceAll('"', '""') + '"';

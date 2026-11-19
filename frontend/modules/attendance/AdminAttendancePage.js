@@ -34,6 +34,7 @@ export default function AdminAttendancePage() {
       .catch((e) => setErr(e.message));
   useEffect(() => {
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
   }, [filters]);
   useEffect(()=>{let cancelled=false;const urls=[];Promise.all(faces.map(async x=>{try{const blob=await apiBlob("/admin/face-enrollments/"+x.id+"/image");const url=URL.createObjectURL(blob);urls.push(url);if(!cancelled)setImages(prev=>({...prev,[x.id]:url}));}catch{/* Missing enrollment images use the existing unavailable state. */}}));return()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};},[faces]);
   async function face(x, status) {setFeedbackArea("face");

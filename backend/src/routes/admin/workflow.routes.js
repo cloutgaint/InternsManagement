@@ -180,7 +180,7 @@ r.post("/groups/:id/merge", async (req, res) => {
       );
     const members = (
       await c.query(
-        "SELECT intern_id,domain_id FROM group_members WHERE group_id=$1 AND active",
+        "SELECT intern_id,domain_id,subdomain_id FROM group_members WHERE group_id=$1 AND active",
         [source.id],
       )
     ).rows;
@@ -203,8 +203,8 @@ r.post("/groups/:id/merge", async (req, res) => {
     ]);
     for (const m of members)
       await c.query(
-        "INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET active=true,domain_id=EXCLUDED.domain_id",
-        [target.id, m.intern_id, m.domain_id],
+        "INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id,active) VALUES($1,$2,$3,$4,true) ON CONFLICT(group_id,intern_id) DO UPDATE SET active=true,domain_id=EXCLUDED.domain_id,subdomain_id=EXCLUDED.subdomain_id",
+        [target.id, m.intern_id, m.domain_id, m.subdomain_id],
       );
     await c.query("UPDATE groups SET status='MERGED' WHERE id=$1", [source.id]);
     await c.query(
@@ -255,7 +255,7 @@ r.post("/groups/:id/split", async (req, res) => {
       throw Object.assign(new Error("Group not found"), { status: 404 });
     const members = (
       await c.query(
-        "SELECT intern_id,domain_id FROM group_members WHERE group_id=$1 AND active",
+        "SELECT intern_id,domain_id,subdomain_id FROM group_members WHERE group_id=$1 AND active",
         [source.id],
       )
     ).rows;
@@ -282,8 +282,8 @@ r.post("/groups/:id/split", async (req, res) => {
         [source.id, m.intern_id],
       );
       await c.query(
-        "INSERT INTO group_members(group_id,intern_id,domain_id,active) VALUES($1,$2,$3,true)",
-        [g.id, m.intern_id, m.domain_id],
+        "INSERT INTO group_members(group_id,intern_id,domain_id,subdomain_id,active) VALUES($1,$2,$3,$4,true)",
+        [g.id, m.intern_id, m.domain_id, m.subdomain_id],
       );
     }
     await history(
@@ -322,7 +322,7 @@ r.get("/task-templates", async (_req, res) => {
   res.json(
     (
       await q(
-        "SELECT t.*,d.name domain_name FROM task_templates t LEFT JOIN domains d ON d.id=t.domain_id WHERE t.active ORDER BY d.name,t.week_no NULLS LAST,t.title",
+        "SELECT t.*,d.name domain_name,sd.name subdomain_name FROM task_templates t LEFT JOIN domains d ON d.id=t.domain_id LEFT JOIN subdomains sd ON sd.id=t.subdomain_id WHERE t.active ORDER BY d.name,sd.name,t.week_no NULLS LAST,t.title",
       )
     ).rows,
   );
@@ -336,11 +336,16 @@ r.post("/task-templates", async (req, res) => {
       .json({ error: "Title and at least one submission type are required" });
   if (!inRange(b.marks ?? 100, 1, 1000))
     return res.status(400).json({ error: "Marks must be between 1 and 1000" });
+  if (b.subdomainId && !b.domainId)
+    return res.status(400).json({ error: "Select a domain before selecting a sub-domain" });
+  if (b.subdomainId && !(await q("SELECT 1 FROM subdomains WHERE id=$1 AND domain_id=$2 AND active",[b.subdomainId,b.domainId])).rowCount)
+    return res.status(400).json({ error: "Selected sub-domain does not belong to the task domain" });
   const x = (
     await q(
-      "INSERT INTO task_templates(domain_id,week_no,title,description,expected_output,submission_types,resources,marks,rubric_id,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *",
+      "INSERT INTO task_templates(domain_id,subdomain_id,week_no,title,description,expected_output,submission_types,resources,marks,rubric_id,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *",
       [
         b.domainId || null,
+        b.subdomainId || null,
         b.weekNo ? Number(b.weekNo) : null,
         b.title.trim(),
         b.description || null,
@@ -411,19 +416,20 @@ r.post("/batches/:id/schedule-tasks", async (req, res) => {
       if (day > batch.end_date) continue;
       const exists = (
         await c.query(
-          "SELECT 1 FROM weekly_tasks WHERE batch_id=$1 AND title=$2 AND domain_id IS NOT DISTINCT FROM $3",
-          [batch.id, t.title, t.domain_id],
+          "SELECT 1 FROM weekly_tasks WHERE batch_id=$1 AND title=$2 AND domain_id IS NOT DISTINCT FROM $3 AND subdomain_id IS NOT DISTINCT FROM $4",
+          [batch.id, t.title, t.domain_id, t.subdomain_id],
         )
       ).rowCount;
       if (exists) continue;
       out.push(
         (
           await c.query(
-            `INSERT INTO weekly_tasks(batch_id,domain_id,title,description,expected_output,submission_types,resources,marks,rubric_id,status,release_at,due_at,release_weekday,release_time,release_timezone)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'SCHEDULED',($10::date+$11::time) AT TIME ZONE $12,($10::date+$13::int+$11::time) AT TIME ZONE $12,$14,$11::time,$12) RETURNING id,title,release_at,due_at`,
+            `INSERT INTO weekly_tasks(batch_id,domain_id,subdomain_id,title,description,expected_output,submission_types,resources,marks,rubric_id,status,release_at,due_at,release_weekday,release_time,release_timezone)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'SCHEDULED',($11::date+$12::time) AT TIME ZONE $13,($11::date+$14::int+$12::time) AT TIME ZONE $13,$15,$12::time,$13) RETURNING id,title,release_at,due_at`,
             [
               batch.id,
               t.domain_id,
+              t.subdomain_id,
               t.title,
               t.description,
               t.expected_output,
@@ -790,7 +796,7 @@ r.get("/reports/operations", async (_req, res) => {
       `SELECT b.name,b.status,count(ba.id)::int interns FROM batches b LEFT JOIN batch_allocations ba ON ba.batch_id=b.id GROUP BY b.id ORDER BY b.start_date DESC`,
     ),
     one(
-      `SELECT d.name,count(ip.id)::int interns FROM domains d LEFT JOIN intern_profiles ip ON ip.final_domain_id=d.id GROUP BY d.id ORDER BY 2 DESC`,
+      `SELECT concat_ws(' · ',d.name,sd.name) name,count(ip.id)::int interns FROM domains d LEFT JOIN intern_profiles ip ON ip.final_domain_id=d.id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id GROUP BY d.id,sd.id ORDER BY 2 DESC`,
     ),
     one(
       `SELECT status,count(*)::int n FROM college_proofs GROUP BY status ORDER BY 2 DESC`,
@@ -1126,7 +1132,7 @@ r.post("/certificates/:internId/issue", async (req, res) => {
       .json({ error: "Certificate already issued", certificate: existing });
   const p = (
     await q(
-      `SELECT ip.*,d.name domain_name,ba.intern_start,ba.intern_end,b.certificate_mode FROM intern_profiles ip LEFT JOIN domains d ON d.id=ip.final_domain_id
+      `SELECT ip.*,concat_ws(' · ',d.name,sd.name) domain_name,sd.name subdomain_name,ba.intern_start,ba.intern_end,b.certificate_mode FROM intern_profiles ip LEFT JOIN domains d ON d.id=ip.final_domain_id LEFT JOIN subdomains sd ON sd.id=ip.final_subdomain_id
      LEFT JOIN LATERAL(SELECT * FROM batch_allocations x WHERE x.intern_id=ip.id ORDER BY x.intern_start DESC NULLS LAST LIMIT 1) ba ON true LEFT JOIN batches b ON b.id=ba.batch_id WHERE ip.id=$1`,
       [req.params.internId],
     )

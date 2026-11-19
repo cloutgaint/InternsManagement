@@ -8,6 +8,7 @@ const validProductionEnvironment = {
   NODE_ENV: "production",
   DATABASE_URL: "postgres://example.invalid/app",
   JWT_SECRET: "x".repeat(64),
+  PQ_REQUIRE_HYBRID_TOKENS: "true",
   FRONTEND_URL: "https://interns.example.test",
   FILE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
   STORAGE_DRIVER: "s3",
@@ -39,11 +40,20 @@ test("complete production configuration is accepted", () => {
 });
 
 test("production refuses to start without encrypted file storage", () => {
-  const environment = { ...validProductionEnvironment };
-  delete environment.FILE_ENCRYPTION_KEY;
-  const result = validate(environment);
+  // Empty rather than deleted: env.js loads the root .env, and dotenv only
+  // fills variables that are absent, so a deleted key would be restored.
+  const result = validate({ ...validProductionEnvironment, FILE_ENCRYPTION_KEY: "" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /FILE_ENCRYPTION_KEY is required in production/);
+});
+
+test("production requires post-quantum token verification", () => {
+  const result = validate({
+    ...validProductionEnvironment,
+    PQ_REQUIRE_HYBRID_TOKENS: "false",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /PQ_REQUIRE_HYBRID_TOKENS must be true/);
 });
 
 test("production refuses malformed encryption keys", () => {
@@ -68,4 +78,23 @@ test("production refuses insecure public service URLs", () => {
   const result = validate({ ...validProductionEnvironment, BIOMETRIC_VERIFY_URL: "http://biometric.example.test/verify" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /BIOMETRIC_VERIFY_URL must use HTTPS in production/);
+});
+
+test("production refuses an out-of-range anti-spoof threshold", () => {
+  const result = validate({ ...validProductionEnvironment, BIOMETRIC_ANTISPOOF_THRESHOLD: "1.5" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /BIOMETRIC_ANTISPOOF_THRESHOLD must be a number between 0 and 1/);
+});
+
+test("production accepts the verifier as a private Compose service over HTTP", () => {
+  const result = validate({ ...validProductionEnvironment, BIOMETRIC_VERIFY_URL: "http://biometric:8765/verify" });
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("production still refuses HTTP to an external or IP-addressed verifier", () => {
+  for (const url of ["http://10.0.0.5:8765/verify", "http://verifier.example.test/verify"]) {
+    const result = validate({ ...validProductionEnvironment, BIOMETRIC_VERIFY_URL: url });
+    assert.notEqual(result.status, 0, url);
+    assert.match(result.stderr, /BIOMETRIC_VERIFY_URL must use HTTPS in production/);
+  }
 });

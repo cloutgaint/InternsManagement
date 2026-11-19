@@ -105,6 +105,10 @@ ALTER TABLE domain_decisions ADD COLUMN IF NOT EXISTS reason text;
 
 -- Attendance calendar: one row per allocation day with its computed status (9, 9.2). Days only
 -- count once they have passed, or once today has a record, so today is not an early absence.
+-- The migration runner intentionally replays all migrations. Drop the dependent summary first
+-- so replaying this older view definition over the newer half-day-aware shape remains safe.
+DROP VIEW IF EXISTS attendance_summary;
+DROP VIEW IF EXISTS attendance_calendar;
 CREATE OR REPLACE VIEW attendance_calendar AS
 SELECT ba.id allocation_id,ba.intern_id,ba.batch_id,d::date AS day,ad.id record_id,ad.check_in,ad.check_out,COALESCE(ad.working_minutes,0) working_minutes,ad.source,ad.correction_reason,
   CASE WHEN h.name IS NOT NULL THEN 'HOLIDAY'

@@ -12,7 +12,6 @@ export default function InternAttendancePage() {
     baselineRef = useRef(null);
   const [st, setSt] = useState(null),
     [eventType, setEventType] = useState("CHECK_IN"),
-    [challenge, setChallenge] = useState(""),
     [phase, setPhase] = useState("READY"),
     [msg, setMsg] = useState(""),
     [err, setErr] = useState("");
@@ -86,7 +85,7 @@ export default function InternAttendancePage() {
     stream.current?.getTracks().forEach((track)=>track.stop());
     stream.current=null;
     if(video.current){video.current.pause();video.current.srcObject=null;}
-    baselineRef.current=null;setChallenge("");setPhase("READY");setErr("");
+    baselineRef.current=null;setPhase("READY");setErr("");
   }
   function capture() {
     const v = video.current,

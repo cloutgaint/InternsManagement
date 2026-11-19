@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import Link from "next/link";
 export default function InternCollaborationPage() {
   const [d, setD] = useState({ group: null, documents: [], messages: [] }),
     [msg, setMsg] = useState(""),
@@ -80,9 +81,9 @@ export default function InternCollaborationPage() {
             resources and group communication.
           </p>
         </div>
-        <a className="btn secondary" href="/intern/notifications">
+        <Link className="btn secondary" href="/intern/notifications">
           Notifications
-        </a>
+        </Link>
       </div>
       {err && <p className="error">{err}</p>}
       {!d.group ? (

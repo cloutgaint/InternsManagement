@@ -285,8 +285,8 @@ r.get("/dashboard", async (req, res) => {
   const p = await me(req.user.id);
   const [alloc, offer, face, att, tasks, notes] = await Promise.all([
     q(
-      `SELECT ba.*,b.name batch_name,b.start_date,b.end_date,d.name domain_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=$2 WHERE ba.intern_id=$1 ORDER BY b.start_date DESC LIMIT 1`,
-      [p.id, p.final_domain_id],
+      `SELECT ba.*,b.name batch_name,b.start_date,b.end_date,d.name domain_name,sd.name subdomain_name FROM batch_allocations ba JOIN batches b ON b.id=ba.batch_id LEFT JOIN domains d ON d.id=$2 LEFT JOIN subdomains sd ON sd.id=$3 WHERE ba.intern_id=$1 ORDER BY b.start_date DESC LIMIT 1`,
+      [p.id, p.final_domain_id, p.final_subdomain_id],
     ),
     q(
       `SELECT ol.* FROM offer_letters ol JOIN batch_allocations ba ON ba.id=ol.allocation_id WHERE ba.intern_id=$1 ORDER BY ol.created_at DESC LIMIT 1`,
@@ -301,8 +301,8 @@ r.get("/dashboard", async (req, res) => {
       [p.id],
     ),
     q(
-      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') AND (wt.target_intern_id IS NULL OR wt.target_intern_id=$1) AND (wt.domain_id IS NULL OR wt.domain_id=$2) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=$1 AND gm.active AND (wt.project_role IS NULL OR gm.project_role=wt.project_role))) ORDER BY wt.due_at`,
-      [p.id, p.final_domain_id],
+      `SELECT wt.* FROM weekly_tasks wt JOIN batch_allocations ba ON ba.batch_id=wt.batch_id WHERE ba.intern_id=$1 AND wt.status IN ('RELEASED','IN_PROGRESS') AND (wt.target_intern_id IS NULL OR wt.target_intern_id=$1) AND (wt.domain_id IS NULL OR wt.domain_id=$2) AND (wt.subdomain_id IS NULL OR wt.subdomain_id=$3) AND (wt.group_id IS NULL OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.group_id=wt.group_id AND gm.intern_id=$1 AND gm.active AND (wt.project_role IS NULL OR gm.project_role=wt.project_role))) ORDER BY wt.due_at`,
+      [p.id, p.final_domain_id, p.final_subdomain_id],
     ),
     q(
       "SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20",
@@ -494,11 +494,11 @@ r.post("/face-enrollment", async (req, res) => {
       old.id,
     ]);
   }
-  const hash = crypto.createHash("sha256").update(buf).digest("hex");
+  const hash = crypto.createHash("sha512").update(buf).digest("hex");
   const x = (
     await q(
       `INSERT INTO face_enrollments(intern_id,template_ref,raw_image_path,status,consent_at,quality_score) VALUES($1,$2,$3,'PENDING_ADMIN_APPROVAL',now(),$4) RETURNING *`,
-      [p.id, "capture:" + hash, file, Number(req.body.qualityScore || 1)],
+      [p.id, "capture:sha512:" + hash, file, Number(req.body.qualityScore || 1)],
     )
   ).rows[0];
   await notifyAdmins(
@@ -1005,8 +1005,8 @@ r.post("/tasks/:id/submit", taskUpload.single("file"), async (req, res) => {
   }
   const alloc = (
     await q(
-      "SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) AND ($4::uuid IS NULL OR $4=$5::uuid) LIMIT 1",
-      [p.id, t.batch_id, t.group_id, t.domain_id, p.final_domain_id],
+      "SELECT 1 FROM batch_allocations ba LEFT JOIN group_members gm ON gm.intern_id=ba.intern_id AND gm.active WHERE ba.intern_id=$1 AND ba.batch_id=$2 AND ($3::uuid IS NULL OR gm.group_id=$3) AND ($4::uuid IS NULL OR $4=$5::uuid) AND ($6::uuid IS NULL OR $6=$7::uuid) LIMIT 1",
+      [p.id, t.batch_id, t.group_id, t.domain_id, p.final_domain_id, t.subdomain_id, p.final_subdomain_id],
     )
   ).rowCount;
   if (t.target_intern_id && t.target_intern_id !== p.id) {

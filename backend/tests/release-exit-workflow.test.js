@@ -13,8 +13,9 @@ test("exit endpoint validates type and reason, records audit and notifies",()=>{
  assert.match(route,/Cannot record an exit after certificate issuance/);
 });
 test("admin completion UI supports exit and suppresses approval after exit",()=>{
- assert.match(page,/recordExit\(x,"WITHDRAWN"\)/);
- assert.match(page,/recordExit\(x,"TERMINATED"\)/);
- assert.match(page,/!x.exit_type && x.individual_marks/);
- assert.match(page,/!x.exit_type && x.completion_status/);
+ assert.match(page,/openDialog\(x,"WITHDRAWN"\)/);
+ assert.match(page,/openDialog\(x,"TERMINATED"\)/);
+ assert.match(page,/action==="WITHDRAWN"\|\|action==="TERMINATED"/);
+ assert.match(page,/!x.exit_type && x.individual_marks != null/);
+ assert.match(page,/!x.exit_type && x.completion_status === "APPROVED"/);
 });

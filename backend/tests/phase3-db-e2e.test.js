@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import jwt from "jsonwebtoken";
+import { signToken } from "../src/common/security/tokens.js";
 import { createApp } from "../src/app.js";
 import { pool, q } from "../src/common/database/index.js";
 
@@ -15,7 +15,7 @@ test("assessment lifecycle: submit, evaluate, recommend and confirm", { skip: !e
   const inserted = { users: [], colleges: [], domains: [], batches: [] };
   const row = async (sql, params = []) => (await q(sql, params)).rows[0];
   const request = async (role, method, path, body) => {
-    const token = jwt.sign({ id: role === "ADMIN" ? inserted.admin : inserted.internUser, role }, process.env.JWT_SECRET);
+    const token = signToken({ id: role === "ADMIN" ? inserted.admin : inserted.internUser, role });
     const response = await fetch(base + path, { method, headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     return { status: response.status, body: await response.json() };
   };

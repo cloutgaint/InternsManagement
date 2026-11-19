@@ -1,5 +1,5 @@
-import jwt from "jsonwebtoken";
 import { q } from "../database/index.js";
+import { verifyToken } from "./tokens.js";
 
 // Disabling, deleting or re-credentialing an account must end existing sessions, not wait for expiry.
 export async function auth(req, res, next) {
@@ -13,7 +13,7 @@ export async function auth(req, res, next) {
 
   let payload;
   try {
-    payload = jwt.verify(token, process.env.JWT_SECRET);
+    payload = verifyToken(token);
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }

@@ -120,7 +120,7 @@ export default function AdminPerformancePage() {
               </span>
               <span>
                 {x.batch_name || "—"}
-                <small>{x.domain_name || "No domain"}</small>
+                <small>{x.domain_name || "No domain"}{x.subdomain_name ? " · " + x.subdomain_name : ""}</small>
               </span>
               <span>
                 {x.attendance_pct}%

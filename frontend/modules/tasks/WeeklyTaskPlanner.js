@@ -1,27 +1,727 @@
 "use client";
-import {useEffect,useState} from "react";
-import {api} from "@/shared/api/client";
-const blank=()=>({week:1,title:"",description:"",expectedOutput:"",releaseAt:""});
+import { useEffect, useState } from "react";
+import { api } from "@/shared/api/client";
+const blank = () => ({
+  week: 1,
+  title: "",
+  description: "",
+  expectedOutput: "",
+  releaseAt: "",
+});
 // datetime-local inputs hold local time; an ISO (UTC) value would shift by the offset on every save.
-const localDate=x=>{if(!x)return "";const d=new Date(x);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
-export default function WeeklyTaskPlanner({role="mentor"}){
- const base="/"+role+"/task-plans";
- const [releaseReasons,setReleaseReasons]=useState({}),[editingWeek,setEditingWeek]=useState(null),[newWeek,setNewWeek]=useState(null),[interns,setInterns]=useState([]),[plans,setPlans]=useState([]),[selected,setSelected]=useState(""),[plan,setPlan]=useState(null),[internId,setInternId]=useState(""),[weeks,setWeeks]=useState([blank()]),[error,setError]=useState(""),[success,setSuccess]=useState(""),[busy,setBusy]=useState(false);
- const refresh=async()=>{try{const [i,p]=await Promise.all([api(base+"/interns"),api(base)]);setInterns(i);setPlans(p);}catch(e){setError(e.message);}};
- useEffect(()=>{refresh();const id=new URLSearchParams(window.location.search).get("plan");if(id)open(id);},[base]);
- async function open(id){setError("");setNewWeek(null);setEditingWeek(null);try{const p=await api(base+"/"+id);setSelected(id);setPlan(p);setInternId(p.intern_id);setWeeks(p.tasks.length?p.tasks.map(t=>({week:t.plan_week,title:t.title,description:t.description||"",expectedOutput:t.expected_output||"",releaseAt:localDate(t.release_at),status:t.status,scheduledAt:t.release_at,taskId:t.id})):[blank()]);}catch(e){setError(e.message);}}
- async function create(){setError("");setSuccess("");try{if(!internId)throw Error("Select an intern first");const p=await api(base,{method:"POST",body:JSON.stringify({internId})});await refresh();await open(p.id);setSuccess("Draft created. Add all weekly tasks before confirming.");}catch(e){setError(e.message);}}
- function update(i,key,value){setWeeks(w=>w.map((x,j)=>i===j?{...x,[key]:value}:x));}
- async function save(confirm=false){if(confirm&&!window.confirm("Confirm and allocate the prepared weekly tasks? You can add more weeks later. Tasks release automatically on their scheduled dates."))return;setBusy(true);setError("");setSuccess("");try{if(!selected)throw Error("Create a draft first");const payload=weeks.map(w=>({...w,releaseAt:w.releaseAt?new Date(w.releaseAt).toISOString():""}));if(weeks.some(w=>!w.title.trim()||!w.description.trim()||!w.releaseAt))throw Error("Complete the title, instructions and release date for each week.");await api(base+"/"+selected+"/weeks",{method:"PUT",body:JSON.stringify({weeks:payload})});if(confirm){await api(base+"/"+selected+"/confirm",{method:"POST",body:"{}"});setSuccess("Prepared weekly tasks confirmed and scheduled. You can add more weeks later.");}else setSuccess("Weekly draft saved.");await refresh();await open(selected);}catch(e){setError(e.message);}finally{setBusy(false);}}
- async function appendWeek(){setBusy(true);setError("");setSuccess("");try{if(!newWeek)throw Error("Add a week first");if(!newWeek.title.trim())throw Error("Task title is required.");if(!newWeek.description.trim())throw Error("Task instructions are required.");if(!newWeek.releaseAt)throw Error("Select a release date and time.");await api(base+"/"+selected+"/append-week",{method:"POST",body:JSON.stringify({...newWeek,releaseAt:newWeek.releaseAt?new Date(newWeek.releaseAt).toISOString():""})});await open(selected);await refresh();setSuccess("Week added and scheduled. Existing confirmed tasks were preserved.");}catch(e){setError(e.message);}finally{setBusy(false);}}
- async function releaseWeek(week){setBusy(true);setError("");setSuccess("");try{const reason=(releaseReasons[week]||"").trim();const result=await api(base+"/"+selected+"/weeks/"+week+"/release",{method:"POST",body:JSON.stringify({reason})});await open(selected);setSuccess("Week "+week+" released"+(result.early?" early with recorded reason.":".")+" The action was audited.");}catch(e){setError(e.message);}finally{setBusy(false);}}
- async function saveEdit(){if(!editingWeek)return;setBusy(true);setError("");setSuccess("");try{const w=weeks.find(x=>Number(x.week)===editingWeek);if(!w.title.trim())throw Error("Task title is required.");if(!w.description.trim())throw Error("Task instructions are required.");if(!w.releaseAt)throw Error("Select a release date and time.");await api(base+"/"+selected+"/weeks/"+editingWeek,{method:"PATCH",body:JSON.stringify({...w,releaseAt:new Date(w.releaseAt).toISOString()})});await open(selected);setSuccess("Week "+editingWeek+" updated successfully.");}catch(e){setError(e.message);}finally{setBusy(false);}}
- const locked=plan?.status==="CONFIRMED";
- const activeIntern=interns.find(i=>i.id===internId);
- const projectName=plan?.project_name||activeIntern?.project_name||"";
- const collegeName=plan?.college_name||activeIntern?.college_name||"";
- const batchName=plan?.batch_name||activeIntern?.batch_name||"";
- const requiredWeeks=activeIntern?.intern_start&&activeIntern?.intern_end?Math.min(52,Math.max(1,Math.ceil((Date.parse(String(activeIntern.intern_end).slice(0,10))-Date.parse(String(activeIntern.intern_start).slice(0,10))+86400000)/604800000))):null;
- const incomplete=weeks.some((w,i)=>Number(w.week)!==i+1);
- return <main className="wrap skillbridge-task-planner"><div className="intern-head"><div><h1>Weekly Task Planner</h1><p className="muted">Prepare all weeks at once, then confirm once. Tasks release automatically on schedule. Fortnight reviews are conducted offline.</p></div></div><section className="card"><h2>Task Plan</h2><div className="form-grid" style={{alignItems:"end"}}><label>Intern<select className="input" value={internId} disabled={!!plan} onChange={e=>setInternId(e.target.value)}><option value="">Select intern</option>{interns.map(i=><option key={i.id} value={i.id}>{i.full_name} · {i.college_name||"College unavailable"} · {i.batch_name||"Batch unavailable"} · {i.project_name||"No project assigned"} · {String(i.intern_start).slice(0,10)} to {String(i.intern_end).slice(0,10)}</option>)}</select></label><label>College<input className="input" readOnly value={collegeName||"College unavailable"} aria-label="Intern college"/></label><label>Batch<input className="input" readOnly value={batchName||"Batch unavailable"} aria-label="Intern batch"/></label><label>Assigned Project<input className="input" readOnly value={projectName||"No project assigned"} aria-label="Assigned project"/></label><label>Existing Plans<select className="input" value={selected} onChange={e=>{if(e.target.value)open(e.target.value);else{setSelected("");setPlan(null);setInternId("");setWeeks([blank()]);}}}><option value="">New plan</option>{plans.map(p=><option key={p.id} value={p.id}>{p.intern_name} · {p.college_name||"College unavailable"} · {p.batch_name||"Batch unavailable"} · {p.project_name||"No project"} · {p.status} ({p.task_count} weeks)</option>)}</select></label></div>{!plan&&<button className="btn" onClick={create}>Create Draft Plan</button>}{plan&&<p className="muted">Status: <strong>{plan.status}</strong> · {weeks.length} weekly task(s)</p>}</section>{plan&&<section className="card"><h2>Weekly Tasks</h2>{requiredWeeks!==null&&<p className="muted">Internship has up to {requiredWeeks} weeks. {weeks.length} prepared. You may confirm these weeks now and add more later.</p>}{weeks.map((w,i)=><div className="card" key={i} style={{marginBottom:12}}><div className="workflow-row" style={{alignItems:"center"}}><h3>Week {w.week}</h3><span className="muted">{w.status||"DRAFT"} · Scheduled: {w.scheduledAt?new Date(w.scheduledAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):w.releaseAt||"Not set"} IST</span>{locked&&new Date(w.releaseAt)>new Date()&&<button className="btn secondary" type="button" disabled={busy} onClick={()=>setEditingWeek(w.week===editingWeek?null:w.week)}>{editingWeek===w.week?"Cancel Edit":"Edit Week"}</button>}{locked&&editingWeek===w.week&&<button className="btn" type="button" disabled={busy} onClick={saveEdit}>Save Changes</button>}{!locked&&weeks.length>1&&<button type="button" className="btn secondary" onClick={()=>setWeeks(x=>x.filter((_,j)=>j!==i).map((v,j)=>({...v,week:j+1})))}>Remove</button>}</div><div className="form-grid"><label>Task Title<input className="input" disabled={locked&&editingWeek!==w.week} value={w.title} onChange={e=>update(i,"title",e.target.value)}/></label><label>Release Date & Time<input className="input" type="datetime-local" disabled={locked&&editingWeek!==w.week} value={w.releaseAt} onChange={e=>update(i,"releaseAt",e.target.value)}/></label></div>{locked&&w.status==="SCHEDULED"&&<div className="card" style={{margin:"12px 0",padding:12}}><p className="muted">{new Date(w.scheduledAt)>new Date()?"Early release requires a reason (minimum 10 characters).":"Scheduled time reached. You may release this task now."}</p>{new Date(w.scheduledAt)>new Date()&&<label>Early Release Reason<textarea className="input" value={releaseReasons[w.week]||""} onChange={e=>setReleaseReasons(s=>({...s,[w.week]:e.target.value}))} placeholder="Why must this task be released before its scheduled time?"/></label>}<button className="btn" type="button" disabled={busy||(new Date(w.scheduledAt)>new Date()&&(releaseReasons[w.week]||"").trim().length<10)} onClick={()=>releaseWeek(w.week)}>Release Week {w.week} Now</button></div>}<label>Instructions<textarea className="input" disabled={locked&&editingWeek!==w.week} value={w.description} onChange={e=>update(i,"description",e.target.value)}/></label><label>Expected Output<textarea className="input" disabled={locked&&editingWeek!==w.week} value={w.expectedOutput} onChange={e=>update(i,"expectedOutput",e.target.value)}/></label></div>)}{locked&&requiredWeeks!==null&&weeks.length<requiredWeeks&&<div className="card" style={{marginBottom:12}}><h3>Add Week {weeks.length+1}</h3><p className="muted">Your earlier confirmed tasks remain unchanged. Add the next week separately.</p>{!newWeek?<button className="btn secondary" type="button" onClick={()=>setNewWeek({...blank(),week:weeks.length+1})}>+ Add Next Week</button>:<><div className="form-grid"><label>Task Title<input className="input" value={newWeek.title} onChange={e=>setNewWeek(w=>({...w,title:e.target.value}))}/></label><label>Release Date & Time<input className="input" type="datetime-local" value={newWeek.releaseAt} onChange={e=>setNewWeek(w=>({...w,releaseAt:e.target.value}))}/></label></div><label>Instructions<textarea className="input" value={newWeek.description} onChange={e=>setNewWeek(w=>({...w,description:e.target.value}))}/></label><label>Expected Output<textarea className="input" value={newWeek.expectedOutput} onChange={e=>setNewWeek(w=>({...w,expectedOutput:e.target.value}))}/></label><div className="action-row"><button className="btn" disabled={busy} onClick={appendWeek}>Save & Schedule Week {weeks.length+1}</button><button className="btn secondary" onClick={()=>setNewWeek(null)}>Cancel</button></div></>}</div>}{!locked&&<div className="action-row"><button className="btn secondary" type="button" onClick={()=>setWeeks(w=>[...w,{...blank(),week:w.length+1}])}>+ Add Week</button><button className="btn secondary" disabled={busy} onClick={()=>save(false)}>Save Draft</button><button className="btn" disabled={busy||incomplete} title={incomplete?"Week numbers must start at 1 and be sequential":""} onClick={()=>save(true)}>Confirm & Allocate Prepared Tasks</button></div>}{error&&<p className="error" role="alert">{error}</p>}{success&&<p className="success" role="status">{success}</p>}</section>}{!plan&&error&&<p className="error" role="alert">{error}</p>}{!plan&&success&&<p className="success" role="status">{success}</p>}<style jsx global>{`.skillbridge-task-planner{max-width:1320px!important;padding:30px 28px 64px}.skillbridge-task-planner>.intern-head{margin-bottom:26px}.skillbridge-task-planner>.intern-head h1{font-size:clamp(28px,2.6vw,36px);letter-spacing:-.7px;font-weight:700}.skillbridge-task-planner>.intern-head p{font-size:14px;line-height:1.65;max-width:850px}.skillbridge-task-planner>.card{padding:26px!important;border:1px solid #dce8e1;border-radius:20px!important;box-shadow:0 6px 24px #204a3210;margin-bottom:20px}.skillbridge-task-planner>.card h2{font-size:21px;font-weight:650;margin:0 0 20px}.skillbridge-task-planner .form-grid{gap:16px 20px}.skillbridge-task-planner label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600;color:#244b38}.skillbridge-task-planner .input{width:100%;min-height:46px;border:1px solid #d7e4dd;border-radius:12px;background:#fff;font-size:14px;color:#1b3027;padding:11px 14px}.skillbridge-task-planner .input[readonly]{background:#f4f8f6;color:#53695d}.skillbridge-task-planner .btn{min-height:44px;border-radius:999px!important;padding:11px 20px;font-size:13px;font-weight:600}.skillbridge-task-planner .btn:not(.secondary){background:#2563eb;color:#fff;border-color:#2563eb}.skillbridge-task-planner .btn:not(.secondary):hover:not(:disabled){background:#1d4ed8;color:#fff}.skillbridge-task-planner .btn.secondary{background:#e7f0ff;color:#1d4ed8;border:1px solid #c6dafc}.skillbridge-task-planner .workflow-row{gap:12px;flex-wrap:wrap}.skillbridge-task-planner .workflow-row h3{font-size:17px}.skillbridge-task-planner .muted{line-height:1.6}.skillbridge-task-planner .action-row{display:flex;gap:10px;flex-wrap:wrap}@media(max-width:700px){.skillbridge-task-planner{padding:18px 14px 40px}.skillbridge-task-planner>.card{padding:18px!important}.skillbridge-task-planner .form-grid{grid-template-columns:1fr}}`}</style></main>;
+const localDate = (x) => {
+  if (!x) return "";
+  const d = new Date(x);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+};
+export default function WeeklyTaskPlanner({ role = "mentor" }) {
+  const base = "/" + role + "/task-plans";
+  const [releaseReasons, setReleaseReasons] = useState({}),
+    [editingWeek, setEditingWeek] = useState(null),
+    [newWeek, setNewWeek] = useState(null),
+    [interns, setInterns] = useState([]),
+    [plans, setPlans] = useState([]),
+    [selected, setSelected] = useState(""),
+    [plan, setPlan] = useState(null),
+    [internId, setInternId] = useState(""),
+    [weeks, setWeeks] = useState([blank()]),
+    [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
+    [busy, setBusy] = useState(false);
+  const refresh = async () => {
+    try {
+      const [i, p] = await Promise.all([api(base + "/interns"), api(base)]);
+      setInterns(i);
+      setPlans(p);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  useEffect(() => {
+    refresh();
+    const id = new URLSearchParams(window.location.search).get("plan");
+    if (id) open(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loaders are recreated each render; run only when the listed values change.
+  }, [base]);
+  async function open(id) {
+    setError("");
+    setNewWeek(null);
+    setEditingWeek(null);
+    try {
+      const p = await api(base + "/" + id);
+      setSelected(id);
+      setPlan(p);
+      setInternId(p.intern_id);
+      setWeeks(
+        p.tasks.length
+          ? p.tasks.map((t) => ({
+              week: t.plan_week,
+              title: t.title,
+              description: t.description || "",
+              expectedOutput: t.expected_output || "",
+              releaseAt: localDate(t.release_at),
+              status: t.status,
+              scheduledAt: t.release_at,
+              taskId: t.id,
+            }))
+          : [blank()],
+      );
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function create() {
+    setError("");
+    setSuccess("");
+    try {
+      if (!internId) throw Error("Select an intern first");
+      const p = await api(base, {
+        method: "POST",
+        body: JSON.stringify({ internId }),
+      });
+      await refresh();
+      await open(p.id);
+      setSuccess("Draft created. Add all weekly tasks before confirming.");
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  function update(i, key, value) {
+    setWeeks((w) => w.map((x, j) => (i === j ? { ...x, [key]: value } : x)));
+  }
+  async function save(confirm = false) {
+    if (
+      confirm &&
+      !window.confirm(
+        "Confirm and allocate the prepared weekly tasks? You can add more weeks later. Tasks release automatically on their scheduled dates.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      if (!selected) throw Error("Create a draft first");
+      const payload = weeks.map((w) => ({
+        ...w,
+        releaseAt: w.releaseAt ? new Date(w.releaseAt).toISOString() : "",
+      }));
+      if (
+        weeks.some(
+          (w) => !w.title.trim() || !w.description.trim() || !w.releaseAt,
+        )
+      )
+        throw Error(
+          "Complete the title, instructions and release date for each week.",
+        );
+      await api(base + "/" + selected + "/weeks", {
+        method: "PUT",
+        body: JSON.stringify({ weeks: payload }),
+      });
+      if (confirm) {
+        await api(base + "/" + selected + "/confirm", {
+          method: "POST",
+          body: "{}",
+        });
+        setSuccess(
+          "Prepared weekly tasks confirmed and scheduled. You can add more weeks later.",
+        );
+      } else setSuccess("Weekly draft saved.");
+      await refresh();
+      await open(selected);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function appendWeek() {
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      if (!newWeek) throw Error("Add a week first");
+      if (!newWeek.title.trim()) throw Error("Task title is required.");
+      if (!newWeek.description.trim())
+        throw Error("Task instructions are required.");
+      if (!newWeek.releaseAt) throw Error("Select a release date and time.");
+      await api(base + "/" + selected + "/append-week", {
+        method: "POST",
+        body: JSON.stringify({
+          ...newWeek,
+          releaseAt: newWeek.releaseAt
+            ? new Date(newWeek.releaseAt).toISOString()
+            : "",
+        }),
+      });
+      await open(selected);
+      await refresh();
+      setSuccess(
+        "Week added and scheduled. Existing confirmed tasks were preserved.",
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function releaseWeek(week) {
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const reason = (releaseReasons[week] || "").trim();
+      const result = await api(
+        base + "/" + selected + "/weeks/" + week + "/release",
+        { method: "POST", body: JSON.stringify({ reason }) },
+      );
+      await open(selected);
+      setSuccess(
+        "Week " +
+          week +
+          " released" +
+          (result.early ? " early with recorded reason." : ".") +
+          " The action was audited.",
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveEdit() {
+    if (!editingWeek) return;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const w = weeks.find((x) => Number(x.week) === editingWeek);
+      if (!w.title.trim()) throw Error("Task title is required.");
+      if (!w.description.trim()) throw Error("Task instructions are required.");
+      if (!w.releaseAt) throw Error("Select a release date and time.");
+      await api(base + "/" + selected + "/weeks/" + editingWeek, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...w,
+          releaseAt: new Date(w.releaseAt).toISOString(),
+        }),
+      });
+      await open(selected);
+      setSuccess("Week " + editingWeek + " updated successfully.");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const locked = plan?.status === "CONFIRMED";
+  const activeIntern = interns.find((i) => i.id === internId);
+  const projectName = plan?.project_name || activeIntern?.project_name || "";
+  const collegeName = plan?.college_name || activeIntern?.college_name || "";
+  const batchName = plan?.batch_name || activeIntern?.batch_name || "";
+  const requiredWeeks =
+    activeIntern?.intern_start && activeIntern?.intern_end
+      ? Math.min(
+          52,
+          Math.max(
+            1,
+            Math.ceil(
+              (Date.parse(String(activeIntern.intern_end).slice(0, 10)) -
+                Date.parse(String(activeIntern.intern_start).slice(0, 10)) +
+                86400000) /
+                604800000,
+            ),
+          ),
+        )
+      : null;
+  const incomplete = weeks.some((w, i) => Number(w.week) !== i + 1);
+  return (
+    <main className="wrap skillbridge-task-planner">
+      <div className="intern-head">
+        <div>
+          <h1>Weekly Task Planner</h1>
+          <p className="muted">
+            Prepare all weeks at once, then confirm once. Tasks release
+            automatically on schedule. Fortnight reviews are conducted offline.
+          </p>
+        </div>
+      </div>
+      <section className="card">
+        <h2>Task Plan</h2>
+        <div className="form-grid" style={{ alignItems: "end" }}>
+          <label>
+            Intern
+            <select
+              className="input"
+              value={internId}
+              disabled={!!plan}
+              onChange={(e) => setInternId(e.target.value)}
+            >
+              <option value="">Select intern</option>
+              {interns.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.full_name} · {i.college_name || "College unavailable"} ·{" "}
+                  {i.batch_name || "Batch unavailable"} ·{" "}
+                  {i.project_name || "No project assigned"} ·{" "}
+                  {String(i.intern_start).slice(0, 10)} to{" "}
+                  {String(i.intern_end).slice(0, 10)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            College
+            <input
+              className="input"
+              readOnly
+              value={collegeName || "College unavailable"}
+              aria-label="Intern college"
+            />
+          </label>
+          <label>
+            Batch
+            <input
+              className="input"
+              readOnly
+              value={batchName || "Batch unavailable"}
+              aria-label="Intern batch"
+            />
+          </label>
+          <label>
+            Assigned Project
+            <input
+              className="input"
+              readOnly
+              value={projectName || "No project assigned"}
+              aria-label="Assigned project"
+            />
+          </label>
+          <label>
+            Existing Plans
+            <select
+              className="input"
+              value={selected}
+              onChange={(e) => {
+                if (e.target.value) open(e.target.value);
+                else {
+                  setSelected("");
+                  setPlan(null);
+                  setInternId("");
+                  setWeeks([blank()]);
+                }
+              }}
+            >
+              <option value="">New plan</option>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.intern_name} · {p.college_name || "College unavailable"} ·{" "}
+                  {p.batch_name || "Batch unavailable"} ·{" "}
+                  {p.project_name || "No project"} · {p.status} ({p.task_count}{" "}
+                  weeks)
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {!plan && (
+          <button className="btn" onClick={create}>
+            Create Draft Plan
+          </button>
+        )}
+        {plan && (
+          <p className="muted">
+            Status: <strong>{plan.status}</strong> · {weeks.length} weekly
+            task(s)
+          </p>
+        )}
+      </section>
+      {plan && (
+        <section className="card">
+          <h2>Weekly Tasks</h2>
+          {requiredWeeks !== null && (
+            <p className="muted">
+              Internship has up to {requiredWeeks} weeks. {weeks.length}{" "}
+              prepared. You may confirm these weeks now and add more later.
+            </p>
+          )}
+          {weeks.map((w, i) => (
+            <div className="card" key={i} style={{ marginBottom: 12 }}>
+              <div className="workflow-row" style={{ alignItems: "center" }}>
+                <h3>Week {w.week}</h3>
+                <span className="muted">
+                  {w.status || "DRAFT"} · Scheduled:{" "}
+                  {w.scheduledAt
+                    ? new Date(w.scheduledAt).toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata",
+                      })
+                    : w.releaseAt || "Not set"}{" "}
+                  IST
+                </span>
+                {locked && new Date(w.releaseAt) > new Date() && (
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      setEditingWeek(w.week === editingWeek ? null : w.week)
+                    }
+                  >
+                    {editingWeek === w.week ? "Cancel Edit" : "Edit Week"}
+                  </button>
+                )}
+                {locked && editingWeek === w.week && (
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={busy}
+                    onClick={saveEdit}
+                  >
+                    Save Changes
+                  </button>
+                )}
+                {!locked && weeks.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={() =>
+                      setWeeks((x) =>
+                        x
+                          .filter((_, j) => j !== i)
+                          .map((v, j) => ({ ...v, week: j + 1 })),
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="form-grid">
+                <label>
+                  Task Title
+                  <input
+                    className="input"
+                    disabled={locked && editingWeek !== w.week}
+                    value={w.title}
+                    onChange={(e) => update(i, "title", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Release Date & Time
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    disabled={locked && editingWeek !== w.week}
+                    value={w.releaseAt}
+                    onChange={(e) => update(i, "releaseAt", e.target.value)}
+                  />
+                </label>
+              </div>
+              {locked && w.status === "SCHEDULED" && (
+                <div className="card" style={{ margin: "12px 0", padding: 12 }}>
+                  <p className="muted">
+                    {new Date(w.scheduledAt) > new Date()
+                      ? "Early release requires a reason (minimum 10 characters)."
+                      : "Scheduled time reached. You may release this task now."}
+                  </p>
+                  {new Date(w.scheduledAt) > new Date() && (
+                    <label>
+                      Early Release Reason
+                      <textarea
+                        className="input"
+                        value={releaseReasons[w.week] || ""}
+                        onChange={(e) =>
+                          setReleaseReasons((s) => ({
+                            ...s,
+                            [w.week]: e.target.value,
+                          }))
+                        }
+                        placeholder="Why must this task be released before its scheduled time?"
+                      />
+                    </label>
+                  )}
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={
+                      busy ||
+                      (new Date(w.scheduledAt) > new Date() &&
+                        (releaseReasons[w.week] || "").trim().length < 10)
+                    }
+                    onClick={() => releaseWeek(w.week)}
+                  >
+                    Release Week {w.week} Now
+                  </button>
+                </div>
+              )}
+              <label>
+                Instructions
+                <textarea
+                  className="input"
+                  disabled={locked && editingWeek !== w.week}
+                  value={w.description}
+                  onChange={(e) => update(i, "description", e.target.value)}
+                />
+              </label>
+              <label>
+                Expected Output
+                <textarea
+                  className="input"
+                  disabled={locked && editingWeek !== w.week}
+                  value={w.expectedOutput}
+                  onChange={(e) => update(i, "expectedOutput", e.target.value)}
+                />
+              </label>
+            </div>
+          ))}
+          {locked && requiredWeeks !== null && weeks.length < requiredWeeks && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h3>Add Week {weeks.length + 1}</h3>
+              <p className="muted">
+                Your earlier confirmed tasks remain unchanged. Add the next week
+                separately.
+              </p>
+              {!newWeek ? (
+                <button
+                  className="btn secondary"
+                  type="button"
+                  onClick={() =>
+                    setNewWeek({ ...blank(), week: weeks.length + 1 })
+                  }
+                >
+                  + Add Next Week
+                </button>
+              ) : (
+                <>
+                  <div className="form-grid">
+                    <label>
+                      Task Title
+                      <input
+                        className="input"
+                        value={newWeek.title}
+                        onChange={(e) =>
+                          setNewWeek((w) => ({ ...w, title: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Release Date & Time
+                      <input
+                        className="input"
+                        type="datetime-local"
+                        value={newWeek.releaseAt}
+                        onChange={(e) =>
+                          setNewWeek((w) => ({
+                            ...w,
+                            releaseAt: e.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Instructions
+                    <textarea
+                      className="input"
+                      value={newWeek.description}
+                      onChange={(e) =>
+                        setNewWeek((w) => ({
+                          ...w,
+                          description: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Expected Output
+                    <textarea
+                      className="input"
+                      value={newWeek.expectedOutput}
+                      onChange={(e) =>
+                        setNewWeek((w) => ({
+                          ...w,
+                          expectedOutput: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className="action-row">
+                    <button
+                      className="btn"
+                      disabled={busy}
+                      onClick={appendWeek}
+                    >
+                      Save & Schedule Week {weeks.length + 1}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      onClick={() => setNewWeek(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {!locked && (
+            <div className="action-row">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() =>
+                  setWeeks((w) => [...w, { ...blank(), week: w.length + 1 }])
+                }
+              >
+                + Add Week
+              </button>
+              <button
+                className="btn secondary"
+                disabled={busy}
+                onClick={() => save(false)}
+              >
+                Save Draft
+              </button>
+              <button
+                className="btn"
+                disabled={busy || incomplete}
+                title={
+                  incomplete
+                    ? "Week numbers must start at 1 and be sequential"
+                    : ""
+                }
+                onClick={() => save(true)}
+              >
+                Confirm & Allocate Prepared Tasks
+              </button>
+            </div>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="success" role="status">
+              {success}
+            </p>
+          )}
+        </section>
+      )}
+      {!plan && error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {!plan && success && (
+        <p className="success" role="status">
+          {success}
+        </p>
+      )}
+      <style jsx global>{`
+        .skillbridge-task-planner {
+          max-width: 1320px !important;
+          padding: 30px 28px 64px;
+        }
+        .skillbridge-task-planner > .intern-head {
+          margin-bottom: 26px;
+        }
+        .skillbridge-task-planner > .intern-head h1 {
+          font-size: clamp(28px, 2.6vw, 36px);
+          letter-spacing: -0.7px;
+          font-weight: 700;
+        }
+        .skillbridge-task-planner > .intern-head p {
+          font-size: 14px;
+          line-height: 1.65;
+          max-width: 850px;
+        }
+        .skillbridge-task-planner > .card {
+          padding: 26px !important;
+          border: 1px solid #dce8e1;
+          border-radius: 20px !important;
+          box-shadow: 0 6px 24px #204a3210;
+          margin-bottom: 20px;
+        }
+        .skillbridge-task-planner > .card h2 {
+          font-size: 21px;
+          font-weight: 650;
+          margin: 0 0 20px;
+        }
+        .skillbridge-task-planner .form-grid {
+          gap: 16px 20px;
+        }
+        .skillbridge-task-planner label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #244b38;
+        }
+        .skillbridge-task-planner .input {
+          width: 100%;
+          min-height: 46px;
+          border: 1px solid #d7e4dd;
+          border-radius: 12px;
+          background: #fff;
+          font-size: 14px;
+          color: #1b3027;
+          padding: 11px 14px;
+        }
+        .skillbridge-task-planner .input[readonly] {
+          background: #f4f8f6;
+          color: #53695d;
+        }
+        .skillbridge-task-planner .btn {
+          min-height: 44px;
+          border-radius: 999px !important;
+          padding: 11px 20px;
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .skillbridge-task-planner .btn:not(.secondary) {
+          background: #2563eb;
+          color: #fff;
+          border-color: #2563eb;
+        }
+        .skillbridge-task-planner .btn:not(.secondary):hover:not(:disabled) {
+          background: #1d4ed8;
+          color: #fff;
+        }
+        .skillbridge-task-planner .btn.secondary {
+          background: #e7f0ff;
+          color: #1d4ed8;
+          border: 1px solid #c6dafc;
+        }
+        .skillbridge-task-planner .workflow-row {
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .skillbridge-task-planner .workflow-row h3 {
+          font-size: 17px;
+        }
+        .skillbridge-task-planner .muted {
+          line-height: 1.6;
+        }
+        .skillbridge-task-planner .action-row {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        @media (max-width: 700px) {
+          .skillbridge-task-planner {
+            padding: 18px 14px 40px;
+          }
+          .skillbridge-task-planner > .card {
+            padding: 18px !important;
+          }
+          .skillbridge-task-planner .form-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+    </main>
+  );
 }

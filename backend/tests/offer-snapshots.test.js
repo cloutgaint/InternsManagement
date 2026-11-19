@@ -14,6 +14,7 @@ test("issued snapshot renders and freezes letter content", () => {
   assert.equal(frozen.rendered_body, "Dear Student A, welcome to Batch 1 at GAINT College.");
   assert.equal(frozen.signatory, "Director");
   assert.match(frozen.content_sha256, /^[a-f0-9]{64}$/);
+  assert.match(frozen.content_sha512, /^[a-f0-9]{128}$/);
   assert.deepEqual(issuedSnapshot({ ...offer, issued_snapshot: frozen }), frozen);
   assert.equal(issuedSnapshot({ ...offer, issued_snapshot: frozen, template_body: "Changed" }).rendered_body, frozen.rendered_body);
 });

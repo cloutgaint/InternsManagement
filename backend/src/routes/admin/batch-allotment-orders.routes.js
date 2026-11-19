@@ -90,14 +90,14 @@ router.post(
         ])
       ).rows[0];
       if (!batch) return res.status(404).json({ error: "Batch not found" });
-      const { hash } = await acceptUpload(file);
+      const { hash, legacyHash } = await acceptUpload(file);
       storedReference = await persistUploadedFile(file, {
         prefix: "batch-allotments",
       });
       const duplicate = (
         await q(
-          "SELECT id FROM batch_allotment_orders WHERE file_hash=$1 OR lower(reference_number)=lower($2) LIMIT 1",
-          [hash, referenceNumber.trim()],
+          "SELECT id FROM batch_allotment_orders WHERE file_hash=ANY($1::text[]) OR lower(reference_number)=lower($2) LIMIT 1",
+          [[hash, legacyHash], referenceNumber.trim()],
         )
       ).rows[0];
       if (duplicate)

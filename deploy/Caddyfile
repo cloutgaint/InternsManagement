@@ -1,0 +1,23 @@
+# One HTTPS domain for the whole app. Caddy obtains and renews the TLS certificate automatically
+# (APP_DOMAIN must already point at this server, with ports 80 and 443 open).
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# API, including uploads (Caddy imposes no body-size limit; the API enforces its own).
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}

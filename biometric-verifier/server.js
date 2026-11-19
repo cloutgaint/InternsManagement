@@ -1,12 +1,18 @@
 import http from "node:http";
 import "@tensorflow/tfjs-node";
 import HumanModule from "@vladmandic/human";
+import { createRequire } from "node:module";
+import path from "node:path";
 // The Node build is CommonJS, so the default import is the module object rather than the class.
 const Human=HumanModule.Human||HumanModule.default;
 const token=process.env.BIOMETRIC_VERIFY_TOKEN;
 if(!token)throw new Error("Set BIOMETRIC_VERIFY_TOKEN before starting verifier");
+// Load the model weights shipped with the installed package, so the verifier works offline and
+// always uses weights that match the library version.
+const modelDir=path.join(path.dirname(createRequire(import.meta.url).resolve("@vladmandic/human")),"..","models")+path.sep;
 // Still images only: disable frame caching/skipping so every input is analysed fresh.
-const human=new Human({backend:"tensorflow",modelBasePath:"https://vladmandic.github.io/human-models/models/",cacheSensitivity:0,face:{enabled:true,detector:{enabled:true,rotation:true,skipFrames:0,maxDetected:2},mesh:{enabled:true},description:{enabled:true,skipFrames:0},emotion:{enabled:false},iris:{enabled:false},antispoof:{enabled:false},liveness:{enabled:false}},body:{enabled:false},hand:{enabled:false},object:{enabled:false},gesture:{enabled:false},segmentation:{enabled:false}});
+// antispoof scores how likely the live capture is a real face rather than a printed or on-screen photo.
+const human=new Human({backend:"tensorflow",modelBasePath:"file://"+modelDir,cacheSensitivity:0,face:{enabled:true,detector:{enabled:true,rotation:true,skipFrames:0,maxDetected:2},mesh:{enabled:true},description:{enabled:true,skipFrames:0},emotion:{enabled:false},iris:{enabled:false},antispoof:{enabled:true,skipFrames:0},liveness:{enabled:false}},body:{enabled:false},hand:{enabled:false},object:{enabled:false},gesture:{enabled:false},segmentation:{enabled:false}});
 await human.load();
 await human.warmup();
 const YAW_SIGN=Number(process.env.BIOMETRIC_YAW_SIGN||1)<0?-1:1;
@@ -36,11 +42,19 @@ const server=http.createServer(async(req,res)=>{
     const enrolled=await detect(enrollmentImageData,"enrollment");
     const live=await detect(imageData,"live");
     const matchScore=human.match.similarity(live.embedding,enrolled.embedding);
-    if(process.env.NODE_ENV!=="production")console.log("verify",{mode:"FACE_ONLY",matchScore});
-    res.writeHead(200).end(JSON.stringify({matchScore,livenessScore:1,challengePass:true}));
+    // Passive presentation-attack score for the live frame (0 = likely spoof, 1 = likely real face).
+    const antispoofScore=Number(live.real);
+    if(!Number.isFinite(antispoofScore))throw new Error("Anti-spoof model returned no score");
+    if(process.env.NODE_ENV!=="production")console.log("verify",{mode:"FACE_ONLY",matchScore,antispoofScore});
+    // FACE_ONLY has no active challenge, so challengePass is always true; the backend decides whether
+    // antispoofScore (sent as livenessScore) is enforced.
+    res.writeHead(200).end(JSON.stringify({matchScore,livenessScore:antispoofScore,challengePass:true}));
   }catch(e){
     if(!(e instanceof InputError)&&!(e instanceof SyntaxError))console.error("verify failed",e);
     res.writeHead(e instanceof InputError||e instanceof SyntaxError?422:500).end(JSON.stringify({error:e instanceof InputError?e.message:"Verification failed"}));
   }
 });
-server.listen(Number(process.env.BIOMETRIC_VERIFY_PORT||8765),"127.0.0.1",()=>console.log("Local biometric verifier listening on 127.0.0.1:"+(process.env.BIOMETRIC_VERIFY_PORT||8765)));
+// Localhost by default; the container sets BIOMETRIC_VERIFY_HOST=0.0.0.0 so the backend can reach it
+// over the private Compose network (the port is never published).
+const bindHost=process.env.BIOMETRIC_VERIFY_HOST||"127.0.0.1",bindPort=Number(process.env.BIOMETRIC_VERIFY_PORT||8765);
+server.listen(bindPort,bindHost,()=>console.log("Local biometric verifier listening on "+bindHost+":"+bindPort));

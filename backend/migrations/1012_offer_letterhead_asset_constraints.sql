@@ -4,11 +4,11 @@ ALTER TABLE report_brand_assets
 
 ALTER TABLE report_brand_assets
  ADD CONSTRAINT report_brand_assets_mime_type_check CHECK (
-  (asset_key IN ('company_stamp','mentor_signature') AND mime_type IN ('image/png','image/jpeg')) OR
+  (asset_key IN ('company_stamp','mentor_signature','offer_signature','offer_watermark') AND mime_type IN ('image/png','image/jpeg')) OR
   (asset_key='offer_letterhead' AND mime_type IN ('image/png','image/jpeg','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
  ),
  ADD CONSTRAINT report_brand_assets_check CHECK (
-  (asset_key IN ('company_stamp','offer_letterhead') AND owner_user_id IS NULL) OR
+  (asset_key IN ('company_stamp','offer_letterhead','offer_signature','offer_watermark') AND owner_user_id IS NULL) OR
   (asset_key='mentor_signature' AND owner_user_id IS NOT NULL)
  );
 

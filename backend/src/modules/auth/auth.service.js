@@ -1,6 +1,4 @@
-import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { tx, q } from "../../common/database/index.js";
@@ -10,20 +8,21 @@ import { sendMail } from "../../common/notifications/mail.service.js";
 import { acceptUpload } from "../../common/storage/secureFiles.js";
 import { persistUploadedFile, removeStoredObject } from "../../common/storage/storage.service.js";
 import { findCoveringOrder, linkInternToOrder, storeProofFiles, validateProofDetails, latestProof } from "../../services/proofService.js";
+import { hashPassword, upgradePasswordHash, verifyPassword } from "../../common/security/password.js";
+import { signToken, verifyToken } from "../../common/security/tokens.js";
 
 // Accept the adjacent 30-second steps so typing delay or phone clock drift does not reject a valid code.
 authenticator.options = { window: 1 };
 
 const privileged = (role) => ["ADMIN", "SUPER_ADMIN", "MENTOR", "COLLEGE_COORDINATOR"].includes(role);
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
-const sign = (user) => jwt.sign(
+const sign = (user) => signToken(
   { id: user.id, email: user.email, role: user.role, mfa: true },
-  process.env.JWT_SECRET,
   { expiresIn: "8h" },
 );
 
 function challengeUser(token) {
-  const payload = jwt.verify(token, process.env.JWT_SECRET);
+  const payload = verifyToken(token);
   if (payload.purpose !== "MFA_CHALLENGE") throw new Error("Invalid MFA challenge");
   return payload;
 }
@@ -87,7 +86,7 @@ export async function registerIntern(input, files) {
       [college.id,rollNumber],
     );
     if(existingRoll.rowCount)throw Object.assign(new Error("This roll number is already registered for the selected college."),{status:409,field:"rollNumber"});
-    const passwordHash=await bcrypt.hash(input.password,12);
+    const passwordHash=await hashPassword(input.password);
     const user=await repository.createInternUser(client,email,passwordHash);
     const profile = await repository.createInternProfile(client, {
       userId: user.id, fullName: input.fullName, mobile: input.mobile,
@@ -135,8 +134,12 @@ async function credentialedApplicant({ email, password }) {
     "SELECT * FROM users WHERE lower(btrim(email))=$1 AND status<>'DELETED' AND role='INTERN' ORDER BY created_at DESC LIMIT 1",
     [normalized],
   )).rows[0];
-  if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash)))
+  const verification = user
+    ? await verifyPassword(String(password || ""), user.password_hash)
+    : { valid: false };
+  if (!user || !verification.valid)
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
+  await upgradePasswordHash(q, user.id, password, verification);
   const profile = (await q("SELECT * FROM intern_profiles WHERE user_id=$1", [user.id])).rows[0];
   return { user, profile };
 }
@@ -202,7 +205,7 @@ export async function requestPasswordReset(email) {
   if (!user) return;
   const token = crypto.randomBytes(32).toString("base64url");
   await q("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL", [user.id]);
-  await q("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes')", [user.id, crypto.createHash("sha256").update(token).digest("hex")]);
+  await q("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes')", [user.id, crypto.createHash("sha512").update(token).digest("hex")]);
   const link = (process.env.FRONTEND_URL || "http://localhost:3000") + "/reset-password?token=" + token;
   await sendMail({ to: user.email, subject: "Reset your GAINT Intern Management password", text: "Use this link within 30 minutes to set a new password:\n\n" + link + "\n\nIf you did not request this, ignore this email." });
 }
@@ -210,14 +213,17 @@ export async function requestPasswordReset(email) {
 const applyPassword = async (run, userId, password) => {
   const parsed = passwordSchema.safeParse(password);
   if (!parsed.success) throw badRequest(parsed.error.issues[0]?.message || "Password does not meet the security policy");
-  await run("UPDATE users SET password_hash=$1,password_changed_at=now(),must_change_password=false,updated_at=now() WHERE id=$2", [await bcrypt.hash(password, 12), userId]);
+  await run("UPDATE users SET password_hash=$1,password_changed_at=now(),must_change_password=false,updated_at=now() WHERE id=$2", [await hashPassword(password), userId]);
 };
 
 export async function resetPassword(token, password) {
-  const hash = crypto.createHash("sha256").update(String(token || "")).digest("hex");
+  const value = String(token || "");
+  const hashes = ["sha512", "sha256"].map((algorithm) =>
+    crypto.createHash(algorithm).update(value).digest("hex"),
+  );
   await tx(async (client) => {
     const run = client.query.bind(client);
-    const row = (await run("UPDATE password_reset_tokens SET used_at=now() WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING user_id", [hash])).rows[0];
+    const row = (await run("UPDATE password_reset_tokens SET used_at=now() WHERE token_hash=ANY($1::text[]) AND used_at IS NULL AND expires_at>now() RETURNING user_id", [hashes])).rows[0];
     if (!row) throw badRequest("This password reset link is invalid or has expired");
     await applyPassword(run, row.user_id, password);
   });
@@ -225,10 +231,13 @@ export async function resetPassword(token, password) {
 
 export async function changePassword(userId, currentPassword, password) {
   const user = await repository.findUserById(userId);
-  if (!user || !(await bcrypt.compare(String(currentPassword || ""), user.password_hash)))
+  const verification = user
+    ? await verifyPassword(String(currentPassword || ""), user.password_hash)
+    : { valid: false };
+  if (!user || !verification.valid)
     throw Object.assign(new Error("Current password is incorrect"), { status: 401 });
   await applyPassword(q, userId, password);
-  return { token: jwt.sign({ id: user.id, email: user.email, role: user.role, mfa: true }, process.env.JWT_SECRET, { expiresIn: "8h" }) };
+  return { token: signToken({ id: user.id, email: user.email, role: user.role, mfa: true }, { expiresIn: "8h" }) };
 }
 
 export async function adminResetPassword(userId, password) {
@@ -239,14 +248,17 @@ export async function adminResetPassword(userId, password) {
 export async function login({ email, password }) {
   const normalizedEmail=String(email||"").trim().toLowerCase();
   const user=(await q("SELECT * FROM users WHERE lower(btrim(email))=$1 AND status<>$2 ORDER BY created_at DESC,id DESC LIMIT 1",[normalizedEmail,"DELETED"])).rows[0];
-  if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash)))
+  const verification = user
+    ? await verifyPassword(String(password || ""), user.password_hash)
+    : { valid: false };
+  if (!user || !verification.valid)
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
+  await upgradePasswordHash(q, user.id, password, verification);
   if (!user.is_active)
     throw Object.assign(new Error(user.status === "PENDING_APPROVAL" ? "Your college permission proof is verified. Your account is awaiting Admin approval." : user.status === "PROOF_UNDER_REVIEW" ? "Your college permission proof is awaiting Admin verification." : user.status === "PROOF_REUPLOAD_REQUIRED" ? "Admin requested a new college permission proof. Open Check Application Status to upload it." : user.status === "CORRECTION_REQUESTED" ? "Admin requested a correction to your application. Open Check Application Status to fix it." : user.status === "PROOF_REJECTED" || user.status === "REJECTED" ? "Your application was rejected" + (user.status_reason ? ": " + user.status_reason : ".") : "Your account is not active. Please contact Admin."), { status: 403 });
   if (privileged(user.role)) {
-    const challenge = jwt.sign(
+    const challenge = signToken(
       { id: user.id, purpose: "MFA_CHALLENGE" },
-      process.env.JWT_SECRET,
       { expiresIn: "5m" },
     );
     return {
@@ -255,9 +267,8 @@ export async function login({ email, password }) {
     };
   }
   return {
-    token: jwt.sign(
+    token: signToken(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
       { expiresIn: "8h" },
     ),
     user: { id: user.id, email: user.email, role: user.role, mustChangePassword: user.must_change_password },
@@ -278,11 +289,21 @@ export async function setupMfa(challenge) {
   return { qrDataUrl, secret };
 }
 
+// The fixed code 000000 is accepted for staff sign-in only when explicitly enabled:
+// ALLOW_DEV_MFA_CODE in development, or ALLOW_TEST_MFA_CODE on a deployed test server.
+// Real authenticator-app codes keep working either way.
+export function testMfaCodeAllowed() {
+  return (
+    process.env.ALLOW_TEST_MFA_CODE === "true" ||
+    (process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true")
+  );
+}
+
 export async function verifyMfa(challenge, code) {
   const payload = challengeUser(challenge);
   const user = await repository.findUserById(payload.id);
   const normalizedCode = String(code || "").trim();
-  const localTestCode = process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_MFA_CODE === "true" && normalizedCode === "000000" && ["ADMIN", "SUPER_ADMIN", "COLLEGE_COORDINATOR", "MENTOR"].includes(user?.role);
+  const localTestCode = testMfaCodeAllowed() && normalizedCode === "000000" && ["ADMIN", "SUPER_ADMIN", "COLLEGE_COORDINATOR", "MENTOR"].includes(user?.role);
   const isValidCode = localTestCode || (!!user?.mfa_secret && authenticator.check(normalizedCode, user.mfa_secret));
 
   if (!user || !isValidCode)

@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { api } from "@/shared/api/client";
 import BatchSettings from "./BatchSettings";
 export default function AdminBatchesPage() {

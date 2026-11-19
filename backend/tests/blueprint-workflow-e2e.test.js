@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
 import crypto from "node:crypto";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
+import { signToken } from "../src/common/security/tokens.js";
+import { verifyPassword } from "../src/common/security/password.js";
 import sharp from "sharp";
 import { createApp } from "../src/app.js";
 import { pool, q } from "../src/common/database/index.js";
@@ -95,7 +95,7 @@ test(
       );
       return {
         id: u.id,
-        token: jwt.sign({ id: u.id, role, mfa: true }, process.env.JWT_SECRET),
+        token: signToken({ id: u.id, role, mfa: true }),
       };
     };
     const superAdmin = await staff("SUPER_ADMIN");
@@ -203,7 +203,7 @@ test(
           const onDisk = fs.readFileSync(JSON.parse(stored.file_path)[0]);
           assert.equal(
             onDisk.subarray(0, 9).toString(),
-            "GAINTENC1",
+            "GAINTENC3",
             "proof must be encrypted at rest",
           );
           const blocked = await call(null, "POST", "/auth/login", {
@@ -803,10 +803,7 @@ test(
             }),
             201,
           );
-          mentorToken = jwt.sign(
-            { id: mentor.user_id, role: "MENTOR", mfa: true },
-            process.env.JWT_SECRET,
-          );
+          mentorToken = signToken({ id: mentor.user_id, role: "MENTOR", mfa: true });
           ok(
             await A("POST", "/groups/" + group.id + "/mentor", {
               mentorId: mentor.id,
@@ -875,7 +872,7 @@ test(
               .readFileSync(enrollment.raw_image_path)
               .subarray(0, 9)
               .toString(),
-            "GAINTENC1",
+            "GAINTENC3",
             "face image must be encrypted at rest",
           );
           ok(
@@ -1606,15 +1603,16 @@ test(
             }),
             400,
           );
-          assert.ok(
-            await bcrypt.compare(
+          assert.equal(
+            (await verifyPassword(
               "Th1rd!Passw0rdX",
               (
                 await one("SELECT password_hash FROM users WHERE id=$1", [
                   firstUser,
                 ])
               ).password_hash,
-            ),
+            )).valid,
+            true,
           );
           await new Promise((resolve) => setTimeout(resolve, 1100));
           const session = ok(

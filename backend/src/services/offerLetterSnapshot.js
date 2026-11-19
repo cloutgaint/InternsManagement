@@ -20,7 +20,12 @@ export function offerSnapshot(offer) {
     issue_at: offer.issue_at ? new Date(offer.issue_at).toISOString() : null,
     rendered_body: rendered.rendered_body, signatory: rendered.signatory,
   };
-  return { ...snapshot, content_sha256: crypto.createHash("sha256").update(JSON.stringify(snapshot)).digest("hex") };
+  const serialized = JSON.stringify(snapshot);
+  return {
+    ...snapshot,
+    content_sha256: crypto.createHash("sha256").update(serialized).digest("hex"),
+    content_sha512: crypto.createHash("sha512").update(serialized).digest("hex"),
+  };
 }
 export function issuedSnapshot(offer) {
   if (offer.issued_snapshot) return offer.issued_snapshot;

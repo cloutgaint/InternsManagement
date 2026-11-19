@@ -88,6 +88,32 @@ export async function readStoredBuffer(reference) {
   return fs.promises.readFile(path.resolve(reference));
 }
 
+export async function replaceStoredBuffer(reference, buffer) {
+  if (!reference) throw Object.assign(new Error("Stored file is unavailable"), { status: 404 });
+  if (isS3Reference(reference)) {
+    const location = parseS3Reference(reference);
+    const encryption = process.env.S3_KMS_KEY_ID
+      ? { ServerSideEncryption: "aws:kms", SSEKMSKeyId: process.env.S3_KMS_KEY_ID }
+      : { ServerSideEncryption: "AES256" };
+    await s3Client().send(new PutObjectCommand({
+      ...location,
+      Body: buffer,
+      ContentType: "application/octet-stream",
+      ...encryption,
+    }));
+    return;
+  }
+  const target = path.resolve(reference);
+  const temporary = `${target}.pq-${crypto.randomUUID()}.tmp`;
+  await fs.promises.writeFile(temporary, buffer, { mode: 0o600 });
+  try {
+    await fs.promises.rename(temporary, target);
+  } catch (error) {
+    await fs.promises.unlink(temporary).catch(() => {});
+    throw error;
+  }
+}
+
 export async function readSecureStoredBuffer(reference) {
   return openBuffer(await readStoredBuffer(reference));
 }

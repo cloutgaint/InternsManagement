@@ -1,5 +1,16 @@
+import { isInternalServiceHost } from "../common/security/internalService.js";
 import { detectFileType } from "../common/storage/secureFiles.js";
 import { readSecureStoredBuffer } from "../common/storage/storage.service.js";
+// Returns the configured anti-spoof threshold in [0, 1], or null when enforcement is off.
+export function antispoofThresholdFromEnv() {
+  const raw = process.env.BIOMETRIC_ANTISPOOF_THRESHOLD?.trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 1)
+    throw new Error("BIOMETRIC_ANTISPOOF_THRESHOLD must be a number between 0 and 1");
+  return value;
+}
+
 export async function verifyAttendanceBiometrics({
   imageData,
   baselineImageData,
@@ -28,7 +39,8 @@ export async function verifyAttendanceBiometrics({
     url.protocol !== "https:" &&
     !(
       url.protocol === "http:" &&
-      ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+      (["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+        isInternalServiceHost(url.hostname))
     )
   )
     return {
@@ -105,22 +117,30 @@ export async function verifyAttendanceBiometrics({
     // matchScore is Human's normalized similarity, where values above 0.5 are considered a match.
     const matchThreshold = Number(process.env.BIOMETRIC_MATCH_THRESHOLD || 0.6);
     const matched = matchScore >= matchThreshold;
-    const live = result.challengePass && livenessScore >= 0.75;
+    // livenessScore is the verifier's passive anti-spoof score for the live frame. It is always
+    // stored with the attendance event, but only enforced once BIOMETRIC_ANTISPOOF_THRESHOLD is set:
+    // the model has not yet been calibrated on real webcam captures, and a guessed threshold would
+    // reject genuine interns. Pick a threshold from the recorded liveness_score values first.
+    const antispoofThreshold = antispoofThresholdFromEnv();
+    const live =
+      result.challengePass &&
+      (antispoofThreshold === null || livenessScore >= antispoofThreshold);
     const reason =
       !matched && !live
-        ? "Face similarity and head-turn verification both failed"
+        ? "Live face did not match the approved registration and looked like a photo or screen"
         : !matched
           ? "Live face did not match the approved registration"
           : !live
-            ? "Head-turn challenge was not verified. Start facing straight ahead, then turn your head in the requested direction."
+            ? "The capture looked like a photo or screen rather than a live face. Retake facing the camera directly in good lighting."
             : null;
     if (process.env.NODE_ENV !== "production")
       console.log("[biometric] attendance decision", {
         matched,
-        challengePass: result.challengePass,
+        live,
         matchScore: Number(matchScore.toFixed(3)),
         matchThreshold,
-        livenessScore,
+        antispoofScore: Number(livenessScore.toFixed(3)),
+        antispoofThreshold: antispoofThreshold ?? "not enforced",
       });
     return {
       ok: matched && live,
