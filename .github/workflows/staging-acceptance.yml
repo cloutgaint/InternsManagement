@@ -1,0 +1,47 @@
+name: Staging acceptance smoke
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: "HTTPS origin of the isolated staging environment (e.g. https://staging.example.com)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: staging-smoke
+  cancel-in-progress: false
+jobs:
+  staging-smoke:
+    name: Read-only HTTPS staging checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate staging target
+        env:
+          STAGING_URL: ${{ inputs.staging_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$STAGING_URL" =~ ^https://[a-zA-Z0-9][a-zA-Z0-9.-]+(:443)?/?$ ]]; then
+            echo "::error::Provide an HTTPS hostname only, without credentials, paths or query parameters."
+            exit 1
+          fi
+          host="${STAGING_URL#https://}"
+          host="${host%%/*}"
+          host="${host%%:*}"
+          if [[ "$host" == "localhost" || "$host" == "127.0.0.1" || "$host" == *.local || "$host" == *.internal ]]; then
+            echo "::error::Staging must have a public HTTPS hostname."
+            exit 1
+          fi
+      - name: Run read-only staging smoke tests
+        env:
+          STAGING_URL: ${{ inputs.staging_url }}
+        run: bash deploy/staging-smoke.sh "$STAGING_URL"
+      - name: Record result
+        if: always()
+        run: |
+          echo '### Staging smoke execution' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Checks: public routes, health, anonymous API access, HSTS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This workflow does not test authenticated workflows, devices, backups, or rollback.' >> "$GITHUB_STEP_SUMMARY"
