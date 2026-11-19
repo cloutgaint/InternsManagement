@@ -11,6 +11,13 @@ if [[ ! "$BASE_URL" =~ ^https://[^/]+/?$ ]]; then
   exit 2
 fi
 BASE_URL="${BASE_URL%/}"
+case "${BASE_URL,,}" in
+  *your-staging-domain.com*|*example.com*|*example.org*|*example.net*)
+    echo "ERROR: This is an example URL, not your deployed staging environment." >&2
+    echo "Deploy staging first, then supply its real HTTPS domain." >&2
+    exit 2
+    ;;
+esac
 echo "Read-only smoke test: $BASE_URL"
 failures=0
 for route in / /login /register /admin /intern /mentor /college-coordinator; do
