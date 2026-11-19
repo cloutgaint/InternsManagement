@@ -7,6 +7,101 @@ on:
 permissions:
   contents: read
 jobs:
+  production-config:
+    name: Production configuration safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate safe production defaults and proxy wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^ALLOW_TEST_MFA_CODE=false
+    name: Frontend lint and production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_URL: /api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - name: Smoke test production Next.js routes
+        run: |
+          npm run start -- --port 3000 > /tmp/skillbridge-next.log 2>&1 &
+          NEXT_PID=$!
+          trap 'kill "$NEXT_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/login; then break; fi
+            sleep 1
+          done
+          for route in / /login /register /admin /intern /mentor /college-coordinator; do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$route")
+            echo "$route -> HTTP $status"
+            test "$status" = 200
+          done
+  backend:
+    name: Backend tests with PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: intern
+          POSTGRES_PASSWORD: intern_ci_password
+          POSTGRES_DB: intern_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U intern -d intern_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://intern:intern_ci_password@localhost:5432/intern_test
+      JWT_SECRET: ci-only-assessment-test-secret
+      RUN_DB_E2E: '1'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run migrate
+      - run: npm test
+  docker:
+    name: Production Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build --build-arg NEXT_PUBLIC_API_URL=/api -t gaint-skillbridge-frontend:ci ./frontend
+      - run: docker build -t gaint-skillbridge-backend:ci ./backend
+ deploy/production.env.example
+          grep -Eq '^[[:space:]]*ALLOW_TEST_MFA_CODE:.*:-false' docker-compose.prod.yml
+          grep -Fq 'NEXT_PUBLIC_API_URL: /api' docker-compose.prod.yml
+          grep -Fq 'handle /api/* {' deploy/Caddyfile
+          grep -Fq 'reverse_proxy backend:8000' deploy/Caddyfile
+          grep -Fq 'reverse_proxy frontend:3000' deploy/Caddyfile
+          if grep -Eq '^([A-Z_]+PASSWORD|JWT_SECRET|FILE_ENCRYPTION_KEY|BIOMETRIC_VERIFY_TOKEN)=.+' deploy/production.env.example; then
+            echo 'Production environment template contains a populated secret-like field'
+            exit 1
+          fi
+          echo 'Production configuration defaults and proxy wiring verified'
   frontend:
     name: Frontend lint and production build
     runs-on: ubuntu-latest
