@@ -33,10 +33,10 @@ router.post("/attendance/manual", async (req, res, next) => {
       if (!allocation) throw fail(409, "No active internship allocation exists for this date");
       if (!(await client.query("SELECT $1::date <= (now() AT TIME ZONE $2)::date AS valid", [input.day, allocation.timezone])).rows[0].valid) throw fail(400, "Future attendance cannot be entered");
       const workday = (await client.query(
-        `SELECT b.working_days @> to_jsonb(extract(dow FROM $2::date)::int) working,
+        `SELECT $4::jsonb @> to_jsonb(extract(dow FROM $2::date)::int) working,
           EXISTS(SELECT 1 FROM holidays h WHERE h.batch_id=$1 AND h.day=$2::date) holiday,
           EXISTS(SELECT 1 FROM leave_requests lr WHERE lr.intern_id=$3 AND lr.status='APPROVED' AND $2::date BETWEEN lr.from_date AND lr.to_date) leave`,
-        [allocation.batch_id, input.day, input.internId],
+        [allocation.batch_id, input.day, input.internId, JSON.stringify(allocation.working_days)],
       )).rows[0];
       if (!workday.working || workday.holiday || workday.leave) throw fail(409, "Attendance cannot be entered on a non-working day, holiday or approved leave");
       const previous = (await client.query("SELECT * FROM attendance_daily WHERE intern_id=$1 AND day=$2::date FOR UPDATE", [input.internId, input.day])).rows[0];
