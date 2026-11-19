@@ -1,6 +1,6 @@
 import { q, pool } from "./common/database/index.js";
 import { hashPassword } from "./common/security/password.js";
-const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || "admin@gaintclout.com")
+const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || "gaintclout@gmail.com")
   .trim()
   .toLowerCase();
 const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || "ChangeMe123!";
