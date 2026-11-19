@@ -14,11 +14,15 @@ export default function AdminAttendancePage() {
     [err, setErr] = useState(""),
     [feedbackArea,setFeedbackArea]=useState("face"),
     [images,setImages] = useState({}),
-    [preview,setPreview] = useState(null);
+    [preview,setPreview] = useState(null),
+    [interns,setInterns] = useState([]),
+    [manual,setManual] = useState({ internId: "", day: "", checkIn: "", checkOut: "", reason: "" }),
+    [savingManual,setSavingManual] = useState(false);
   const [filters, setFilters] = useState({ batchId: "", status: "", from: "", to: "" }),
     [batches, setBatches] = useState([]);
   useEffect(() => {
     api("/admin/batches").then(setBatches).catch((e) => setErr(e.message));
+    api("/admin/interns").then(setInterns).catch((e) => setErr(e.message));
   }, []);
   const load = () =>
     Promise.all([
@@ -80,6 +84,17 @@ export default function AdminAttendancePage() {
       setErr(e.message);
     }
   }
+  async function saveManual(event) {
+    event.preventDefault();
+    setFeedbackArea("manual");setErr("");setMsg("");setSavingManual(true);
+    try {
+      const result = await api("/admin/attendance/manual", { method: "POST", body: JSON.stringify(manual) });
+      setMsg("Manual attendance saved: " + displayLabel(result.status) + ". Duration: " + result.working_minutes + " minutes.");
+      setManual({ internId: "", day: "", checkIn: "", checkOut: "", reason: "" });
+      await load();
+    } catch (e) { setErr(e.message); }
+    finally { setSavingManual(false); }
+  }
   const attendancePageSize = 10;
   const attendanceTotalPages = Math.max(1, Math.ceil(records.length / attendancePageSize));
   const currentAttendancePage = Math.min(attendancePage, attendanceTotalPages);
@@ -127,7 +142,22 @@ export default function AdminAttendancePage() {
           }
           )
         </button>
+        <button type="button" className={tab === "manual" ? "btn" : "btn secondary"} onClick={() => {setTab("manual");setErr("");setMsg("");}}>Manual attendance</button>
       </div>
+      {tab === "manual" && (
+        <section className="card workflow-section">
+          <h2>Manual attendance entry</h2>
+          <p className="muted">For interns unable to log in or complete face verification. Admin verification and a reason are required. Existing attendance must be corrected through Exceptions.</p>
+          <form onSubmit={saveManual} className="form-grid">
+            <label>Intern<select required value={manual.internId} onChange={e=>setManual(v=>({...v,internId:e.target.value}))}><option value="">Select intern</option>{interns.filter(x=>x.account_status!=="DELETED").map(x=><option key={x.id} value={x.id}>{x.full_name} — {x.roll_number}{x.batch_name?" — "+x.batch_name:""}</option>)}</select></label>
+            <label>Attendance date<input type="date" required value={manual.day} onChange={e=>setManual(v=>({...v,day:e.target.value}))}/></label>
+            <label>Check-in time<input type="time" required value={manual.checkIn} onChange={e=>setManual(v=>({...v,checkIn:e.target.value}))}/></label>
+            <label>Check-out time<input type="time" required value={manual.checkOut} onChange={e=>setManual(v=>({...v,checkOut:e.target.value}))}/></label>
+            <label style={{gridColumn:"1 / -1"}}>Reason for manual attendance<textarea required minLength={10} maxLength={1000} rows={3} value={manual.reason} onChange={e=>setManual(v=>({...v,reason:e.target.value}))} placeholder="Describe the login or face-verification issue and how attendance was verified"/></label>
+            <div style={{gridColumn:"1 / -1"}}>{feedbackArea==="manual"&&err&&<p className="error" role="alert">{err}</p>}{feedbackArea==="manual"&&msg&&<p className="success" role="status">{msg}</p>}<button type="submit" className="btn" disabled={savingManual}>{savingManual?"Saving…":"Save manual attendance"}</button></div>
+          </form>
+        </section>
+      )}
       {tab === "faces" && (
         <section className="card workflow-section">{["face","requireReenrollment","deleteFace"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {faces.map((x) => (
