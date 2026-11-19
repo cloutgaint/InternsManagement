@@ -12,11 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Validate safe production defaults and proxy wiring
+      - name: Validate production defaults and proxy wiring
         shell: bash
         run: |
           set -euo pipefail
-          grep -Eq '^ALLOW_TEST_MFA_CODE=false
+          grep -Fxq 'ALLOW_TEST_MFA_CODE=false' deploy/production.env.example
+          grep -Fq 'ALLOW_TEST_MFA_CODE: ${ALLOW_TEST_MFA_CODE:-false}' docker-compose.prod.yml
+          grep -Fq 'NEXT_PUBLIC_API_URL: /api' docker-compose.prod.yml
+          grep -Fq 'handle /api/* {' deploy/Caddyfile
+          grep -Fq 'reverse_proxy backend:8000' deploy/Caddyfile
+          grep -Fq 'reverse_proxy frontend:3000' deploy/Caddyfile
+          if grep -Eq '^(POSTGRES_PASSWORD|JWT_SECRET|FILE_ENCRYPTION_KEY|BIOMETRIC_VERIFY_TOKEN|INITIAL_ADMIN_PASSWORD)=.+' deploy/production.env.example; then
+            echo 'Production environment template has a populated secret'
+            exit 1
+          fi
+          echo 'Production defaults and proxy wiring verified'
+  frontend:
     name: Frontend lint and production build
     runs-on: ubuntu-latest
     defaults:
