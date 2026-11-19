@@ -16,6 +16,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          grep -Fxq 'APP_DOMAIN=skillbridge.gaintclout.com' deploy/production.env.example
           grep -Fxq 'ALLOW_TEST_MFA_CODE=false' deploy/production.env.example
           grep -Fq 'ALLOW_TEST_MFA_CODE: ${ALLOW_TEST_MFA_CODE:-false}' docker-compose.prod.yml
           grep -Fq 'NEXT_PUBLIC_API_URL: /api' docker-compose.prod.yml
