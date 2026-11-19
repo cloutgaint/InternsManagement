@@ -8,6 +8,7 @@ import {
   calculatePerformance,
 } from "../../services/performanceScoreService.js";
 import { Router } from "express";
+import manualAttendanceRoutes from "./manual-attendance.routes.js";
 import rateLimit from "express-rate-limit";
 import batchAllotmentOrders from "./batch-allotment-orders.routes.js";
 import adminWorkflow from "./workflow.routes.js";
@@ -84,6 +85,7 @@ async function notifyMentorAssigned(mentorId, groupId) {
 }
 r.use(auth, permit("ADMIN", "SUPER_ADMIN"));
 r.use(taskPlans);
+r.use(manualAttendanceRoutes);
 r.use(batchAllotmentOrders);
 r.use(adminWorkflow);
 r.use(manualAttendance);
