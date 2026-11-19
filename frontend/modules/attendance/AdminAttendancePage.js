@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
 import { api, apiBlob } from "@/shared/api/client";
+import ManualAttendanceEntry from "./ManualAttendanceEntry";
 const displayLabel = (value) => String(value || "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 export default function AdminAttendancePage() {
   const [faces, setFaces] = useState([]),
@@ -117,6 +118,7 @@ export default function AdminAttendancePage() {
         </div>
       </div>
       <div className="tab-row">
+        <button type="button" className={tab === "manual" ? "btn" : "btn secondary"} onClick={() => {setTab("manual");setErr("");setMsg("");}}>Manual attendance</button>
         <button
           className={tab === "faces" ? "btn" : "btn secondary"}
           onClick={() => setTab("faces")}
@@ -158,6 +160,7 @@ export default function AdminAttendancePage() {
           </form>
         </section>
       )}
+      {tab === "manual" && <ManualAttendanceEntry onSaved={load}/>}
       {tab === "faces" && (
         <section className="card workflow-section">{["face","requireReenrollment","deleteFace"].includes(feedbackArea)&&<>{err&&<p className="error" role="alert">{err}</p>}{msg&&<p className="success" role="status">{msg}</p>}</>}
           {faces.map((x) => (
