@@ -323,9 +323,9 @@ export default function App({ Component, pageProps }) {
         .login-back-bar .page-back-inner{max-width:1000px}
         .page-back-button .back-arrow{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#e5f4eb;color:#087449;flex:none}
         .page-back-button .back-arrow svg{display:block}
-        .login-back-bar .page-back-button{display:inline-flex;align-items:center;gap:9px;min-height:38px;padding:5px 14px 5px 7px;border:1px solid #cde3d5;border-radius:999px;background:#ffffffd9;color:#09583a;font-size:13px;font-weight:750;box-shadow:0 3px 12px #154c3210;transition:background .16s,border-color .16s,transform .16s}
+        .login-back-bar .page-back-button{display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:5px 14px 5px 6px;border:1px solid #d5e4db;border-radius:999px;background:#fff;color:#174d37;font-size:13px;font-weight:750;box-shadow:0 2px 8px #173c280d;transition:background .16s,border-color .16s,box-shadow .16s,transform .16s}
         .login-back-bar .page-back-button .back-arrow{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#e5f4eb;color:#087449;font-size:18px;line-height:1}
-        .login-back-bar .page-back-button:hover{background:#fff;border-color:#8bc6a6;transform:translateX(-2px)}
+        .login-back-bar .page-back-button:hover{background:#f6fbf8;border-color:#a9cdbc;box-shadow:0 4px 12px #173c2814;transform:translateX(-2px)}
         .login-back-bar .page-back-button:focus-visible{outline:3px solid #25865c;outline-offset:2px}
         @media(max-width:640px){.login-back-bar{padding:10px 14px 8px}}
         /* Google-inspired soft surfaces, subtle borders and rounded action geometry. */
@@ -368,23 +368,35 @@ export default function App({ Component, pageProps }) {
         :where(main,form,.card) :is(input,select,textarea):disabled{cursor:not-allowed;opacity:.65}
         .page-back-bar .page-back-button,
         .login-back-bar .page-back-button{
-          background:#2563eb!important;
-          border:1px solid #2563eb!important;
-          color:#fff!important;
-          font-weight:600;
-          box-shadow:0 4px 12px rgba(37,99,235,.16);
+          min-height:40px;
+          padding:5px 14px 5px 6px;
+          gap:9px;
+          background:#fff!important;
+          background-image:none!important;
+          border:1px solid #d5e4db!important;
+          border-radius:999px!important;
+          color:#174d37!important;
+          font-size:13px;
+          font-weight:750;
+          box-shadow:0 2px 8px rgba(23,60,40,.06)!important;
         }
         .page-back-bar .page-back-button .back-arrow,
         .login-back-bar .page-back-button .back-arrow{
-          background:rgba(255,255,255,.18)!important;
-          color:#fff!important;
+          width:28px;
+          height:28px;
+          background:#e8f4ed!important;
+          color:#087149!important;
         }
         .page-back-bar .page-back-button:hover,
         .login-back-bar .page-back-button:hover{
-          background:#1d4ed8!important;
-          border-color:#1d4ed8!important;
-          color:#fff!important;
+          background:#f6fbf8!important;
+          border-color:#a9cdbc!important;
+          color:#0b5d3c!important;
+          box-shadow:0 4px 12px rgba(23,60,40,.09)!important;
+          filter:none;
+          transform:translateX(-2px);
         }
+        .page-back-button svg,.page-back-button svg *{color:inherit!important;stroke:currentColor!important}
         .page-back-bar .page-back-button:focus-visible,
         .login-back-bar .page-back-button:focus-visible{outline:3px solid #bfdbfe;outline-offset:3px}
         .nav-notification-icon {
