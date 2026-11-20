@@ -9,6 +9,7 @@ import adminRoutes from "./routes/admin/index.js";
 import collegeRoutes from "./modules/colleges/college.routes.js";
 import internRoutes from "./routes/intern/index.js";
 import collegeCoordinatorRoutes from "./routes/collegeCoordinator.js";
+import collegeIntakeRoutes from "./routes/collegeIntake.js";
 import mentorRoutes from "./routes/mentor/index.js";
 import kluFortnightRoutes from "./routes/kluFortnight.js";
 import reportBrandAssetsRoutes from "./routes/reportBrandAssets.js";
@@ -41,6 +42,7 @@ export function createApp() {
   app.use("/api/admin", collegeRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/college-coordinator", collegeCoordinatorRoutes);
+  app.use("/api", collegeIntakeRoutes);
   app.use("/api/intern", internRoutes);
   app.use("/api/mentor", mentorRoutes);
   app.use("/api/klu-fortnight", kluFortnightRoutes);
