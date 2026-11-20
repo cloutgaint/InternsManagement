@@ -38,7 +38,7 @@ r.get("/college-coordinator/intake",permit("COLLEGE_COORDINATOR"),college,async(
 r.post("/college-coordinator/intake",permit("COLLEGE_COORDINATOR"),college,upload.array("files",5),async(req,res)=>{
  const {academicYear,department,semester,studentCount,proposedStart,proposedEnd,remarks}=req.body;
  const count=Number(studentCount),start=proposedStart||null,end=proposedEnd||null;
- if(!/^20\d{2}-20\d{2}$/.test(String(academicYear||""))||!String(department||"").trim()||!String(semester||"").trim()||!Number.isInteger(count)||count<1||count>10000||String(remarks||"").length>2000||((start||end)&&(!/^\d{4}-\d{2}-\d{2}$/.test(start||"")||!/^\d{4}-\d{2}-\d{2}$/.test(end||"")||start>end)))return res.status(400).json({error:"Provide academic year, department, semester, valid student count and valid proposed dates"});
+ if(!/^20\d{2}-20\d{2}$/.test(String(academicYear||""))||!String(department||"").trim()||String(department||"").length>1000||String(department||"").split(",").some(d=>!d.trim())||!String(semester||"").trim()||!Number.isInteger(count)||count<1||count>10000||String(remarks||"").length>2000||((start||end)&&(!/^\d{4}-\d{2}-\d{2}$/.test(start||"")||!/^\d{4}-\d{2}-\d{2}$/.test(end||"")||start>end)))return res.status(400).json({error:"Provide academic year, department, semester, valid student count and valid proposed dates"});
  const files=req.files||[];
  if(files.some(f=>!validFile(f)))return res.status(400).json({error:"Unsupported or invalid file. Use PDF, image, XLSX, DOCX, CSV or TXT (10 MB maximum each)."});
  for(const f of files){const scan=await scanBuffer(f.buffer);if(!scan.clean||process.env.NODE_ENV==="production"&&!scan.scanned)return res.status(422).json({error:"Files must pass antivirus scanning before upload"});}
