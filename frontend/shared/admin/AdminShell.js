@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 const groups=[
 ["Overview",[["Dashboard","/admin","dashboard"]]],
-["People",[["Student verification","/admin/verification","users"],["Colleges","/admin/colleges","building"],["Mentors","/admin/mentors","users"]]],
+["People",[["Student verification","/admin/verification","users"],["Colleges","/admin/colleges","building"],["College intake","/admin/college-intake","files"],["Mentors","/admin/mentors","users"]]],
 ["Internship operations",[["Batches","/admin/batches","layers"],["Attendance","/admin/attendance","calendar"],["Leave & holidays","/admin/leave","calendar"],["Projects","/admin/projects","folder"],["Domain master","/admin/domain-master","layers"],["Domain recommendations","/admin/domains","layers"],["Internship management","/admin/work","folder"],["Task plans","/admin/task-plans","check"],["Task schedule","/admin/task-schedule","calendar"],["Tasks","/admin/tasks","check"]]],
 ["Learning & assessments",[["Assessments","/admin/assessments","check"],["Question bank","/admin/questions","files"]]],
 ["Documents & communication",[["Offer letters","/admin/offers","files"],["Documents","/admin/documents","files"],["Notifications","/notifications","bell"]]],
