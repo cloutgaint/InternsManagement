@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS college_intake_requests (
  college_id uuid NOT NULL REFERENCES colleges(id),
  coordinator_id uuid NOT NULL REFERENCES users(id),
  academic_year varchar(20) NOT NULL,
- department varchar(120) NOT NULL,
+ department text NOT NULL,
  semester varchar(60) NOT NULL,
  proposed_start date,
  proposed_end date,
