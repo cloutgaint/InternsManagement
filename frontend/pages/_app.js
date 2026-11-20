@@ -35,7 +35,7 @@ export default function App({ Component, pageProps }) {
     };
   }, [profileOpen]);
   const loggedIn = !!session.token;
-  const coordinatorShell = loggedIn && session.role === "COLLEGE_COORDINATOR" && router.pathname === "/college-coordinator";
+  const coordinatorShell = loggedIn && session.role === "COLLEGE_COORDINATOR" && (router.pathname === "/college-coordinator" || router.pathname.startsWith("/college-coordinator/"));
   const mentorShell = loggedIn && session.role === "MENTOR" && (router.pathname === "/mentor" || router.pathname.startsWith("/mentor/"));
   const internShell = loggedIn && session.role === "INTERN" && (router.pathname === "/intern" || router.pathname.startsWith("/intern/"));
   const adminShell = loggedIn && ["ADMIN","SUPER_ADMIN"].includes(session.role) && (router.pathname === "/admin" || router.pathname.startsWith("/admin/"));
